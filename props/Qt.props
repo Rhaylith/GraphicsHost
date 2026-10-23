@@ -1,0 +1,72 @@
+<Project>
+  <!--
+    Qt 6 from the vcpkg install (dynamic). Replaces the Qt Visual Studio Tools extension: moc is run by Qt.targets,
+    so no extension is needed on a build machine. Import after props/GraphicsHost.props.
+    List the modules a project needs in QtModules (default: Core;Gui;Widgets), e.g. <QtModules>Core;Gui;Widgets;Charts</QtModules>.
+  -->
+  <PropertyGroup>
+    <QtModules Condition="'$(QtModules)'==''">Core;Gui;Widgets</QtModules>
+    <QtIncludeRoot>$(VcpkgInstalled)include\Qt6\</QtIncludeRoot>
+    <QtToolsDir>$(VcpkgInstalled)tools\Qt6\bin\</QtToolsDir>
+    <QtLibDir Condition="'$(Configuration)'=='Debug'">$(VcpkgInstalled)debug\lib\</QtLibDir>
+    <QtLibDir Condition="'$(Configuration)'!='Debug'">$(VcpkgInstalled)lib\</QtLibDir>
+    <QtLibSuffix Condition="'$(Configuration)'=='Debug'">d</QtLibSuffix>
+    <QtLibSuffix Condition="'$(Configuration)'!='Debug'"></QtLibSuffix>
+    <QtMocDir>$(IntDir)moc\</QtMocDir>
+  </PropertyGroup>
+  <ItemGroup>
+    <QtModule Include="$(QtModules)" />
+  </ItemGroup>
+  <!-- properties are evaluated before items, so these are built from the QtModules string, not from @(QtModule) -->
+  <!-- (Replace() cannot be used: it escapes the semicolons it produces, so the list would not split.) -->
+  <PropertyGroup>
+    <QtInc>$(VcpkgInstalled)include\Qt6</QtInc>
+    <QtIncludes>$(QtInc)</QtIncludes>
+    <QtLibs></QtLibs>
+  </PropertyGroup>
+  <PropertyGroup Condition="$(QtModules.Contains('Core'))">
+    <QtIncludes>$(QtIncludes);$(QtInc)\QtCore</QtIncludes>
+    <QtLibs>$(QtLibs);Qt6Core$(QtLibSuffix).lib</QtLibs>
+  </PropertyGroup>
+  <PropertyGroup Condition="$(QtModules.Contains('Gui'))">
+    <QtIncludes>$(QtIncludes);$(QtInc)\QtGui</QtIncludes>
+    <QtLibs>$(QtLibs);Qt6Gui$(QtLibSuffix).lib</QtLibs>
+  </PropertyGroup>
+  <PropertyGroup Condition="$(QtModules.Contains('Widgets'))">
+    <QtIncludes>$(QtIncludes);$(QtInc)\QtWidgets</QtIncludes>
+    <QtLibs>$(QtLibs);Qt6Widgets$(QtLibSuffix).lib</QtLibs>
+  </PropertyGroup>
+  <PropertyGroup Condition="$(QtModules.Contains('Network'))">
+    <QtIncludes>$(QtIncludes);$(QtInc)\QtNetwork</QtIncludes>
+    <QtLibs>$(QtLibs);Qt6Network$(QtLibSuffix).lib</QtLibs>
+  </PropertyGroup>
+  <PropertyGroup Condition="$(QtModules.Contains('Charts'))">
+    <QtIncludes>$(QtIncludes);$(QtInc)\QtCharts</QtIncludes>
+    <QtLibs>$(QtLibs);Qt6Charts$(QtLibSuffix).lib</QtLibs>
+  </PropertyGroup>
+  <PropertyGroup Condition="$(QtModules.Contains('Svg'))">
+    <QtIncludes>$(QtIncludes);$(QtInc)\QtSvg</QtIncludes>
+    <QtLibs>$(QtLibs);Qt6Svg$(QtLibSuffix).lib</QtLibs>
+  </PropertyGroup>
+  <PropertyGroup Condition="$(QtModules.Contains('Concurrent'))">
+    <QtIncludes>$(QtIncludes);$(QtInc)\QtConcurrent</QtIncludes>
+    <QtLibs>$(QtLibs);Qt6Concurrent$(QtLibSuffix).lib</QtLibs>
+  </PropertyGroup>
+  <PropertyGroup Condition="$(QtModules.Contains('Test'))">
+    <QtIncludes>$(QtIncludes);$(QtInc)\QtTest</QtIncludes>
+    <QtLibs>$(QtLibs);Qt6Test$(QtLibSuffix).lib</QtLibs>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(QtIncludes);$(QtMocDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <SDLCheck>false</SDLCheck>
+      <PreprocessorDefinitions>QT_USE_QSTRINGBUILDER;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>$(QtLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>$(QtLibs);%(AdditionalDependencies)</AdditionalDependencies>
+      <SubSystem>Windows</SubSystem>
+      <EntryPointSymbol>mainCRTStartup</EntryPointSymbol>
+    </Link>
+  </ItemDefinitionGroup>
+</Project>

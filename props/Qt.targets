@@ -1,0 +1,39 @@
+<Project>
+  <!--
+    Runs moc for every <QtMoc Include="Header.h" /> item before compiling, and compiles the generated files.
+    Incremental: a header is re-processed only when it is newer than its moc output.
+  -->
+  <Target Name="QtMoc" BeforeTargets="SelectClCompile" Condition="'@(QtMoc)'!=''"
+          Inputs="@(QtMoc)" Outputs="@(QtMoc->'$(QtMocDir)moc_%(Filename).cpp')">
+    <MakeDir Directories="$(QtMocDir)" />
+    <ItemGroup>
+      <QtIncludeDir Include="$(QtIncludes)" />
+    </ItemGroup>
+    <Exec Command="&quot;$(QtToolsDir)moc.exe&quot; --no-notes -DWIN32 -D_WIN32 -DNOMINMAX @(QtIncludeDir->'-I&quot;%(Identity)&quot;', ' ') &quot;%(QtMoc.FullPath)&quot; -o &quot;$(QtMocDir)moc_%(QtMoc.Filename).cpp&quot;" />
+  </Target>
+  <!--
+    Copies the Qt plugins an application needs next to the exe (platforms\qwindows.dll is required to start at all).
+    vcpkg's app-local step already copies the Qt DLLs. Set QtDeploy=false in a project to skip this.
+  -->
+  <PropertyGroup>
+    <QtPluginRoot Condition="'$(Configuration)'=='Debug'">$(VcpkgInstalled)debug\Qt6\plugins\</QtPluginRoot>
+    <QtPluginRoot Condition="'$(Configuration)'!='Debug'">$(VcpkgInstalled)Qt6\plugins\</QtPluginRoot>
+  </PropertyGroup>
+  <Target Name="QtDeployPlugins" AfterTargets="Build" Condition="'$(QtDeploy)'!='false' And '$(ConfigurationType)'=='Application'">
+    <ItemGroup>
+      <QtPluginFile Include="$(QtPluginRoot)platforms\qwindows*.dll;$(QtPluginRoot)platforms\qoffscreen*.dll" Dest="platforms" />
+      <QtPluginFile Include="$(QtPluginRoot)styles\*.dll" Dest="styles" />
+      <QtPluginFile Include="$(QtPluginRoot)imageformats\*.dll" Dest="imageformats" />
+      <QtPluginFile Include="$(QtPluginRoot)iconengines\*.dll" Dest="iconengines" />
+    </ItemGroup>
+    <Copy SourceFiles="@(QtPluginFile)" DestinationFolder="$(OutDir)%(QtPluginFile.Dest)" SkipUnchangedFiles="true" />
+  </Target>
+  <Target Name="QtAddMocSources" BeforeTargets="SelectClCompile" DependsOnTargets="QtMoc" Condition="'@(QtMoc)'!=''">
+    <ItemGroup>
+      <ClCompile Include="@(QtMoc->'$(QtMocDir)moc_%(Filename).cpp')">
+        <WarningLevel>Level3</WarningLevel>
+        <ObjectFileName>$(IntDir)moc_%(Filename).obj</ObjectFileName>
+      </ClCompile>
+    </ItemGroup>
+  </Target>
+</Project>
