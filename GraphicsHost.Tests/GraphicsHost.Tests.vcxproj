@@ -56,6 +56,7 @@
     <ClCompile Include="ModelManagerTests.cpp" />
     <ClCompile Include="FitEstimatorTests.cpp" />
     <ClCompile Include="LoadAdviceTests.cpp" />
+    <ClCompile Include="PresetTests.cpp" />
     <ClInclude Include="ModelFixture.h" />
     <ClInclude Include="TestUtil.h" />
   </ItemGroup>

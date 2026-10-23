@@ -336,7 +336,7 @@ Goal: retire the biggest risk (§10) before any application code exists.
 - [x] 2.8 Fit estimator v1 (weights + VAE + activations at W×H×batch) with the low-VRAM suggestions (`vae_tiling`, `offload_params_to_cpu`) (M) — `engine/FitEstimator`: constants calibrated on 9 measured runs (`docs/vram-measurements.md`, `tools/measure-vram.ps1`); suggests offload and flash attention (found: SD1.5 at 768 is 5x faster with it); auto falls back to CPU, an explicit GPU never does; 12 test cases
 - [x] 2.9 CPU→Vulkan fallback *offer* on load failure; error codes and the exit-code table (S) — `engine/LoadAdvice` (offers offload, then CPU; never retries by itself), `cli::exitCodeFor` maps `EngineErrorCode` to the exit-code table; 5 test cases. The CLI prints the offers in 2.10
 - [ ] 2.10 CLI verbs `gen`, `ls`, `load`/`unload`/`ps`, `hardware`, `config`, `--json` (M)
-- [ ] 2.11 Per-model defaults and presets (files, live reload) (S)
+- [x] 2.11 Per-model defaults and presets (files, live reload) (S) — `presets/PresetStore` (files re-read on every call = live reload, safe names, validation incl. field paths, import/export) and `ModelDefaultsStore` (per checkpoint file name), `layerRequest/layerLoadOptions` (model defaults < preset < explicit); 8 test cases. CLI `preset` verbs come with 2.10
 
 **Exit:** `graphicshost gen "a lighthouse" --model sd15 --steps 20 --seed 1` writes an image on CPU and on AMD Vulkan; cancel works; the engine integration test passes.
 
