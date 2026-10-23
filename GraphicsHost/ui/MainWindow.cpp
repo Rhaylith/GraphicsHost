@@ -1,6 +1,8 @@
 #include "MainWindow.h"
 
+#include "DiscoverTab.h"
 #include "GenerateTab.h"
+#include "ModelsTab.h"
 #include "UiUtil.h"
 #include "core/Log.h"
 #include "host/AppHost.h"
@@ -70,8 +72,13 @@ void MainWindow::buildTabs() {
     generate_ = new GenerateTab(host_, tabs_);
     tabs_->addTab(generate_, tr("Generate"));
     placeholder(tr("Gallery"), tr("The gallery arrives in phase 5."));
-    placeholder(tr("My Models"), tr("The model library arrives in step 4.8."));
-    placeholder(tr("Discover"), tr("Model discovery and downloads arrive in step 4.8."));
+    auto* models = new ModelsTab(host_, tabs_);
+    tabs_->addTab(models, tr("My Models"));
+    auto* discover = new DiscoverTab(host_, tabs_);
+    tabs_->addTab(discover, tr("Discover"));
+    connect(models, &ModelsTab::modelsChanged, generate_, &GenerateTab::refreshLists);
+    connect(discover, &DiscoverTab::modelsChanged, generate_, &GenerateTab::refreshLists);
+    connect(discover, &DiscoverTab::modelsChanged, models, &ModelsTab::refresh);
     placeholder(tr("Settings"), tr("Settings arrive in step 4.9."));
     placeholder(tr("Logs"), tr("The log arrives in step 4.9."));
 }

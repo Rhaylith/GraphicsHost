@@ -36,6 +36,12 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="ui\MainWindow.cpp" />
     <ClCompile Include="ui\UiUtil.cpp" />
+    <ClCompile Include="ui\ModelsTab.cpp" />
+    <ClInclude Include="ui\ModelsTab.h" />
+    <QtMoc Include="ui\ModelsTab.h" />
+    <ClCompile Include="ui\DiscoverTab.cpp" />
+    <ClInclude Include="ui\DiscoverTab.h" />
+    <QtMoc Include="ui\DiscoverTab.h" />
     <ClCompile Include="ui\GenerateTab.cpp" />
     <ClInclude Include="ui\GenerateTab.h" />
     <QtMoc Include="ui\GenerateTab.h" />

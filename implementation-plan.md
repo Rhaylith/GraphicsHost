@@ -367,7 +367,8 @@ Goal: retire the biggest risk (§10) before any application code exists.
   - `tools/ui-shots.ps1` saves a picture of every tab (offscreen) for checking layouts. Single instance and the tray are not exercised by an automated check (they need a real desktop).
 - [x] 4.7 Qt **Generate** tab: prompt boxes, parameter panel with interface-mode gating, model/device picker, live progress and preview, results, context menus (L)
   - Auto fields show the model default ("Auto (512)"); the load checkboxes are tri-state (partly filled = the model default). Loading runs off the UI thread. Checked with `tools/ui-shots.ps1`-style runs: `--screenshot-dir <dir> --generate-prompt <text>` generates a small image first (needs a model in the data folder).
-- [ ] 4.8 Qt **My Models** and **Discover** tabs, download queue (L)
+- [x] 4.8 Qt **My Models** and **Discover** tabs, download queue (L)
+  - My Models: table of the folder (watcher + rescan), load/unload (off the UI thread), defaults editor, delete, open folder. Discover: catalog with fit hints, Hugging Face search + file list, a confirmation with the plan before anything downloads, a download queue with pause/resume/cancel. The Hugging Face client is built in one place now (`makeConfiguredHub`). Load and download clicks were not driven by an automated UI test; the services behind them are covered by the API and model-service tests.
 - [ ] 4.9 Qt **Settings** tab (server, tokens, runtime/backend, GPU device, models folder) and **Logs** tab (M)
 - [ ] 4.10 Browser UI: embedded static files served at `/`, with Generate, Gallery, My Models, Discover and Settings against `/api/v1` (L)
 - [ ] 4.11 API contract tests (server on an ephemeral port) and UI smoke checks (M)

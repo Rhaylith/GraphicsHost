@@ -16,10 +16,7 @@ namespace fs = std::filesystem;
 
 namespace {
 
-models::HuggingFace makeHub() {
-    const char* url = std::getenv("GRAPHICSHOST_HUB_URL");   // tests and mirrors
-    return models::HuggingFace(core::huggingFaceToken().value_or(std::string()), url && *url ? url : "https://huggingface.co");
-}
+models::HuggingFace makeHub() { return models::makeConfiguredHub(); }
 
 models::HardwareBudget budget(host::AppHost& host) {
     const auto* runtime = host.selectedRuntime();

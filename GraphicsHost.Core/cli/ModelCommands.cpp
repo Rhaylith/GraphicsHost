@@ -37,9 +37,7 @@ std::string hubUrl() {
     return hub && *hub ? hub : "https://huggingface.co";
 }
 
-HuggingFace makeHub() {
-    return HuggingFace(core::huggingFaceToken().value_or(std::string()), hubUrl());
-}
+HuggingFace makeHub() { return makeConfiguredHub(); }
 
 HardwareBudget budget(host::AppHost& host) {
     const auto* runtime = host.selectedRuntime();
