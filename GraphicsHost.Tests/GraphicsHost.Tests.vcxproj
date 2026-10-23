@@ -67,6 +67,8 @@
     <ClCompile Include="FitHintTests.cpp" />
     <ClCompile Include="ModelUpdatesTests.cpp" />
     <ClCompile Include="CliModelTests.cpp" />
+    <ClCompile Include="ApiServerTests.cpp" />
+    <ClInclude Include="ApiTestUtil.h" />
     <ClInclude Include="TestHttpServer.h" />
     <ClInclude Include="SafetensorsFixture.h" />
     <ClInclude Include="ModelFixture.h" />
