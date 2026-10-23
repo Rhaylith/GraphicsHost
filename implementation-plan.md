@@ -1,0 +1,371 @@
+# GraphicsHost — implementation plan (C++)
+
+A local **image-generation host**, modelled on [LLMHost](../LLMHost/README.md): one native executable that discovers and
+downloads models, runs them in-process on **CPU or GPU (Vulkan)**, exposes one standard set of generation parameters, and
+serves them through a desktop window, a CLI and an HTTP API.
+
+LLMHost is C# (LLamaSharp over llama.cpp). Here the whole program is **C++20**, which removes the wrapper layer: we link
+**stable-diffusion.cpp** (the ggml-based sibling of llama.cpp) directly and call its C API.
+
+Effort: **S** ≤ 2 d · **M** 3–5 d · **L** 6–10 d · **XL** > 10 d (one engineer, includes tests).
+
+---
+
+## 1. What we copy from LLMHost, and what changes
+
+| Concern | LLMHost | GraphicsHost (C++) |
+|---|---|---|
+| Engine | llama.cpp via LLamaSharp (P/Invoke) | **stable-diffusion.cpp** linked directly (`stable-diffusion.h`), built from source with ggml CPU + Vulkan |
+| Model format | GGUF | GGUF first; also `.safetensors` / `.ckpt` single-file checkpoints, which stable-diffusion.cpp reads and can quantise |
+| Model families | chat LLMs | **v1: SD 1.x and SDXL (incl. Turbo/Lightning) only**, plus VAE, LoRA. SD3 / FLUX are post-v1 |
+| Output | token stream | PNG images + progress callbacks per sampling step |
+| UI | WinForms + WebView2 + web UI | **Qt 6 Widgets desktop UI + a browser UI** served by the built-in HTTP server |
+| Hardware (v1) | CPU or Vulkan (AMD, NVIDIA, Intel) | **CPU and Vulkan on AMD only.** Other vendors may work but are not tested or supported |
+| API | ASP.NET minimal API (OpenAI / Anthropic / native) | C++ HTTP server: OpenAI `/v1/images/generations` + `/v1/images/edits`, plus native `/api/v1` |
+| Discovery | `catalog.json` + Hugging Face search | same, filtered to diffusion models (§6) |
+
+### Why C++ simplifies the engine, and what it costs
+
+- **Gain:** no binding question. No marshalling, no wrapper lagging behind upstream; we can track stable-diffusion.cpp
+  master, use its progress/log callbacks directly, and compile exactly the ggml backends we want.
+- **Cost:** we own the build (MSBuild projects for ggml, Vulkan shader compilation with `glslc`), memory safety, and every piece LLMHost got for
+  free from the .NET BCL and ASP.NET (HTTP, JSON, async, DI, settings binding). Those are covered by libraries in §2.
+
+---
+
+## 2. Toolchain, build and dependencies
+
+- **Language / compiler:** C++20, MSVC from Visual Studio 2026, `/W4 /permissive-`, x64 only (ARM64 later).
+- **Build system: Visual Studio 2026 solution and project files, no CMake.** `GraphicsHost.slnx` holds MSBuild `.vcxproj`
+  projects (§3 lists them). The empty C# WPF project currently in this repo is removed in Phase 1.
+- **Packages:** **vcpkg in manifest mode** (`vcpkg.json` at the repo root, `vcpkg integrate install` once). All vcpkg
+  libraries are **dynamic**: the stock triplet `x64-windows` (DLLs, dynamic CRT `/MD`), with no custom triplet. The complete
+  package list is in §11. A vcpkg checkout already exists at `D:\code\vcpkg`.
+- **Deployment consequence of all-dynamic.** The vcpkg DLLs (OpenSSL, curl, libpng, spdlog, SQLite, …) and the Qt DLLs ship
+  next to `GraphicsHost.exe`. vcpkg's MSBuild integration copies the DLLs to the output folder on build
+  (`VcpkgApplocalDeps`); `windeployqt` adds the Qt plugins. The installer (Phase 6) packages that folder, plus the VC++
+  Redistributable or an app-local copy. This also keeps Qt LGPL-compliant.
+- The `sd-*.dll` runtimes are separate DLLs by design. They expose a plain C ABI and link ggml/stable-diffusion statically
+  (our own `.vcxproj` static libs), so they do not need the vcpkg DLLs.
+- **Qt in MSBuild:** use the **Qt Visual Studio Tools** extension, which runs `moc`, `uic`, `rcc` and `lupdate` as normal MSBuild
+  steps and points the project at the vcpkg Qt (`QtInstall` = `D:\code\vcpkg\installed\x64-windows`). The alternative, plain
+  custom build steps calling `moc.exe`, works but is more to maintain.
+- **stable-diffusion.cpp is not consumed through vcpkg.** It is a pinned git submodule (`extern/stable-diffusion.cpp`, with its
+  `ggml` submodule), compiled by our own `ggml.vcxproj` + `stable-diffusion.vcxproj` (static libraries). This is the hard part
+  of choosing MSBuild over CMake: ggml's Vulkan backend needs shader sources compiled at build time. See the Phase 0 spike and
+  the first risk in §10.
+
+| Need | Source | Notes |
+|---|---|---|
+| Diffusion engine | **stable-diffusion.cpp** submodule, pinned commit | ggml CPU backend always, ggml-vulkan for the GPU runtime |
+| Vulkan build tools | Vulkan SDK **or** vcpkg `shaderc` | `glslc` compiles ggml's `.comp` shaders; runtime needs only the AMD driver (Adrenalin) |
+| Everything else | vcpkg packages | §11 |
+
+- **Backends shipped as separate DLLs** (the C++ equivalent of LLMHost's separate CPU/Vulkan native folders):
+  `sd-cpu-avx2.dll`, `sd-cpu-noavx.dll` and `sd-vulkan.dll` (AVX-512 optional later), each exporting the same small C ABI
+  (`gh_load`, `gh_generate`, `gh_free`, …) implemented by a thin shim around `stable-diffusion.h`. The host loads exactly one
+  with `LoadLibrary` at startup. This keeps the host independent of ggml's CPU-feature selection and lets a user-installed
+  newer runtime replace a bundled one without recompiling the app. Each is its own `.vcxproj` using the same shim source with
+  different preprocessor defines.
+- **Error policy:** exceptions inside our code, `noexcept` C ABI at the DLL boundary (errors returned as codes + message).
+  RAII everywhere; no raw `new`/`delete`. Run MSVC `/analyze`, clang-tidy, and AddressSanitizer builds in CI.
+
+---
+
+## 3. Architecture
+
+```
+GraphicsHost/
+├─ GraphicsHost.slnx, vcpkg.json, Directory.Build.props   shared C++20 / warning / vcpkg settings
+├─ extern/stable-diffusion.cpp          pinned submodule (+ ggml)
+├─ ggml/                 ggml.vcxproj            static lib: ggml core + CPU backend (+ Vulkan backend, shader step)
+├─ sdcpp/                stable-diffusion.vcxproj static lib
+├─ runtime/              sd-cpu-avx2 / sd-cpu-noavx / sd-vulkan .vcxproj -> sd-*.dll   (only code that includes ggml headers)
+├─ GraphicsHost/         GraphicsHost.vcxproj    the application (Qt Widgets, CLI, server) - single exe
+│  ├─ core/      settings, paths, logging, migrations, hardware, AppHost (composition root)
+│  ├─ engine/    IImageEngine, RuntimeLoader, GpuDevices, ModelManager, JobQueue, FitEstimator
+│  ├─ models/    Catalog, HuggingFace, DownloadManager, ModelLibrary, ModelCard, Gguf/Safetensors readers
+│  ├─ server/    HTTP routes, auth, request log, metrics, static web UI hosting
+│  ├─ cli/       verbs, --json, exit codes
+│  ├─ ui/        Qt desktop application (view models + views)
+│  └─ web/       browser UI (HTML/CSS/JS), embedded as resources
+└─ GraphicsHost.Tests/   GraphicsHost.Tests.vcxproj   unit / api / integration (Catch2)
+```
+
+- **One process, one engine host.** UI, CLI and HTTP server all call the same services from `AppHost`; nothing UI-specific
+  lives below `ui/`.
+- **Threading model:** one **engine thread per loaded model** (stable-diffusion.cpp contexts are not thread-safe); a
+  `JobQueue` feeds it (FIFO, cancellation token, progress callback). HTTP handlers and UI never call into the engine
+  directly. A small `asio`-style thread pool (or `std::jthread` + a work queue) serves HTTP and downloads.
+- **Cancellation:** the shim checks an atomic flag in the sampling-step callback, so Cancel takes effect at the next step.
+
+---
+
+## 4. Engine layer (hosting + Vulkan/CPU)
+
+**Reference:** LLMHost `Inference/ModelRuntime.cs`, `ModelManager.cs`, `NativeBackend.cs`, `RuntimeManager.cs`, `GpuDevices.cs`.
+
+```cpp
+struct LoadOptions;          // see below
+struct GenerationRequest;    // §5
+struct GenerationResult { std::vector<Image> images; std::vector<int64_t> seeds; std::vector<std::string> warnings; Timings t; };
+
+class ILoadedModel {
+public:
+    virtual ~ILoadedModel() = default;
+    virtual const ModelInfo& info() const = 0;
+    virtual GenerationResult generate(const GenerationRequest&, ProgressSink&, std::stop_token) = 0;
+};
+class IImageEngine {
+public:
+    virtual std::unique_ptr<ILoadedModel> load(const LoadOptions&, std::stop_token) = 0;
+};
+```
+
+- **`LoadOptions`** (per load): model path, optional VAE / CLIP-L / CLIP-G / T5 paths (resolved from the model card, §6),
+  `device` (`cpu` | `vulkan:<index>`), `threads`, `weight_type` override (quantise on load: f16, q8_0, q5_0, q4_0),
+  `vae_tiling`, `clip_on_cpu`, `vae_on_cpu`, `offload_params_to_cpu` (low-VRAM mode), `flash_attention`, LoRA directory,
+  idle-unload TTL.
+- **Runtime selection (CPU vs Vulkan).** `RuntimeLoader` enumerates bundled + user-installed runtime folders, marks
+  compatibility (CPUID for AVX/AVX2/AVX-512; Vulkan loader + a usable device for GPU), persists the choice, applies it on the
+  next start. Setting `backend = auto | vulkan | cpu`; `auto` = Vulkan if a usable device exists, else CPU.
+- **GPU discovery.** `GpuDevices` calls `vkEnumeratePhysicalDevices` / `vkGetPhysicalDeviceMemoryProperties` (and DXGI for live
+  VRAM use on Windows) to list name, vendor, VRAM; feeds the device picker, the hardware monitor and `FitEstimator`.
+- **Fit estimation.** Weights + text encoders + VAE + activation memory at the requested width × height × batch; warn before
+  loading ("fits VRAM" / "needs offload" / "CPU only, expect minutes").
+- **Fallback.** If a Vulkan load fails (OOM, driver), *offer* a retry on CPU; never switch silently; log the native error.
+- **Several models at once** (only if memory allows), JIT load with eviction and idle TTL (LLMHost §6.1 behaviour). Default: one loaded model, the
+  previous one evicted, because image models are large.
+- **v1 hardware scope:** CPU and **Vulkan on AMD** only. `GpuDevices` still lists every Vulkan device, but non-AMD devices are
+  labelled "unsupported in this version" and `backend = auto` never picks them. No ROCm/HIP/CUDA anywhere. Test on at least
+  one RDNA card and, if available, one older GCN card, plus the integrated Radeon in APUs (shared memory: VRAM numbers
+  from Vulkan heaps are misleading there, so `FitEstimator` treats an iGPU's budget as a fraction of system RAM).
+- **Risks:** ggml Vulkan behaviour differs per driver (AMD Adrenalin vs. Mesa is out of scope on Windows); CPU is slow for
+  SDXL. Both go on the model card as "expected speed". SDXL at 1024² on a card with < 8 GB VRAM needs `vae_tiling` and
+  `offload_params_to_cpu`; the fit estimator proposes them automatically.
+
+**Effort:** L.
+
+---
+
+## 5. Standard parameter set
+
+One `GenerationRequest` struct, independent of model family and API. Fields a family does not support are ignored and reported
+in `warnings`.
+
+| Group | Parameter | Notes |
+|---|---|---|
+| Core | `prompt`, `negative_prompt` | Turbo-style SDXL models use CFG ~1 and ignore it |
+| | `width`, `height` | multiples of 8 (validated); defaults per family |
+| | `steps`, `cfg_scale` | defaults from the model card |
+| | `seed` (−1 = random), `batch_count` (`n`) | the returned seed is always the real one |
+| Sampler | `sampler` | euler, euler_a, heun, dpm2, dpm++2s_a, dpm++2m, dpm++2mv2, lcm, ipndm, … |
+| | `scheduler` | discrete, karras, exponential, ays, gits, … |
+| | `clip_skip` | |
+| Image-to-image | `init_image`, `strength`, `mask_image` | inpainting |
+| Extras | `loras: [{name, weight}]` | also parsed from `<lora:name:0.8>` in the prompt |
+| | `control_image`, `control_strength` | ControlNet, phase 5 |
+| | `vae_tiling`, `upscale` | ESRGAN upscaler optional, phase 5 |
+| Output | `format` (png / jpeg / webp), `embed_metadata` | PNG text chunk with the full parameter set so any image can be re-created |
+| Safety | `safety_filter` (bool) | optional; **off by default** (setting `safety.enabled`, overridable per request). See §7 |
+
+**Plumbing** (copy LLMHost `docs/adding-options.md`): declare in the struct → validator returning `{field, message}` list →
+per-model defaults → presets → JSON (de)serialisation (`to_json`/`from_json` in one place) → API mapping → CLI flag → UI
+parameter panel → tests. Write the checklist as `docs/adding-options.md` in Phase 1. Each option carries an interface-mode
+tag (User / Power user / Developer) so advanced samplers and offload switches can be hidden.
+
+**Effort:** M.
+
+---
+
+## 6. Settings, storage, model discovery and download
+
+### Settings and storage
+**Reference:** LLMHost `Core/Settings.cs`, `Migrations.cs`, `SettingsValidator.cs`, `PresetFiles.cs`.
+
+- `%USERPROFILE%\.graphicshost\`: `settings.json` (with `schemaVersion` + a migration list, backups `.bak-vN`, from day
+  one), `presets/*.json`, `model-defaults.json`, `runtimes/`, `logs/`, `outputs/YYYY/MM/DD/*.png`.
+- Files are written atomically (write temp + `MoveFileEx` replace); config reads tolerate unknown keys.
+- **Gallery store:** every image stored with its parameters (PNG text chunk + sidecar JSON); UI gallery, "reuse settings" and
+  API history read this one source. Index in SQLite (`sqlite3` via vcpkg) so search by prompt is fast.
+- Presets: named `GenerationRequest` templates, live reload (directory watcher), import/export.
+
+### Discovery and download
+**Reference:** LLMHost `Models/Catalog.cs`, `catalog.json`, `HuggingFace.cs`, `DownloadManager.cs`, `ModelLibrary.cs`,
+`ModelDirectories.cs`, `Gguf.cs`, `ModelCard.cs`, `ModelUpdates.cs`.
+
+- **Library scan.** Watch model folders (`publisher/repo/file` layout). Detect family from metadata: GGUF header reader
+  (port `Gguf.cs`), and for `.safetensors` parse the 8-byte-length-prefixed JSON header for tensor names/shapes to tell SD1.5 /
+  SDXL apart (SD3 / FLUX are only detected, to report "not supported in this version"). Result: a `ModelCard` with family, default size/steps/cfg/sampler and required companions.
+  Files are memory-mapped (`CreateFileMapping`) for the header read only.
+- **Companion files.** Some SD1.5/SDXL checkpoints need a separate VAE (e.g. an fp16-safe SDXL VAE). The card lists it; the
+  library resolves it and **downloads it together with the main model** (the equivalent of LLMHost's auto-fetched `mmproj`).
+  The mechanism is general, so FLUX/SD3 text encoders can be added after v1.
+- **Curated catalog** (`catalog.json` embedded as a resource, dated): `key`, `family`, `repo`, `file`, `quant`,
+  `companions[]`, `tags` (`txt2img`, `fast`, `inpaint`, `sd15`, `sdxl`…), approximate size, minimum VRAM, licence note.
+- **Live Hugging Face search** (automatic discovery): HF API for repos tagged `text-to-image` that contain GGUF or
+  safetensors diffusion files; filter by family, size, "fits this GPU/RAM"; sort by downloads/likes; show licence and gating.
+- **Gated models:** HF-token + accept-terms flow (token kept in Windows Credential Manager, not in `settings.json`).
+- **Downloads.** Port `DownloadManager` onto libcurl: HTTP range resume, queue, pause/resume, free-space check, SHA-256,
+  split files, progress events to UI/CLI/API.
+- **Update check** against the repo's latest revision (`ModelUpdates.cs`).
+- **First run wizard:** survey hardware (GPU, VRAM, RAM, AVX), recommend a model that fits.
+
+**Effort:** M (settings/storage) + L (models).
+
+---
+
+## 7. API surface
+
+**Reference:** LLMHost `Server/ApiServer.cs`, `ApiAuth.cs`, `NativeApi.cs`, `NetworkSecurity.cs`.
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /v1/images/generations` | OpenAI-compatible: `prompt`, `n`, `size` ("1024x1024"), `response_format` (`b64_json`/`url`); our extra parameters accepted as top-level fields |
+| `POST /v1/images/edits` | img2img / inpainting (multipart `image`, `mask`) |
+| `GET /v1/models` | loaded and installed image models |
+| `POST /api/v1/generate` | native: full parameter set, returns a job id; `GET /api/v1/jobs/{id}` (poll), `/stream` (SSE step progress), `DELETE` cancels |
+| `GET/POST /api/v1/models`, `/load`, `/unload` | library; load/unload with `LoadOptions` |
+| `GET/POST /api/v1/downloads`, `GET /api/v1/discover` | catalog, HF search, queue downloads |
+| `GET /api/v1/gallery`, `GET /outputs/...` | history and image files |
+| `GET /metrics`, `GET /api/requests` | Prometheus text + request log |
+
+Hardening as in LLMHost: API tokens with permissions (stored hashed), localhost-only by default, `--lan`, optional HTTPS
+(OpenSSL; generated self-signed or user certificate), IP allow-list, body-size and rate limits, JIT load policy. Request bodies
+are size-capped *before* parsing, since base64 images are large.
+
+**Safety filter (optional, off by default).** A post-generation classifier hook (`ISafetyFilter`) that runs on each output
+image when `safety.enabled` is true or the request sets `safety_filter: true`. Flagged images are replaced by a blurred
+placeholder and the result carries `"safety": {"flagged": true}`. The classifier is a small ONNX/ggml model downloaded on
+first enable (not bundled); the interface exists in v1 and the first implementation is picked in Phase 5. Because it is off
+by default, no v1 path depends on it.
+
+**Browser UI.** The same server hosts the web UI at `/` (embedded static files, vanilla HTML/CSS/JS with no build step or
+CDN, so it works offline and over LAN). It talks only to `/api/v1` (the same endpoints the Qt UI's services use) and covers
+the Generate, Gallery, My Models, Discover, and Settings tabs with feature parity as the goal; the first release may omit
+inpaint-mask drawing. The server is localhost-only unless `--lan` is set, and the browser UI uses the same tokens as the API.
+
+**Effort:** L.
+
+---
+
+## 8. Desktop UI
+
+**Qt 6 Widgets** (decided), dynamically linked for LGPL compliance (ship the licence texts, no static Qt). Charts for the
+hardware monitor use **Qt Charts**; the gallery uses a `QListView` with a lazy thumbnail model; context menus are plain
+`QMenu`. UI code stays in `ui/` behind view-model-style classes, and the browser UI (§7) is a second client of the same
+services, so features are built as services first and screens second. Qt's event loop runs on the main thread; engine,
+download and server callbacks post to it with `QMetaObject::invokeMethod`.
+
+| Tab | Contents |
+|---|---|
+| **Generate** | Prompt + negative prompt, parameter panel (mode-gated), model + device picker, Generate/Cancel, live step progress and preview, result grid, batch, "send to img2img", seed lock, save/copy/open folder, context menus on images |
+| **Gallery** | Thumbnails (lazy model/view), search by prompt, "reuse parameters", delete, export |
+| **My Models** | Library with family/size/fit badges, load dialog (`LoadOptions`), per-model defaults, companion-file status, disk usage, folders, import |
+| **Discover** | Catalog + live HF search, filters, fit hints, gated flow, download queue |
+| **Requests / Logs** | API request log, application log with level filter |
+| **Settings** | Server (port, LAN, tokens, HTTPS), runtimes + backend `auto/vulkan/cpu`, GPU device, hardware monitor graphs (GPU util / VRAM), interface mode, theme, models folder |
+
+Also: tray icon, single instance (named mutex), remembered window state, light/dark/accent themes, all strings through
+Qt's translation system from the start.
+
+**Effort:** XL.
+
+---
+
+## 9. CLI
+
+`graphicshost` with LLMHost's conventions: `--json`, `--quiet`, and the same exit-code table (0 ok, 1 failure, 2 usage,
+3 not found, 4 not authorised, 5 server unreachable, 6 out of memory, 7 cancelled, 8 conflict). Console build as a second
+executable (`graphicshost.com`-style) or `AttachConsole` in the GUI exe so output reaches the terminal.
+
+Verbs: `catalog`, `search`, `get`, `downloads`, `ls`, `load` / `unload` / `ps`, `gen "<prompt>" [--model --steps --seed --size …]`,
+`serve`, `daemon` (Windows service via the SCM API), `preset`, `config`, `token`, `runtime`, `hardware`, `log`.
+No verb = open the desktop window with the API running.
+
+**Effort:** M.
+
+---
+
+## 10. Phasing, testing and decisions
+
+| Phase | Deliverable | Effort |
+|---|---|---|
+| **0 Spike** | `ggml.vcxproj` + `stable-diffusion.vcxproj` build with the Vulkan backend (shader compile step solved without CMake); generate one SD1.5 and one SDXL image from a console `main()` on **CPU and on an AMD GPU**; record timings and VRAM use | M |
+| **1 Foundations** | Remove C# project, `.slnx`/`.vcxproj` set + `Directory.Build.props`, vcpkg manifest, Qt VS Tools, `AppHost`, settings + migrations, logging, hardware/GPU info, runtime DLL shim + `RuntimeLoader`, `docs/adding-options.md`, CI | M |
+| **2 Engine** | `IImageEngine`, load/unload, `GenerationRequest` + validator, job queue, progress/cancel, PNG metadata, gallery store. CLI `gen` works end to end | L |
+| **3 Models** | (SD1.5 + SDXL only) Library scan + family detection, catalog, HF discovery, libcurl downloader, companion resolution, fit estimator | L |
+| **4 API + UI** | OpenAI/native endpoints, tokens; Qt Generate, My Models, Discover, Settings; browser UI for the same tabs | XL |
+| **5 Depth** | img2img/inpaint, LoRA, ControlNet, upscaler, presets, gallery tab, multi-model, hardware monitor | L |
+| **6 Polish** | First-run wizard, themes/interface modes, HTTPS/limits, installer (WiX/MSIX), auto-update, notifications | L |
+
+**Tests** (Catch2, run from Test Explorer; tags `[unit]`, `[api]`, `[integration]`): validators, JSON round-trips, family detection from
+header fixtures, catalog parsing, download resume against a local test server, API contract tests (HTTP server started on an
+ephemeral port), and an integration test that generates a 256×256 image on CPU with a tiny fixture model (skipped when
+absent). An opt-in Vulkan test checks only that an image of the right size returns (outputs differ between backends).
+CI builds with `/analyze`, clang-tidy and an ASan configuration.
+
+### Risks specific to C++
+
+- ggml/stable-diffusion.cpp API changes often → pin a commit, wrap it only in `runtime/`, upgrade deliberately.
+- **ggml's Vulkan shaders have no MSBuild path upstream.** The Vulkan backend normally generates its shader sources through
+  CMake (`vulkan-shaders-gen`). Phase 0 must solve this: build `vulkan-shaders-gen` as its own `.vcxproj`, run it from a
+  pre-build step with `glslc`, and add the generated sources to `ggml.vcxproj`. If that proves too fragile, the fallback is to
+  use prebuilt Vulkan releases of stable-diffusion.cpp as the `sd-vulkan.dll` runtime, which the DLL design already allows.
+- Vulkan needs `glslc` on the build machine and an AMD driver at run time; verify on AMD only (other vendors are out of v1 scope).
+- Qt through vcpkg compiles from source the first time (hours); enable vcpkg binary caching.
+- Native crashes take the whole process down → keep the engine in-process for v1, but design `IImageEngine` so a
+  **worker-process** implementation (crash isolation, as in LLMHost plan §2.5) can be added without touching callers.
+
+### Decisions (settled)
+
+| Question | Decision |
+|---|---|
+| Build system | Visual Studio 2026 solution + `.vcxproj` files. **No CMake.** |
+| UI | Qt 6 Widgets desktop UI **and** a browser UI served by the built-in HTTP server |
+| Model families, v1 | SD 1.x and SDXL only |
+| Safety filter | Optional, off by default |
+| Hardware, v1 | CPU and Vulkan on AMD only |
+| LLMHost | Nothing shared: own models folder, own Hugging Face token, own settings |
+
+## 11. vcpkg packages
+
+Manifest (`vcpkg.json`) for the stock triplet `x64-windows` (§2): every library is dynamic. Package and feature
+names are from memory of the vcpkg registry; run `vcpkg search <name>` once to confirm each before the first install.
+
+| Package (features) | Used for |
+|---|---|
+| `qtbase` | Qt Core, Gui, Widgets, Network; also provides `moc`, `uic`, `rcc` |
+| `qtcharts` | hardware-monitor graphs |
+| `qtsvg` | SVG icons |
+| `qttools` | Linguist (`lupdate`/`lrelease`), `windeployqt` |
+| `qtimageformats` | WebP / TIFF in the gallery and previews |
+| `cpp-httplib` (`openssl`) | HTTP/HTTPS server, SSE, hosting the browser UI |
+| `openssl` | HTTPS certificates, TLS for the server |
+| `curl` (`ssl`; Schannel on Windows) | resumable downloads, Hugging Face API |
+| `nlohmann-json` | settings, presets, catalog, API payloads |
+| `spdlog` (brings `fmt`) | logging, JSON-lines sink |
+| `cli11` | command-line parsing |
+| `sqlite3` | gallery index and search |
+| `libpng` (brings `zlib`) | PNG with parameter text chunks |
+| `libjpeg-turbo` | JPEG output |
+| `libwebp` | WebP output |
+| `catch2` | tests |
+| `vulkan-headers`, `vulkan-loader` | Vulkan build headers and loader for the ggml Vulkan backend and `GpuDevices` |
+| `shaderc` | provides `glslc` to compile ggml's Vulkan shaders (not needed if the Vulkan SDK is installed) |
+
+Not from vcpkg (install separately):
+
+- **Visual Studio 2026** with the *Desktop development with C++* workload (MSVC, Windows SDK, MSBuild).
+- **Qt Visual Studio Tools** extension (runs `moc`/`uic`/`rcc` inside MSBuild). Point it at the vcpkg install of the
+  `x64-windows` triplet; `windeployqt` copies the Qt plugins next to the exe.
+- **Vulkan SDK** (LunarG): the alternative to `shaderc`, and includes validation layers useful in Phase 0.
+- **AMD Adrenalin driver** on the test machines (runtime Vulkan driver).
+- **stable-diffusion.cpp** and its **ggml** submodule (git submodules, pinned).
+- **Git**, and later **WiX Toolset** for the installer (Phase 6).
+- SHA-256 uses Windows CNG (`bcrypt`), and the browser UI is plain HTML/CSS/JS, so neither needs a package.
+
+### Sources
+
+- [stable-diffusion.cpp](https://github.com/leejet/stable-diffusion.cpp) — the engine (CPU and Vulkan backends via ggml)
+- LLMHost, `D:\code\LLMHost` — the reference design

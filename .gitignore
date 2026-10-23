@@ -1,0 +1,32 @@
+# Build output
+bin/
+obj/
+.vs/
+*.user
+
+# Downloaded model files (default models folder: ./DownloadedModels in the working directory)
+DownloadedModels/
+*.gguf
+*.gguf.part
+*.ggml
+*.safetensors
+
+# Local app data if LLMHOST_HOME is pointed inside the repo
+.llmhost/
+
+# GraphicsHost local logs
+logs/
+
+# GraphicsHost native runtimes (installed by GraphicsHost/tools/fetch-native.ps1)
+GraphicsHost/native/sd-cpu/
+GraphicsHost/native/sd-vulkan/
+
+# GraphicsHost generated images
+GraphicsHost/outputs/
+
+# GraphicsHost per-user runtime settings
+GraphicsHost/settings.local.json
+
+# GraphicsHost window state and WebView2 profile
+GraphicsHost/window.json
+GraphicsHost/webview2/
