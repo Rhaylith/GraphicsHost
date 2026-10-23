@@ -8,7 +8,10 @@
 #include "engine/ModelManager.h"
 #include "engine/RuntimeLoader.h"
 #include "gallery/GalleryStore.h"
+#include "models/Catalog.h"
+#include "models/DownloadManager.h"
 #include "models/ModelLibrary.h"
+#include "models/ModelService.h"
 #include "presets/PresetStore.h"
 
 #include <memory>
@@ -63,6 +66,9 @@ public:
     presets::PresetStore& presets();      // <data folder>/presets
     presets::ModelDefaultsStore& modelDefaults();  // <data folder>/model-defaults.json
     models::ModelLibrary& library();               // the checkpoints, VAEs and LoRAs in modelsDir()
+    models::DownloadManager& downloads();          // model downloads (a few at a time)
+    models::ModelService& modelService();          // catalog + downloads + library: "get this model"
+    const models::Catalog& catalog();              // datatalog.json next to the exe, overridden by <data folder>talog.json
 
 private:
     core::AppPaths paths_;
@@ -81,6 +87,9 @@ private:
     presets::ModelDefaultsStore modelDefaults_;
     models::ModelLibrary library_;
     std::unique_ptr<engine::ModelManager> models_;
+    std::unique_ptr<models::DownloadManager> downloads_;
+    std::unique_ptr<models::Catalog> catalog_;
+    std::unique_ptr<models::ModelService> modelService_;
 };
 
 }  // namespace gh::host

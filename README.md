@@ -5,10 +5,10 @@ runs them in-process on **CPU or Vulkan (AMD GPUs)**, exposes one standard set o
 them through a Qt desktop window, a browser UI, a CLI and an HTTP API. Modelled on LLMHost; the engine is
 [stable-diffusion.cpp](https://github.com/leejet/stable-diffusion.cpp).
 
-Status: **Phase 2 (engine) is done**: images are generated from the command line on CPU and on the AMD GPU (Vulkan), for
+Status: **Phases 2 (engine) and 3 (models) are done**: images are generated from the command line on CPU and on the AMD GPU (Vulkan), for
 SD 1.x and SDXL, with all samplers and schedulers, a job queue with cancellation, PNG/JPEG/WebP output with the
-parameters embedded, a gallery, presets, per-model defaults and a memory estimate. The Qt window is still empty; model
-discovery and downloads (phase 3), the HTTP API and both UIs (phase 4) are next. See
+parameters embedded, a gallery, presets, per-model defaults and a memory estimate, plus a model library, a verified catalog,
+Hugging Face search and resumable downloads. The Qt window is still empty; the HTTP API and both UIs (phase 4) are next. See
 [implementation-plan.md](implementation-plan.md) for the plan and what is ticked off.
 
 ## Build
@@ -69,6 +69,25 @@ GraphicsHost.exe gen "..." -m v1-5 --preset portrait --steps 40   # model defaul
 GraphicsHost.exe defaults set v1-5-pruned-emaonly.safetensors sampler euler_a
 GraphicsHost.exe gallery list lighthouse                     # also: show ID, rm ID, rescan
 ```
+
+Finding and downloading models:
+
+```
+GraphicsHost.exe catalog                       # the curated list, with "fits the GPU / needs offload / CPU only" for this computer
+GraphicsHost.exe get sdxl                      # downloads SDXL base + its VAE, checks the SHA-256, records where it came from
+GraphicsHost.exe get sdxl --dry-run            # what would be downloaded, where, and how it fits
+GraphicsHost.exe search "dreamshaper"          # live search on Hugging Face (text-to-image models)
+GraphicsHost.exe info Lykon/DreamShaper        # the usable files of a repository, with sizes
+GraphicsHost.exe get Lykon/DreamShaper DreamShaper_8_pruned.safetensors
+GraphicsHost.exe login                         # a token for gated models; kept in the Windows Credential Manager
+GraphicsHost.exe updates                       # have the downloaded models changed on Hugging Face?
+GraphicsHost.exe downloads                     # partial files of interrupted downloads (run `get` again to continue)
+```
+
+Downloads resume where they stopped (also after killing the program or a crash) and a checksum mismatch deletes the
+file. Models land in `<models folder>\<publisher>\<repository>\<file>`; a VAE that belongs to a checkpoint is linked
+through the record next to it (`<file>.source.json`), or by naming it `<checkpoint name>...vae....safetensors` in the same
+folder. `<data folder>\catalog.json` adds to or replaces entries of the shipped `data\catalog.json`.
 
 `gen` prints progress on stderr and the result on stdout (`--json` for scripts). Ctrl+C cancels at the next sampling
 step. The seed that was actually used is always reported; the same prompt, parameters and seed give the same image on

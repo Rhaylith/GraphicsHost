@@ -40,4 +40,26 @@ int runDefaults(host::AppHost& host, const std::string& action, const std::vecto
 int runGallery(host::AppHost& host, const std::string& action, const std::vector<std::string>& args, int limit,
                bool json, std::ostream& out, std::ostream& err);
 
+
+struct GetInvocation {
+    std::string target;        // a catalog key, or a Hugging Face repository "publisher/name"
+    std::string file;          // for a repository: the file to download (optional when only one fits)
+    bool noCompanions = false; // do not fetch the VAE that belongs to a catalog model
+    bool dryRun = false;       // show the plan, download nothing
+};
+
+// Model discovery and downloads.
+int runCatalog(host::AppHost& host, const std::string& text, const std::string& family, const std::string& kind, bool json,
+               std::ostream& out, std::ostream& err);
+int runSearch(host::AppHost& host, const std::string& text, int limit, bool json, std::ostream& out, std::ostream& err);
+int runInfo(host::AppHost& host, const std::string& repo, bool json, std::ostream& out, std::ostream& err);
+int runGet(host::AppHost& host, const GetInvocation& invocation, bool json, bool quiet, std::ostream& out, std::ostream& err);
+// downloads list | clear : the partial files that interrupted downloads left behind (get continues them)
+int runDownloads(host::AppHost& host, const std::string& action, bool json, std::ostream& out, std::ostream& err);
+int runUpdates(host::AppHost& host, bool json, std::ostream& out, std::ostream& err);
+// login [token] (the token is read from stdin when not given), logout, whoami
+int runLogin(host::AppHost& host, const std::string& token, bool json, std::ostream& out, std::ostream& err);
+int runLogout(bool json, std::ostream& out, std::ostream& err);
+int runWhoami(host::AppHost& host, bool json, std::ostream& out, std::ostream& err);
+
 }  // namespace gh::cli

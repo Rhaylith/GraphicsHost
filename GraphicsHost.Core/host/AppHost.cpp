@@ -49,6 +49,8 @@ AppHost::AppHost(std::optional<std::filesystem::path> home)
 AppHost::~AppHost() {
     models_.reset();  // cancels running jobs, then frees the model
     engine_.reset();
+    modelService_.reset();
+    downloads_.reset();  // keeps partial files for the next start
     gallery_.reset();
     log::info("GraphicsHost stopping");
     log::shutdown();
@@ -139,6 +141,45 @@ namespace gh::host {
 
 models::ModelLibrary& AppHost::library() {
     return library_;
+}
+
+}  // namespace gh::host
+
+#include "core/SecretStore.h"
+
+namespace gh::host {
+
+const models::Catalog& AppHost::catalog() {
+    std::lock_guard<std::mutex> lock(serviceMutex_);
+    if (!catalog_) {
+        catalog_ = std::make_unique<models::Catalog>(models::Catalog::load(
+            {core::AppPaths::executableDir() / "data" / "catalog.json", paths_.root() / "catalog.json"}));
+        for (const auto& w : catalog_->warnings()) log::warn("catalog: " + w);
+    }
+    return *catalog_;
+}
+
+models::DownloadManager& AppHost::downloads() {
+    std::lock_guard<std::mutex> lock(serviceMutex_);
+    if (!downloads_) {
+        downloads_ = std::make_unique<models::DownloadManager>(2);
+    }
+    return *downloads_;
+}
+
+models::ModelService& AppHost::modelService() {
+    const models::Catalog& cat = catalog();
+    auto& dl = downloads();
+    std::lock_guard<std::mutex> lock(serviceMutex_);
+    if (!modelService_) {
+        models::ModelServiceConfig config;
+        config.modelsDir = modelsDir();
+        // GRAPHICSHOST_HUB_URL points the application at another Hugging Face compatible server (the tests use it)
+        if (const char* hub = std::getenv("GRAPHICSHOST_HUB_URL"); hub && *hub) config.hubBaseUrl = hub;
+        config.token = [] { return core::huggingFaceToken().value_or(std::string()); };
+        modelService_ = std::make_unique<models::ModelService>(cat, library_, dl, modelDefaults_, std::move(config));
+    }
+    return *modelService_;
 }
 
 }  // namespace gh::host

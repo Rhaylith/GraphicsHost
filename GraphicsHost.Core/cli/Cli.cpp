@@ -320,6 +320,36 @@ int run(int argc, char** argv, std::ostream& out, std::ostream& err, std::option
     galleryCmd->add_option("args", galleryArgs, "list: text to search for; show, rm: the image id");
     galleryCmd->add_option("--limit", galleryLimit, "list: how many")->capture_default_str();
 
+    // model discovery and downloads
+    auto* catalogCmd = app.add_subcommand("catalog", "the curated list of models");
+    std::string catalogText, catalogFamily, catalogKind;
+    catalogCmd->add_option("text", catalogText, "search text (name, family, tag)");
+    catalogCmd->add_option("--family", catalogFamily, "SD 1.x or SDXL");
+    catalogCmd->add_option("--kind", catalogKind, "checkpoint | vae | lora");
+    auto* searchCmd = app.add_subcommand("search", "search Hugging Face for text-to-image models");
+    std::string searchText;
+    int searchLimit = 20;
+    searchCmd->add_option("text", searchText, "what to look for")->required();
+    searchCmd->add_option("--limit", searchLimit, "how many results")->capture_default_str();
+    auto* infoCmd = app.add_subcommand("info", "the usable files in a Hugging Face repository");
+    std::string infoRepo;
+    infoCmd->add_option("repository", infoRepo, "publisher/name")->required();
+    auto* getCmd = app.add_subcommand("get", "download a model: a catalog key, or a repository and file");
+    GetInvocation getInv;
+    getCmd->add_option("target", getInv.target, "catalog key, or publisher/name")->required();
+    getCmd->add_option("file", getInv.file, "for a repository: the file to download");
+    getCmd->add_flag("--no-companions", getInv.noCompanions, "do not download the VAE that belongs to a catalog model");
+    getCmd->add_flag("--dry-run", getInv.dryRun, "show what would be downloaded");
+    auto* downloadsCmd = app.add_subcommand("downloads", "interrupted downloads");
+    std::string downloadsAction = "list";
+    downloadsCmd->add_option("action", downloadsAction, "list | clear")->capture_default_str();
+    auto* updatesCmd = app.add_subcommand("updates", "check the downloaded models for newer versions");
+    auto* loginCmd = app.add_subcommand("login", "store a Hugging Face access token (needed for gated models)");
+    std::string loginToken;
+    loginCmd->add_option("token", loginToken, "the token; asked for when left out");
+    auto* logoutCmd = app.add_subcommand("logout", "remove the stored Hugging Face token");
+    auto* whoamiCmd = app.add_subcommand("whoami", "the Hugging Face user of the stored token");
+
     try {
         app.parse(argc, argv);
     } catch (const CLI::ParseError& e) {
@@ -351,6 +381,15 @@ int run(int argc, char** argv, std::ostream& out, std::ostream& err, std::option
         if (config->parsed()) {
             return cmdConfig(host, configAction, configArgs, json, out, err);
         }
+        if (logoutCmd->parsed()) return runLogout(json, out, err);
+        if (catalogCmd->parsed()) return runCatalog(host, catalogText, catalogFamily, catalogKind, json, out, err);
+        if (searchCmd->parsed()) return runSearch(host, searchText, searchLimit, json, out, err);
+        if (infoCmd->parsed()) return runInfo(host, infoRepo, json, out, err);
+        if (getCmd->parsed()) return runGet(host, getInv, json, quiet, out, err);
+        if (downloadsCmd->parsed()) return runDownloads(host, downloadsAction, json, out, err);
+        if (updatesCmd->parsed()) return runUpdates(host, json, out, err);
+        if (loginCmd->parsed()) return runLogin(host, loginToken, json, out, err);
+        if (whoamiCmd->parsed()) return runWhoami(host, json, out, err);
         if (ls->parsed()) {
             return runLs(host, json, out, err);
         }
