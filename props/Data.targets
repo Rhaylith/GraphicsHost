@@ -1,0 +1,9 @@
+<Project>
+  <!-- Copies the shipped data files (catalog.json) next to the executable: <exe folder>\data\ -->
+  <Target Name="CopyDataFiles" AfterTargets="Build" Condition="'$(ConfigurationType)'=='Application'">
+    <ItemGroup>
+      <DataFile Include="$(RepoRoot)data\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(DataFile)" DestinationFiles="@(DataFile->'$(OutDir)data\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+  </Target>
+</Project>

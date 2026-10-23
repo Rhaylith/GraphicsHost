@@ -61,10 +61,12 @@
     <ClCompile Include="ModelCardTests.cpp" />
     <ClCompile Include="ModelLibraryTests.cpp" />
     <ClCompile Include="DownloadTests.cpp" />
+    <ClCompile Include="CatalogTests.cpp" />
     <ClInclude Include="TestHttpServer.h" />
     <ClInclude Include="SafetensorsFixture.h" />
     <ClInclude Include="ModelFixture.h" />
     <ClInclude Include="TestUtil.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Import Project="$(RepoRoot)props\Data.targets" />
 </Project>
