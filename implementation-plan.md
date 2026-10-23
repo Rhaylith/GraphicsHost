@@ -334,7 +334,7 @@ Goal: retire the biggest risk (§10) before any application code exists.
 - [x] 2.6 Gallery store: `outputs/YYYY/MM/DD`, sidecar JSON, SQLite index (M) — `gallery/GalleryStore`: dated folders, sidecar JSON, SQLite index (WAL), list/search/get/remove, `rescan()` rebuilds the index from the sidecars; 10 test cases incl. concurrency and collisions
 - [x] 2.7 `ModelManager`: load, unload, idle TTL, one-model-loaded policy with eviction (S) — `engine/ModelManager`: one model loaded, reuse on identical options, eviction only while the queue is idle, idle TTL via injectable clock plus background sweeper, owns the JobQueue; 12 test cases, stable over 5 runs
 - [x] 2.8 Fit estimator v1 (weights + VAE + activations at W×H×batch) with the low-VRAM suggestions (`vae_tiling`, `offload_params_to_cpu`) (M) — `engine/FitEstimator`: constants calibrated on 9 measured runs (`docs/vram-measurements.md`, `tools/measure-vram.ps1`); suggests offload and flash attention (found: SD1.5 at 768 is 5x faster with it); auto falls back to CPU, an explicit GPU never does; 12 test cases
-- [ ] 2.9 CPU→Vulkan fallback *offer* on load failure; error codes and the exit-code table (S)
+- [x] 2.9 CPU→Vulkan fallback *offer* on load failure; error codes and the exit-code table (S) — `engine/LoadAdvice` (offers offload, then CPU; never retries by itself), `cli::exitCodeFor` maps `EngineErrorCode` to the exit-code table; 5 test cases. The CLI prints the offers in 2.10
 - [ ] 2.10 CLI verbs `gen`, `ls`, `load`/`unload`/`ps`, `hardware`, `config`, `--json` (M)
 - [ ] 2.11 Per-model defaults and presets (files, live reload) (S)
 

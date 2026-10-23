@@ -1,8 +1,10 @@
 #pragma once
 
+#include "engine/ImageEngine.h"
+
+#include <filesystem>
 #include <iosfwd>
 #include <optional>
-#include <filesystem>
 
 namespace gh::cli {
 
@@ -18,6 +20,9 @@ enum ExitCode : int {
     kCancelled = 7,
     kConflict = 8,
 };
+
+// The exit code a failed engine call turns into: InvalidRequest 2, NotFound 3, OutOfMemory 6, Cancelled 7, others 1.
+int exitCodeFor(engine::EngineErrorCode code);
 
 // True when the command line asks for the CLI instead of the desktop window: any argument other than
 // --smoke-test (or the explicit "gui" verb, which opens the window).

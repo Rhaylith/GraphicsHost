@@ -233,6 +233,18 @@ int cmdConfig(host::AppHost& host, const std::string& action, const std::vector<
 
 }  // namespace
 
+int exitCodeFor(engine::EngineErrorCode code) {
+    switch (code) {
+        case engine::EngineErrorCode::InvalidRequest: return kUsage;
+        case engine::EngineErrorCode::NotFound: return kNotFound;
+        case engine::EngineErrorCode::OutOfMemory: return kOutOfMemory;
+        case engine::EngineErrorCode::Cancelled: return kCancelled;
+        case engine::EngineErrorCode::LoadFailed:
+        case engine::EngineErrorCode::Failed: return kFailure;
+    }
+    return kFailure;
+}
+
 bool wantsGui(int argc, char** argv) {
     if (argc <= 1) {
         return true;
