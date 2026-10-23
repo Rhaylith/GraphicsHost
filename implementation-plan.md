@@ -342,7 +342,7 @@ Goal: retire the biggest risk (§10) before any application code exists.
 
 ### Phase 3 — Models: discover, download, library (L)
 
-- [ ] 3.1 Safetensors header reader and GGUF header reader (port of LLMHost `Gguf.cs`); family detection SD1.5 / SDXL (SD3/FLUX detected and reported unsupported) (M)
+- [x] 3.1 Safetensors header reader and GGUF header reader (port of LLMHost `Gguf.cs`); family detection SD1.5 / SDXL (SD3/FLUX detected and reported unsupported) (M) — `models/CheckpointHeader` (safetensors + GGUF, header only, damaged files refused with a reason), `models/ModelCard` (`detectFamily`: SD1.x/2.x/SDXL, inpainting, VAE, LoRA; FLUX/SD3 detected and reported unsupported; weight-size estimate from tensor types, calibrated on the two reference checkpoints); 9 test cases
 - [ ] 3.2 `ModelLibrary`: folder watching, `publisher/repo/file` layout, `ModelCard` (family, default size/steps/CFG/sampler, companions) (M)
 - [ ] 3.3 `DownloadManager` on libcurl: queue, range resume, pause/resume, free-space check, SHA-256 (CNG), progress events (L)
 - [ ] 3.4 Embedded `catalog.json` (curated SD1.5 / SDXL / Turbo / Lightning entries) and `Catalog` loader (S)

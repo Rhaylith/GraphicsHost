@@ -58,6 +58,7 @@
     <ClCompile Include="LoadAdviceTests.cpp" />
     <ClCompile Include="PresetTests.cpp" />
     <ClCompile Include="CliGenTests.cpp" />
+    <ClCompile Include="ModelCardTests.cpp" />
     <ClInclude Include="ModelFixture.h" />
     <ClInclude Include="TestUtil.h" />
   </ItemGroup>
