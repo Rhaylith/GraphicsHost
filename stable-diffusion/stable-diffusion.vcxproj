@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  stable-diffusion.cpp as a static library (replaces the CMake target "stable-diffusion" plus its thirdparty
+  objects zip, onig and sd-utf8proc). Examples (cli/server) and WebP/WebM image I/O are not built: those only
+  exist in the examples folder, not in the library.
+-->
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>18.0</VCProjectVersion>
+    <ProjectGuid>{7B3D1E0A-5C2F-4E7A-9A11-0F6E2D4C8A02}</ProjectGuid>
+    <RootNamespace>stablediffusion</RootNamespace>
+    <Keyword>Win32Proj</Keyword>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Debug'">true</UseDebugLibraries>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Release'">false</UseDebugLibraries>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <PropertyGroup>
+    <SdSrc>$(Sdcpp)</SdSrc>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>false</SDLCheck>
+      <ConformanceMode>true</ConformanceMode>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <AdditionalOptions>/utf-8 /bigobj /wd4244 /wd4267 /wd4305 /wd4996 /wd4068 /wd4005 /wd4018 /wd4101 /wd4146 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalIncludeDirectories>$(SdSrc)include;$(SdSrc)src;$(SdSrc)src\core;$(SdSrc)thirdparty;$(SdSrc)thirdparty\oniguruma;$(SdSrc)thirdparty\utf8proc;$(SdSrc)ggml\include;$(SdSrc)ggml\src;$(RepoRoot)ggml\generated;$(MSBuildThisFileDirectory)generated;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>GGML_MAX_NAME=160;GGML_SCHED_MAX_COPIES=4;_CRT_SECURE_NO_WARNINGS;_SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING;ONIG_STATIC;UTF8PROC_STATIC;GGML_USE_CPU;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
+    <ClCompile>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup Label="library sources (the CMake glob: everything under src)">
+    <ClCompile Include="$(SdSrc)src\**\*.cpp" />
+  </ItemGroup>
+  <ItemGroup Label="thirdparty: zip, utf8proc, oniguruma">
+    <ClCompile Include="$(SdSrc)thirdparty\zip.c" />
+    <ClCompile Include="$(SdSrc)thirdparty\utf8proc\utf8proc.c" />
+    <ClCompile Include="$(SdSrc)thirdparty\oniguruma\ascii.c" />
+    <ClCompile Include="$(SdSrc)thirdparty\oniguruma\regcomp.c" />
+    <ClCompile Include="$(SdSrc)thirdparty\oniguruma\regenc.c" />
+    <ClCompile Include="$(SdSrc)thirdparty\oniguruma\regerror.c" />
+    <ClCompile Include="$(SdSrc)thirdparty\oniguruma\regexec.c" />
+    <ClCompile Include="$(SdSrc)thirdparty\oniguruma\regparse.c" />
+    <ClCompile Include="$(SdSrc)thirdparty\oniguruma\st.c" />
+    <ClCompile Include="$(SdSrc)thirdparty\oniguruma\unicode.c" />
+    <ClCompile Include="$(SdSrc)thirdparty\oniguruma\unicode_fold1_key.c" />
+    <ClCompile Include="$(SdSrc)thirdparty\oniguruma\unicode_fold2_key.c" />
+    <ClCompile Include="$(SdSrc)thirdparty\oniguruma\unicode_fold3_key.c" />
+    <ClCompile Include="$(SdSrc)thirdparty\oniguruma\unicode_unfold_key.c" />
+    <ClCompile Include="$(SdSrc)thirdparty\oniguruma\utf8.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ggml\ggml.vcxproj">
+      <Project>{7B3D1E0A-5C2F-4E7A-9A11-0F6E2D4C8A01}</Project>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <!-- Same-named sources live in different folders: make every object name unique. -->
+  <Target Name="UniqueObjectNames" BeforeTargets="SelectClCompile">
+    <ItemGroup>
+      <ClCompile>
+        <ObjectFileName>$(IntDir)$([System.String]::Copy('%(FullPath)').Replace('$(SdSrc)','').Replace('\','_')).obj</ObjectFileName>
+      </ClCompile>
+    </ItemGroup>
+  </Target>
+  <!-- The version strings come from git in the CMake build; fixed to the pinned submodule commit here. -->
+  <ItemGroup>
+    <ClCompile Update="$(SdSrc)src\version.cpp">
+      <PreprocessorDefinitions>SDCPP_BUILD_COMMIT=fd21ecf;SDCPP_BUILD_VERSION=master-995-fd21ecf;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemGroup>
+</Project>

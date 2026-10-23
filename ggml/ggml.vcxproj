@@ -43,7 +43,7 @@
       <LanguageStandard_C>stdc11</LanguageStandard_C>
       <AdditionalOptions>/utf-8 /bigobj /experimental:c11atomics /wd4244 /wd4267 /wd4305 /wd4996 /wd4068 /wd4005 %(AdditionalOptions)</AdditionalOptions>
       <AdditionalIncludeDirectories>$(GgmlSrc)include;$(GgmlSrc)src;$(GgmlSrc)src\ggml-cpu;$(MSBuildThisFileDirectory)generated;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>GGML_SCHED_MAX_COPIES=4;_CRT_SECURE_NO_WARNINGS;GGML_USE_CPU;GGML_USE_LLAMAFILE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>GGML_MAX_NAME=160;GGML_SCHED_MAX_COPIES=4;_CRT_SECURE_NO_WARNINGS;GGML_USE_CPU;GGML_USE_LLAMAFILE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">

@@ -1,0 +1,12 @@
+/* Hand-written replacement for the CMake-generated oniguruma config.h (MSVC, x64). */
+#define HAVE_ALLOCA 1
+#define HAVE_STDINT_H 1
+#define HAVE_SYS_TYPES_H 1
+#define HAVE_INTTYPES_H 1
+#define PACKAGE "onig"
+#define PACKAGE_VERSION "6.9.10"
+#define VERSION "6.9.10"
+#define SIZEOF_INT 4
+#define SIZEOF_LONG 4
+#define SIZEOF_LONG_LONG 8
+#define SIZEOF_VOIDP 8
