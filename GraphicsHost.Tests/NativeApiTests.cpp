@@ -42,6 +42,9 @@ TEST_CASE("native: status, hardware, settings and logs", "[integration][api][nat
     CHECK(hardware.contains("vulkan"));
     CHECK(hardware["memory"]["totalBytes"].get<uint64_t>() > 0);
 
+    const json parameters = test::bodyJson(c.Get("/api/v1/parameters"));
+    CHECK(parameters["samplers"].size() > 3);
+    CHECK(parameters["limits"]["minSize"] == 64);
     CHECK(test::bodyJson(c.Get("/api/v1/settings"))["backend"] == "auto");
     const auto changed = c.Put("/api/v1/settings", R"({"logging":{"level":"debug"},"server":{"port":4321}})", "application/json");
     REQUIRE(changed->status == 200);

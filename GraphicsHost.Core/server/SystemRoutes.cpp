@@ -56,6 +56,16 @@ void registerSystemRoutes(httplib::Server& server, RouteContext& ctx) {
                        {"memory", {{"totalBytes", memory.totalBytes}, {"freeBytes", memory.freeBytes}}}});
     });
 
+    // What a client may put into a generation request: the names it can choose from and the limits.
+    server.Get("/api/v1/parameters", [&ctx](const httplib::Request& req, httplib::Response& res) {
+        if (!authorize(ctx, req, res, "read")) return;
+        sendJson(res, {{"samplers", engine::knownSamplers()},
+                       {"schedulers", engine::knownSchedulers()},
+                       {"formats", {"png", "jpeg", "webp"}},
+                       {"limits", {{"minSize", 64}, {"maxSize", 4096}, {"sizeStep", 8}, {"maxImages", 16}}},
+                       {"defaults", toJson(engine::GenerationRequest{})}});
+    });
+
     server.Get("/api/v1/settings", [&ctx](const httplib::Request& req, httplib::Response& res) {
         if (!authorize(ctx, req, res, "read")) return;
         sendJson(res, core::toJson(ctx.host.settings()));

@@ -1,9 +1,11 @@
 <Project>
-  <!-- Copies the shipped data files (catalog.json) next to the executable: <exe folder>\data\ -->
+  <!-- Copies the shipped data files (catalog.json) and the browser UI next to the executable: <exe folder>\data\ and <exe folder>\web\ -->
   <Target Name="CopyDataFiles" AfterTargets="Build" Condition="'$(ConfigurationType)'=='Application'">
     <ItemGroup>
       <DataFile Include="$(RepoRoot)data\**\*" />
+      <WebFile Include="$(RepoRoot)web\**\*" />
     </ItemGroup>
     <Copy SourceFiles="@(DataFile)" DestinationFiles="@(DataFile->'$(OutDir)data\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(WebFile)" DestinationFiles="@(WebFile->'$(OutDir)web\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
   </Target>
 </Project>
