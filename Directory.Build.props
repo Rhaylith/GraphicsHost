@@ -1,0 +1,11 @@
+<Project>
+  <!-- Shared settings for every C++ project in the solution. -->
+  <PropertyGroup>
+    <RepoRoot>$(MSBuildThisFileDirectory)</RepoRoot>
+    <Sdcpp>$(RepoRoot)extern\stable-diffusion.cpp\</Sdcpp>
+    <PlatformToolset>v145</PlatformToolset>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <OutDir>$(RepoRoot)build\bin\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(RepoRoot)build\obj\$(MSBuildProjectName)\$(Platform)\$(Configuration)\</IntDir>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ggml as one static library: ggml-base + the backend registry + the x86 CPU backend.
+  Replaces the CMake targets ggml-base, ggml and ggml-cpu of the pinned stable-diffusion.cpp submodule.
+  GgmlCpuVariant selects the instruction set: avx2 (default) or noavx.
+-->
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>18.0</VCProjectVersion>
+    <ProjectGuid>{7B3D1E0A-5C2F-4E7A-9A11-0F6E2D4C8A01}</ProjectGuid>
+    <RootNamespace>ggml</RootNamespace>
+    <Keyword>Win32Proj</Keyword>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Debug'">true</UseDebugLibraries>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Release'">false</UseDebugLibraries>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <PropertyGroup>
+    <GgmlCpuVariant Condition="'$(GgmlCpuVariant)'==''">avx2</GgmlCpuVariant>
+    <GgmlSrc>$(Sdcpp)ggml\</GgmlSrc>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>false</SDLCheck>
+      <ConformanceMode>true</ConformanceMode>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
+      <AdditionalOptions>/utf-8 /bigobj /experimental:c11atomics /wd4244 /wd4267 /wd4305 /wd4996 /wd4068 /wd4005 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalIncludeDirectories>$(GgmlSrc)include;$(GgmlSrc)src;$(GgmlSrc)src\ggml-cpu;$(MSBuildThisFileDirectory)generated;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>GGML_SCHED_MAX_COPIES=4;_CRT_SECURE_NO_WARNINGS;GGML_USE_CPU;GGML_USE_LLAMAFILE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
+    <ClCompile>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(GgmlCpuVariant)'=='avx2'">
+    <ClCompile>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+      <PreprocessorDefinitions>GGML_AVX2;GGML_FMA;GGML_F16C;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup Label="ggml-base and backend registry">
+    <ClCompile Include="$(GgmlSrc)src\ggml.c" />
+    <ClCompile Include="$(GgmlSrc)src\ggml.cpp" />
+    <ClCompile Include="$(GgmlSrc)src\ggml-alloc.c" />
+    <ClCompile Include="$(GgmlSrc)src\ggml-backend.cpp" />
+    <ClCompile Include="$(GgmlSrc)src\ggml-backend-meta.cpp" />
+    <ClCompile Include="$(GgmlSrc)src\ggml-backend-dl.cpp" />
+    <ClCompile Include="$(GgmlSrc)src\ggml-backend-reg.cpp" />
+    <ClCompile Include="$(GgmlSrc)src\ggml-opt.cpp" />
+    <ClCompile Include="$(GgmlSrc)src\ggml-threading.cpp" />
+    <ClCompile Include="$(GgmlSrc)src\ggml-quants.c" />
+    <ClCompile Include="$(GgmlSrc)src\gguf.cpp" />
+  </ItemGroup>
+  <ItemGroup Label="CPU backend (x86)">
+    <ClCompile Include="$(GgmlSrc)src\ggml-cpu\ggml-cpu.c" />
+    <ClCompile Include="$(GgmlSrc)src\ggml-cpu\ggml-cpu.cpp" />
+    <ClCompile Include="$(GgmlSrc)src\ggml-cpu\repack.cpp" />
+    <ClCompile Include="$(GgmlSrc)src\ggml-cpu\hbm.cpp" />
+    <ClCompile Include="$(GgmlSrc)src\ggml-cpu\quants.c" />
+    <ClCompile Include="$(GgmlSrc)src\ggml-cpu\traits.cpp" />
+    <ClCompile Include="$(GgmlSrc)src\ggml-cpu\amx\amx.cpp" />
+    <ClCompile Include="$(GgmlSrc)src\ggml-cpu\amx\mmq.cpp" />
+    <ClCompile Include="$(GgmlSrc)src\ggml-cpu\tiled\tiled.cpp" />
+    <ClCompile Include="$(GgmlSrc)src\ggml-cpu\tiled\tiled-kernel.cpp" />
+    <ClCompile Include="$(GgmlSrc)src\ggml-cpu\binary-ops.cpp" />
+    <ClCompile Include="$(GgmlSrc)src\ggml-cpu\unary-ops.cpp" />
+    <ClCompile Include="$(GgmlSrc)src\ggml-cpu\vec.cpp" />
+    <ClCompile Include="$(GgmlSrc)src\ggml-cpu\ops.cpp" />
+    <ClCompile Include="$(GgmlSrc)src\ggml-cpu\llamafile\sgemm.cpp" />
+    <ClCompile Include="$(GgmlSrc)src\ggml-cpu\arch\x86\quants.c" />
+    <ClCompile Include="$(GgmlSrc)src\ggml-cpu\arch\x86\repack.cpp" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <!-- Different folders hold same-named sources (quants.c, repack.cpp, ggml.c vs ggml.cpp): make every object name unique. -->
+  <Target Name="UniqueObjectNames" BeforeTargets="SelectClCompile">
+    <ItemGroup>
+      <ClCompile>
+        <ObjectFileName>$(IntDir)$([System.String]::Copy('%(FullPath)').Replace('$(GgmlSrc)src\','').Replace('\','_')).obj</ObjectFileName>
+      </ClCompile>
+    </ItemGroup>
+  </Target>
+</Project>

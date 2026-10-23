@@ -30,3 +30,6 @@ GraphicsHost/settings.local.json
 # GraphicsHost window state and WebView2 profile
 GraphicsHost/window.json
 GraphicsHost/webview2/
+
+# MSBuild output of the native projects
+build/
