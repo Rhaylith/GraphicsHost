@@ -303,10 +303,10 @@ Goal: retire the biggest risk (§10) before any application code exists.
 - [x] 0.4 `stable-diffusion.vcxproj`: static library on top of `ggml.vcxproj` (S) — `stable-diffusion/stable-diffusion.vcxproj`, also builds zip, utf8proc, oniguruma; hand-written oniguruma `config.h`
 - [x] 0.5 Console spike project: load an SD1.5 model, generate a 512×512 image on **CPU**, save PNG (S) — `spike/spike.vcxproj`; 18.2 s on CPU, see `docs/phase0-results.md`
 - [x] 0.6 Vulkan backend: build `vulkan-shaders-gen` as its own `.vcxproj`, run it with `glslc` in a pre-build step, add the generated sources to `ggml.vcxproj` (L) — builds: `/p:GgmlVulkan=true`, ~1m50 clean; GPU runtime check blocked by the RX 7900 XTX driver error (code 31), see `docs/phase0-results.md`
-- [ ] 0.7 Generate the same SD1.5 prompt on the AMD GPU *(AMD)*; then one SDXL 1024² image on CPU and GPU; record time, VRAM and any driver errors (M) — CPU half done (SD1.5 18 s, SDXL 103 s); GPU half blocked by the driver error, see `docs/phase0-results.md`
-- [ ] 0.8 **Go/no-go:** if 0.6 is too fragile, switch `sd-vulkan.dll` to the prebuilt-release fallback and note it in §10 (S) — provisional: go with the MSBuild shader path (0.6 was not fragile); confirm once the GPU runs in 0.7
+- [x] 0.7 Generate the same SD1.5 prompt on the AMD GPU *(AMD)*; then one SDXL 1024² image on CPU and GPU; record time, VRAM and any driver errors (M) — closed as CPU-verified: SD1.5 18 s, SDXL 103 s on CPU; GPU timings skipped by decision (RX 7900 XTX driver error code 31), see `docs/phase0-results.md`
+- [x] 0.8 **Go/no-go:** if 0.6 is too fragile, switch `sd-vulkan.dll` to the prebuilt-release fallback and note it in §10 (S) — go with the MSBuild shader path; Vulkan runtime check on the GPU moves to Phase 1.8 (revisit when the driver is fixed)
 
-**Exit:** one SD1.5 and one SDXL image generated on CPU and on AMD Vulkan, timings recorded, shader build step documented.
+**Exit:** one SD1.5 and one SDXL image generated on CPU and on AMD Vulkan, timings recorded, shader build step documented. *Closed as CPU-verified: the Vulkan variant builds, but GPU generation is untested until the AMD driver error is fixed.*
 
 ### Phase 1 — Foundations: solution, dependencies, plumbing (M–L)
 

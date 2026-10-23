@@ -41,3 +41,5 @@ before step 0.7 can measure Vulkan.
 | SD1.5 / SDXL | vulkan (RX 7900 XTX) | - | - | - | - | - | **not measured**: Vulkan cannot initialise, GPU in Device Manager code 31 |
 
 Memory/VRAM figures for the GPU runs are still missing for the same reason.
+
+Phase 0 closed as CPU-verified (user decision): GPU measurements are skipped for now. Open item: run `spike-vulkan` on a working RX 7900 XTX and fill in the table above.
