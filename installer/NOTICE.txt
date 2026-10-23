@@ -1,0 +1,23 @@
+GraphicsHost - third-party components
+
+GraphicsHost itself: see the LICENSE of the project.
+
+Bundled with the application (all as separate files next to GraphicsHost.exe, so each can be replaced):
+
+  Qt 6 (Core, Gui, Widgets, Charts, OpenGL)  LGPL v3 / GPL / commercial. Used here under the LGPL v3 as dynamic libraries
+                                              (Qt6*.dll, platforms\, styles\, imageformats\, iconengines\). You may replace
+                                              them with your own build of the same Qt version. Source: https://download.qt.io
+  stable-diffusion.cpp and ggml               MIT. Built into runtimes\sd-*.dll. https://github.com/leejet/stable-diffusion.cpp
+  OpenSSL 3 (libssl, libcrypto)               Apache License 2.0
+  libcurl                                      curl license
+  cpp-httplib, nlohmann/json, CLI11, spdlog,
+  fmt                                          MIT / BSD-3 (CLI11)
+  SQLite                                       public domain
+  libpng, libjpeg-turbo, libwebp               libpng license, IJG / BSD-3, BSD-3
+  zlib, zstd, brotli, bzip2, freetype,
+  harfbuzz, ICU, pcre2, double-conversion,
+  md4c                                         permissive licenses (zlib, BSD, MIT, FTL, Unicode)
+  Microsoft Visual C++ runtime                 redistributable under the Visual Studio license terms
+
+Models are not part of the package. Every model has its own license; the catalog lists it, and the first-run wizard and
+the Discover tab show it before a download.
