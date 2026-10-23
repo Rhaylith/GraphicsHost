@@ -42,6 +42,7 @@ struct GenerationRequest {
     // files); the JSON form only says whether there is one.
     std::shared_ptr<const Image> initImage;
     float strength = 0.75f;      // with initImage: how much of it is replaced, (0..1]; 1 ignores the picture
+    std::shared_ptr<const Image> maskImage;   // with initImage: white = repaint, black = keep (inpainting); same size as the result
 };
 
 // How a model is put in memory. Changing it needs a reload. Mirrors gh_load_params in runtime/gh_runtime.h.

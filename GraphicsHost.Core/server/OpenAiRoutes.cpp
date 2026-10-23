@@ -171,6 +171,10 @@ void registerOpenAiRoutes(httplib::Server& server, RouteContext& ctx) {
                 if (!req.form.has_file("image")) throw std::invalid_argument("the 'image' file is required");
                 const auto file = req.form.get_file("image");
                 call.initImage = imageFromBytes(std::vector<uint8_t>(file.content.begin(), file.content.end()), "image");
+                if (req.form.has_file("mask")) {
+                    const auto mask = req.form.get_file("mask");
+                    call.maskImage = imageFromBytes(std::vector<uint8_t>(mask.content.begin(), mask.content.end()), "mask");
+                }
             } else {
                 if (!readJsonObject(req, res, body)) return;
                 call = callFromBody(body);

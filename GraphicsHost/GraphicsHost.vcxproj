@@ -36,6 +36,8 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="ui\MainWindow.cpp" />
     <ClCompile Include="ui\UiUtil.cpp" />
+    <ClCompile Include="ui\MaskEditor.cpp" />
+    <ClInclude Include="ui\MaskEditor.h" />
     <ClCompile Include="ui\GalleryTab.cpp" />
     <ClInclude Include="ui\GalleryTab.h" />
     <QtMoc Include="ui\GalleryTab.h" />

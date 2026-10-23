@@ -128,3 +128,34 @@ TEST_CASE("img2img: the gallery remembers the strength", "[integration][api][img
     CHECK(entries[0].parameters["request"]["strength"].get<double>() == Catch::Approx(0.6));
     CHECK(entries[0].parameters["request"]["hasInitImage"] == true);
 }
+
+TEST_CASE("inpainting: a mask travels with the source image", "[integration][api][img2img][inpaint]") {
+    GenApp g;
+    auto c = g.client();
+    const auto png = samplePng(128, 128);
+    const auto mask = samplePng(32, 32);   // a different size: it is scaled to the result
+    httplib::UploadFormDataItems form = {{"prompt", "fix the corner", "", ""},
+                                         {"model", "tiny", "", ""},
+                                         {"image", std::string(png.begin(), png.end()), "in.png", "image/png"},
+                                         {"mask", std::string(mask.begin(), mask.end()), "mask.png", "image/png"}};
+    const auto r = c.Post("/v1/images/edits", form);
+    REQUIRE(r);
+    INFO(r->body);
+    REQUIRE(r->status == 200);
+    const auto request = lastRequest(g);
+    REQUIRE(request.initImage);
+    REQUIRE(request.maskImage);
+    CHECK(request.maskImage->width == request.initImage->width);
+    CHECK(request.maskImage->height == request.initImage->height);
+    CHECK(test::bodyJson(g.app.client().Get("/api/v1/gallery"))["items"][0]["parameters"]["request"]["hasMask"] == true);
+
+    // JSON form
+    REQUIRE(g.post("/v1/images/edits", {{"model", "tiny"}, {"prompt", "p"}, {"image", asBase64(png)}, {"mask", asBase64(mask)}})->status == 200);
+    CHECK(lastRequest(g).maskImage);
+
+    // a mask without a picture, or a broken mask, is refused
+    const auto alone = g.post("/v1/images/generations", {{"model", "tiny"}, {"prompt", "p"}, {"mask", asBase64(mask)}});
+    CHECK(alone->status == 400);
+    CHECK(test::bodyJson(alone)["error"]["message"].get<std::string>().find("source image") != std::string::npos);
+    CHECK(g.post("/v1/images/edits", {{"model", "tiny"}, {"prompt", "p"}, {"image", asBase64(png)}, {"mask", "###"}})->status == 400);
+}

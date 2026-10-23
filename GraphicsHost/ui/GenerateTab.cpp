@@ -1,6 +1,7 @@
 #include "GenerateTab.h"
 
 #include "ImageView.h"
+#include "MaskEditor.h"
 #include "UiUtil.h"
 #include "engine/ImageCodec.h"
 #include "host/AppHost.h"
@@ -152,6 +153,22 @@ void GenerateTab::buildUi() {
     strength_->setToolTip(tr("How much of the picture is replaced: low keeps it, 1 ignores it"));
     sourceButtons->addWidget(choose);
     sourceButtons->addWidget(clearSource_);
+    maskButton_ = new QPushButton(tr("Edit mask…"), sourceBox);
+    maskButton_->setEnabled(false);
+    maskButton_->setToolTip(tr("Paint the part of the picture that should be regenerated (inpainting)"));
+    sourceButtons->addWidget(maskButton_);
+    connect(maskButton_, &QPushButton::clicked, this, [this] {
+        MaskEditor editor(source_, mask_, this);
+        if (editor.exec() != QDialog::Accepted) return;
+        mask_ = editor.mask();
+        bool any = false;
+        for (int y = 0; y < mask_.height() && !any; ++y) {
+            const uchar* row = mask_.constScanLine(y);
+            for (int x = 0; x < mask_.width(); ++x) if (row[x] >= 128) { any = true; break; }
+        }
+        if (!any) mask_ = QImage();   // nothing painted: no mask
+        maskButton_->setText(mask_.isNull() ? tr("Edit mask…") : tr("Edit mask… (set)"));
+    });
     sourceLayout->addWidget(sourceView_);
     sourceLayout->addLayout(sourceButtons);
     sourceLayout->addWidget(strength_, 1);
@@ -354,6 +371,19 @@ gh::host::GenerateCall GenerateTab::currentCall() const {
         image->data.resize(static_cast<size_t>(rgb.width()) * rgb.height() * 3);
         for (int y = 0; y < rgb.height(); ++y) std::memcpy(image->data.data() + static_cast<size_t>(y) * rgb.width() * 3, rgb.constScanLine(y), static_cast<size_t>(rgb.width()) * 3);
         call.initImage = image;
+        if (!mask_.isNull()) {
+            const QImage gray = mask_.convertToFormat(QImage::Format_Grayscale8);
+            auto m = std::make_shared<gh::engine::Image>();
+            m->width = static_cast<uint32_t>(gray.width());
+            m->height = static_cast<uint32_t>(gray.height());
+            m->channels = 3;
+            m->data.resize(static_cast<size_t>(gray.width()) * gray.height() * 3);
+            for (int y = 0; y < gray.height(); ++y) {
+                const uchar* row = gray.constScanLine(y);
+                for (int x = 0; x < gray.width(); ++x) std::fill_n(&m->data[(static_cast<size_t>(y) * gray.width() + x) * 3], 3, row[x]);
+            }
+            call.maskImage = m;
+        }
         r["strength"] = strength_->value();
     }
     Json& l = call.loadOptions;
@@ -574,6 +604,9 @@ namespace gh::ui {
 
 void GenerateTab::setSourceImage(const QImage& image) {
     source_ = image;
+    mask_ = QImage();
+    maskButton_->setEnabled(!image.isNull());
+    maskButton_->setText(tr("Edit mask…"));
     clearSource_->setEnabled(!image.isNull());
     if (image.isNull()) {
         sourceView_->setPixmap(QPixmap());

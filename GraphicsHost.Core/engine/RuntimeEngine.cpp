@@ -88,6 +88,13 @@ public:
         params.scheduler = request.scheduler.empty() ? nullptr : request.scheduler.c_str();
         params.clip_skip = request.clipSkip;
         params.vae_tiling = request.vaeTiling ? 1 : 0;
+        if (request.maskImage && (runtime_->features() & GH_FEATURE_INPAINT) == 0) {
+            throw EngineError(EngineErrorCode::InvalidRequest, "this runtime build does not support inpainting: update the runtime DLLs");
+        }
+        if (request.maskImage && (static_cast<int>(request.maskImage->width) != request.width || static_cast<int>(request.maskImage->height) != request.height)) {
+            throw EngineError(EngineErrorCode::InvalidRequest, "the mask must have the size of the result");
+        }
+        gh_image maskView{};
         gh_image initView{};
         if (request.initImage) {
             initView.width = request.initImage->width;
@@ -96,6 +103,13 @@ public:
             initView.data = const_cast<uint8_t*>(request.initImage->data.data());   // read only for the runtime
             params.init_image = &initView;
             params.strength = request.strength;
+            if (request.maskImage) {
+                maskView.width = request.maskImage->width;
+                maskView.height = request.maskImage->height;
+                maskView.channels = request.maskImage->channels;
+                maskView.data = const_cast<uint8_t*>(request.maskImage->data.data());
+                params.mask_image = &maskView;
+            }
         }
 
         // The engine reports progress for weight loading and VAE decoding as well (totals such as 140 tensors).

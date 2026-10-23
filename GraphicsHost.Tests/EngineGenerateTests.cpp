@@ -354,3 +354,58 @@ TEST_CASE("engine: image to image keeps the source the more the lower the streng
         CHECK(e.code() == EngineErrorCode::InvalidRequest);
     }
 }
+
+TEST_CASE("engine: inpainting repaints only the white part of the mask", "[model][engine][img2img][inpaint]") {
+    auto l = loadSd15OrSkip();
+    GenerationRequest source = tiny();
+    source.steps = 6;
+    const auto base = l.model->generate(source, {}, {});
+    const auto init = std::make_shared<const Image>(base.images[0]);
+
+    // white on the left half (repaint), black on the right half (keep)
+    auto mask = std::make_shared<Image>();
+    mask->width = 256;
+    mask->height = 256;
+    mask->channels = 3;
+    mask->data.assign(256 * 256 * 3, 0);
+    for (int y = 0; y < 256; ++y) {
+        for (int x = 0; x < 128; ++x) std::fill_n(&mask->data[(static_cast<size_t>(y) * 256 + x) * 3], 3, uint8_t{255});
+    }
+
+    GenerationRequest r = tiny();
+    r.prompt = "a blue sphere";
+    r.steps = 8;
+    r.seed = 5;
+    r.initImage = init;
+    r.maskImage = mask;
+    r.strength = 1.0f;
+    const auto result = l.model->generate(r, {}, {});
+    REQUIRE(result.images.size() == 1);
+    const Image& out = result.images[0];
+
+    auto halfDifference = [&](int fromX, int toX) {
+        double sum = 0;
+        size_t n = 0;
+        for (int y = 0; y < 256; ++y) {
+            for (int x = fromX; x < toX; ++x) {
+                for (int c = 0; c < 3; ++c, ++n) {
+                    const size_t i = (static_cast<size_t>(y) * 256 + x) * 3 + c;
+                    sum += std::abs(static_cast<int>(out.data[i]) - static_cast<int>(init->data[i]));
+                }
+            }
+        }
+        return sum / static_cast<double>(n);
+    };
+    // the kept side (away from the seam) stays close to the source; the repainted side does not
+    CHECK(halfDifference(160, 256) < halfDifference(0, 96));
+
+    // a mask without a source picture is a request error
+    GenerationRequest bad = tiny();
+    bad.maskImage = mask;
+    try {
+        l.model->generate(bad, {}, {});
+        FAIL("expected an error");
+    } catch (const EngineError& e) {
+        CHECK(e.code() == EngineErrorCode::InvalidRequest);
+    }
+}

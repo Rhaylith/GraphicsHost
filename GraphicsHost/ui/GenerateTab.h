@@ -114,6 +114,8 @@ private:
     QWidget* powerWidgets_ = nullptr;
     QPushButton* showJson_ = nullptr;
     QImage source_;
+    QImage mask_;               // inpainting: white = regenerate (same size as source_), null = no mask
+    QPushButton* maskButton_ = nullptr;
     QLabel* sourceView_ = nullptr;
     QDoubleSpinBox* strength_ = nullptr;
     QPushButton* clearSource_ = nullptr;

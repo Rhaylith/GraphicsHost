@@ -110,6 +110,9 @@ std::vector<core::FieldError> validate(const GenerationRequest& r) {
     if (r.clipSkip < -1 || r.clipSkip > 12) {
         errors.push_back({"clipSkip", "must be -1 (model default) or between 0 and 12"});
     }
+    if (r.maskImage && !r.initImage) {
+        errors.push_back({"mask", "needs a source image"});
+    }
     if (r.initImage && !(r.strength > 0.0f && r.strength <= 1.0f)) {
         errors.push_back({"strength", "must be above 0 and at most 1"});
     }
@@ -153,7 +156,8 @@ Json toJson(const GenerationRequest& r) {
             {"embedMetadata", r.embedMetadata},
             {"safetyFilter", r.safetyFilter},
             {"strength", r.strength},
-            {"hasInitImage", r.initImage != nullptr}};
+            {"hasInitImage", r.initImage != nullptr},
+            {"hasMask", r.maskImage != nullptr}};
 }
 
 GenerationRequest applyRequestJson(GenerationRequest r, const Json& json) {

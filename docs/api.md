@@ -62,6 +62,9 @@ Add a source picture to a generation and it becomes image to image: the result s
 * `strength` (0.05 to 1, default 0.75) says how much of the picture is replaced: low keeps it, 1 ignores it.
 * Without `size`/`width`/`height` the result has the picture's size (rounded to a multiple of 8, at most twice the
   model's default size); with a size, the picture is scaled to it.
+* Inpainting: add a `mask` (base64, or the `mask` file of `/v1/images/edits`). **White repaints, black keeps** (not
+  OpenAI's transparency convention: alpha is ignored). The mask is scaled to the result's size. A mask without a source
+  image is refused. The Qt UI has a mask painter ("Edit mask…"); the browser UI does not yet.
 * A runtime DLL built before this feature answers 400 (`invalid_parameters`): update the DLLs in `runtimes\`.
 
 ## Native API (`/api/v1`)

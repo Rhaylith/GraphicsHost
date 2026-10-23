@@ -384,7 +384,8 @@ Goal: retire the biggest risk (§10) before any application code exists.
   - Qt: thumbnails load in pages of 60 off the UI thread, multi-select delete, "Reuse parameters" fills the Generate tab, save as / show in folder, export of the selection or of everything that matches the search into a folder. Browser: search, load more, detail dialog with reuse, download and delete (done in 4.10).
 - [x] 5.2 img2img (`init_image`, `strength`) and `/v1/images/edits` (M)
   - Runtime ABI: `gh_runtime_info.features` (`GH_FEATURE_IMG2IMG`) and `init_image` + `strength` appended to `gh_generate_params`, read only when the caller's struct has them. Verified on the real model (CPU test: lower strength stays closer to the source, same inputs give the same picture, progress counts steps*strength+1) and through the browser UI on the GPU. Qt: source image row with strength, "Use as source image" from results and the gallery.
-- [ ] 5.3 Inpainting with `mask_image`; mask drawing in the Qt UI (browser UI may follow later) (M)
+- [x] 5.3 Inpainting with `mask_image`; mask drawing in the Qt UI (browser UI may follow later) (M)
+  - ABI: `GH_FEATURE_INPAINT` and `mask_image` (white = repaint). Verified on the real model (CPU test: the kept half stays close to the source, the repainted half does not). Qt: "Edit mask…" painter (brush, erase, invert, clear); it is also rendered by the screenshot/`[ui]` check. Browser: not yet.
 - [ ] 5.4 LoRA support: library scan, `loras[]` parameter, `<lora:name:w>` prompt syntax (M)
 - [ ] 5.5 Presets import/export; hardware monitor graphs (GPU utilisation, VRAM) with Qt Charts (M)
 - [ ] 5.6 Optional safety filter: `ISafetyFilter`, first implementation, per-request override, off by default (M)

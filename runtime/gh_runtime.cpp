@@ -104,7 +104,7 @@ GH_API int32_t gh_runtime_get_info(gh_runtime_info* out) {
     info.engine_version = sd_version();
     info.engine_commit = sd_commit();
     info.system_info = sd_get_system_info();
-    info.features = GH_FEATURE_IMG2IMG;
+    info.features = GH_FEATURE_IMG2IMG | GH_FEATURE_INPAINT;
     std::memcpy(out, &info, size < sizeof(info) ? size : sizeof(info));
     return GH_OK;
 }
@@ -232,6 +232,26 @@ GH_API int32_t gh_generate(gh_model* model, const gh_generate_params* params, gh
             }
             gp.init_image = sd_image_t{in.width, in.height, 3, initPixels.data()};
             gp.strength = params->strength;
+        }
+
+        // inpainting (ABI field appended in 5.3): the engine wants one channel, 255 where the picture is repainted
+        std::vector<uint8_t> maskPixels;
+        if (has_field(params->struct_size, offsetof(gh_generate_params, mask_image), sizeof(params->mask_image)) && params->mask_image &&
+            params->mask_image->data) {
+            const gh_image& m = *params->mask_image;
+            if (!gp.init_image.data) {
+                return fail(GH_ERR_INVALID_ARGUMENT, "gh_generate: mask_image needs an init_image");
+            }
+            if ((m.channels != 3 && m.channels != 4) || static_cast<int32_t>(m.width) != params->width ||
+                static_cast<int32_t>(m.height) != params->height) {
+                return fail(GH_ERR_INVALID_ARGUMENT, "gh_generate: mask_image must be RGB(A) and have the size of the result");
+            }
+            const size_t pixels = static_cast<size_t>(m.width) * m.height;
+            maskPixels.resize(pixels);
+            for (size_t i = 0; i < pixels; ++i) {
+                maskPixels[i] = m.data[i * m.channels] >= 128 ? 255 : 0;
+            }
+            gp.mask_image = sd_image_t{m.width, m.height, 1, maskPixels.data()};
         }
 
         sample_method_t method = sd_get_default_sample_method(model->ctx);

@@ -47,6 +47,7 @@ typedef enum gh_status {
 
 /* What a runtime can do beyond plain text-to-image (gh_runtime_info.features). */
 #define GH_FEATURE_IMG2IMG 0x1u   /* gh_generate_params.init_image + strength */
+#define GH_FEATURE_INPAINT 0x2u   /* gh_generate_params.mask_image (with init_image) */
 
 typedef struct gh_model gh_model;
 
@@ -91,6 +92,8 @@ typedef struct gh_generate_params {
     /* appended in step 5.2: needs GH_FEATURE_IMG2IMG */
     const struct gh_image* init_image; /* start from this picture (RGB); NULL = text to image */
     float strength;             /* 0..1: how much of init_image is replaced (1 = ignore it); used with init_image */
+    /* appended in step 5.3: needs GH_FEATURE_INPAINT */
+    const struct gh_image* mask_image; /* with init_image: white (255) = repaint, black (0) = keep; RGB or RGBA, same size as the result; NULL = no mask */
 } gh_generate_params;
 
 typedef struct gh_image {

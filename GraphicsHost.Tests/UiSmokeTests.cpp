@@ -53,5 +53,5 @@ TEST_CASE("ui smoke: the desktop app opens and every tab renders", "[integration
         names.push_back(e.path().filename().string());
         CHECK(fs::file_size(e.path()) > 5000);   // a blank or failed render is tiny
     }
-    CHECK(names.size() == 6);   // Generate, Gallery, My Models, Discover, Settings, Logs
+    CHECK(names.size() == 7);   // Generate, Gallery, My Models, Discover, Settings, Logs and the mask editor
 }

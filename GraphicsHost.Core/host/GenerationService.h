@@ -26,6 +26,7 @@ struct GenerateCall {
     nlohmann::json loadOptions = nlohmann::json::object();   // only the load options the caller gave (partial)
     bool addToGallery = true;
     std::shared_ptr<const engine::Image> initImage;   // image to image: the picture to start from (strength is a request parameter)
+    std::shared_ptr<const engine::Image> maskImage;   // inpainting: white = repaint, black = keep (needs initImage)
 };
 
 struct Submission {

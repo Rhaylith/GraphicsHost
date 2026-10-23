@@ -1,6 +1,7 @@
 #include "cli/Cli.h"
 #include "host/AppHost.h"
 #include "ui/GenerateTab.h"
+#include "ui/MaskEditor.h"
 #include "ui/MainWindow.h"
 
 #include <QApplication>
@@ -106,6 +107,16 @@ int runGui(int argc, char* argv[]) {
                 settle.exec();
                 const QString name = window.tabs()->tabText(i).remove(QLatin1Char('&')).replace(QLatin1Char(' '), QLatin1Char('-')).toLower();
                 window.grab().save(dir + QStringLiteral("/") + QString::number(i + 1) + QStringLiteral("-") + name + QStringLiteral(".png"));
+            }
+            {   // the mask editor is a dialog, not a tab: show it over a sample picture so it is part of the check
+                QImage sample(512, 384, QImage::Format_RGB888);
+                for (int y = 0; y < sample.height(); ++y) for (int x = 0; x < sample.width(); ++x) sample.setPixel(x, y, qRgb(x / 2, y / 2, 160));
+                gh::ui::MaskEditor editor(sample, QImage());
+                editor.show();
+                QEventLoop settle;
+                QTimer::singleShot(300, &settle, &QEventLoop::quit);
+                settle.exec();
+                editor.grab().save(dir + QStringLiteral("/") + QString::number(window.tabs()->count() + 1) + QStringLiteral("-mask-editor.png"));
             }
             app.quit();
         };

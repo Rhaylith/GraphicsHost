@@ -121,6 +121,16 @@ GenerationService::Prepared GenerationService::prepare(const GenerateCall& call)
         } catch (const std::exception& e) {
             throw EngineError(EngineErrorCode::InvalidRequest, std::string("the source image cannot be used: ") + e.what());
         }
+        if (call.maskImage) {
+            try {
+                request.maskImage = std::make_shared<const engine::Image>(
+                    engine::resizeImage(*call.maskImage, static_cast<uint32_t>(request.width), static_cast<uint32_t>(request.height)));
+            } catch (const std::exception& e) {
+                throw EngineError(EngineErrorCode::InvalidRequest, std::string("the mask cannot be used: ") + e.what());
+            }
+        }
+    } else if (call.maskImage) {
+        throw EngineError(EngineErrorCode::InvalidRequest, "a mask needs a source image (init_image)");
     }
     load.modelPath = card.path.string();
     if (load.vaePath.empty() && !card.vae.empty()) load.vaePath = (card.path.parent_path() / card.vae).string();

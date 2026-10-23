@@ -49,7 +49,15 @@ inline std::shared_ptr<const engine::Image> imageFromGallery(host::AppHost& host
 
 // The source image of a JSON request: "init_image" (also "initImage", "image") as base64, or "init_image_gallery_id" /
 // "initImageGalleryId" to start from something already in the gallery. Throws std::invalid_argument.
+// An optional "mask" (also "mask_image", "maskImage") as base64: white = repaint, black = keep.
 inline void attachInputImages(host::AppHost& host, const nlohmann::json& body, host::GenerateCall& call) {
+    for (const char* key : {"mask", "mask_image", "maskImage"}) {
+        if (body.contains(key) && !body[key].is_null()) {
+            if (!body[key].is_string()) throw std::invalid_argument(std::string(key) + " must be a base64 string");
+            call.maskImage = imageFromBase64(body[key].get<std::string>(), key);
+            break;
+        }
+    }
     for (const char* key : {"init_image", "initImage", "image"}) {
         if (body.contains(key) && !body[key].is_null()) {
             if (!body[key].is_string()) throw std::invalid_argument(std::string(key) + " must be a base64 string");
