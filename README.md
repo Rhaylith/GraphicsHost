@@ -5,12 +5,12 @@ runs them in-process on **CPU or Vulkan (AMD GPUs)**, exposes one standard set o
 them through a Qt desktop window, a browser UI, a CLI and an HTTP API. Modelled on LLMHost; the engine is
 [stable-diffusion.cpp](https://github.com/leejet/stable-diffusion.cpp).
 
-Status: **Phases 2 (engine), 3 (models) and 4 (server and UIs) are done**: images are generated from the Qt window, the
+Status: **Phases 2 to 5 are done except the stretch items (upscaler, ControlNet)**: images are generated from the Qt window, the
 browser, the command line and the HTTP API (OpenAI-compatible and native) on CPU and on the AMD GPU (Vulkan), for
 SD 1.x and SDXL, with all samplers and schedulers, a job queue with cancellation, PNG/JPEG/WebP output with the
 parameters embedded, a gallery, presets, per-model defaults and a memory estimate, plus a model library, a verified catalog,
-Hugging Face search and resumable downloads, API tokens and a request log. Image-to-image, inpainting, LoRA and the safety
-filter belong to phase 5. See [implementation-plan.md](implementation-plan.md) for the plan and what is ticked off, and
+Hugging Face search and resumable downloads, API tokens and a request log, image to image, inpainting, LoRA, a hardware monitor and an
+optional prompt safety filter. See [implementation-plan.md](implementation-plan.md) for the plan and what is ticked off, and
 [docs/api.md](docs/api.md) for the HTTP API.
 
 ## Build
