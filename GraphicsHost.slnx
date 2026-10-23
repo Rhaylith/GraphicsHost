@@ -5,6 +5,9 @@
   <Folder Name="/app/">
     <Project Path="GraphicsHost/GraphicsHost.vcxproj" />
   </Folder>
+  <Folder Name="/core/">
+    <Project Path="GraphicsHost.Core/GraphicsHost.Core.vcxproj" />
+  </Folder>
   <Folder Name="/engine/">
     <Project Path="ggml/ggml.vcxproj" />
     <Project Path="stable-diffusion/stable-diffusion.vcxproj" />

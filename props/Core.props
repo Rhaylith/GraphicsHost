@@ -1,0 +1,27 @@
+<Project>
+  <!--
+    Import into every project that uses GraphicsHost.Core (the app, the tests): include path, the Core library and the
+    vcpkg libraries Core is built on. Core is a static library, so its dependencies are not inherited automatically.
+    Import after props/GraphicsHost.props.
+    CLI11 and nlohmann-json are header-only here. spdlog and fmt are the dynamic vcpkg builds.
+  -->
+  <PropertyGroup>
+    <CoreDir>$(RepoRoot)GraphicsHost.Core\</CoreDir>
+    <VcpkgDebugSuffix Condition="'$(Configuration)'=='Debug'">d</VcpkgDebugSuffix>
+    <VcpkgDebugSuffix Condition="'$(Configuration)'!='Debug'"></VcpkgDebugSuffix>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(CoreDir);$(RepoRoot)runtime;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>SPDLOG_SHARED_LIB;SPDLOG_COMPILED_LIB;SPDLOG_FMT_EXTERNAL;FMT_SHARED;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>spdlog$(VcpkgDebugSuffix).lib;fmt$(VcpkgDebugSuffix).lib;advapi32.lib;shell32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ProjectReference Include="$(CoreDir)GraphicsHost.Core.vcxproj">
+      <Project>{7B3D1E0A-5C2F-4E7A-9A11-0F6E2D4C8A09}</Project>
+    </ProjectReference>
+  </ItemGroup>
+</Project>
