@@ -304,7 +304,7 @@ Goal: retire the biggest risk (§10) before any application code exists.
 - [x] 0.5 Console spike project: load an SD1.5 model, generate a 512×512 image on **CPU**, save PNG (S) — `spike/spike.vcxproj`; 18.2 s on CPU, see `docs/phase0-results.md`
 - [x] 0.6 Vulkan backend: build `vulkan-shaders-gen` as its own `.vcxproj`, run it with `glslc` in a pre-build step, add the generated sources to `ggml.vcxproj` (L) — builds: `/p:GgmlVulkan=true`, ~1m50 clean; GPU runtime check blocked by the RX 7900 XTX driver error (code 31), see `docs/phase0-results.md`
 - [ ] 0.7 Generate the same SD1.5 prompt on the AMD GPU *(AMD)*; then one SDXL 1024² image on CPU and GPU; record time, VRAM and any driver errors (M) — CPU half done (SD1.5 18 s, SDXL 103 s); GPU half blocked by the driver error, see `docs/phase0-results.md`
-- [ ] 0.8 **Go/no-go:** if 0.6 is too fragile, switch `sd-vulkan.dll` to the prebuilt-release fallback and note it in §10 (S)
+- [ ] 0.8 **Go/no-go:** if 0.6 is too fragile, switch `sd-vulkan.dll` to the prebuilt-release fallback and note it in §10 (S) — provisional: go with the MSBuild shader path (0.6 was not fragile); confirm once the GPU runs in 0.7
 
 **Exit:** one SD1.5 and one SDXL image generated on CPU and on AMD Vulkan, timings recorded, shader build step documented.
 
@@ -429,6 +429,8 @@ CI builds with `/analyze`, clang-tidy and an ASan configuration.
   CMake (`vulkan-shaders-gen`). Phase 0 must solve this: build `vulkan-shaders-gen` as its own `.vcxproj`, run it from a
   pre-build step with `glslc`, and add the generated sources to `ggml.vcxproj`. If that proves too fragile, the fallback is to
   use prebuilt Vulkan releases of stable-diffusion.cpp as the `sd-vulkan.dll` runtime, which the DLL design already allows.
+  **Phase 0 result:** the MSBuild path works (clean Vulkan build in about 2 minutes, no CMake), so the prebuilt-release fallback is
+  not needed so far; this still has to be confirmed on a working AMD GPU (step 0.7).
 - Vulkan needs `glslc` on the build machine and an AMD driver at run time; verify on AMD only (other vendors are out of v1 scope).
 - Qt through vcpkg compiles from source the first time (hours); enable vcpkg binary caching.
 - Native crashes take the whole process down → keep the engine in-process for v1, but design `IImageEngine` so a
