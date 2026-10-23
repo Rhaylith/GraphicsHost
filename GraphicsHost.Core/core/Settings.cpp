@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <filesystem>
 #include <stdexcept>
 
@@ -13,8 +14,12 @@ namespace {
 
 using Json = nlohmann::json;
 
-constexpr std::array<const char*, 10> kKnownKeys = {"schemaVersion", "backend", "gpuDevice", "threads", "modelsDir",
-                                                  "interfaceMode",  "server",  "logging",   "safety", "firstRunDone"};
+constexpr std::array<const char*, 12> kKnownKeys = {"schemaVersion", "backend", "gpuDevice", "threads", "modelsDir",
+                                                  "interfaceMode",  "server",  "logging",   "safety", "firstRunDone", "theme", "accent"};
+
+bool validAccent(const std::string& c) {
+    return c.size() == 7 && c[0] == '#' && std::all_of(c.begin() + 1, c.end(), [](unsigned char ch) { return std::isxdigit(ch) != 0; });
+}
 
 bool oneOf(const std::string& value, std::initializer_list<const char*> allowed) {
     return std::any_of(allowed.begin(), allowed.end(), [&](const char* a) { return value == a; });
@@ -31,6 +36,8 @@ Json toJson(const Settings& s) {
     json["modelsDir"] = s.modelsDir;
     json["interfaceMode"] = s.interfaceMode;
     json["firstRunDone"] = s.firstRunDone;
+    json["theme"] = s.theme;
+    json["accent"] = s.accent;
     json["server"] = {{"enabled", s.server.enabled}, {"port", s.server.port}, {"lan", s.server.lan}, {"requireToken", s.server.requireToken}};
     json["logging"] = {{"level", s.logging.level}};
     json["safety"] = {{"enabled", s.safety.enabled}};
@@ -49,6 +56,8 @@ Settings settingsFromJson(const Json& json) {
     s.modelsDir = json.value("modelsDir", s.modelsDir);
     s.interfaceMode = json.value("interfaceMode", s.interfaceMode);
     s.firstRunDone = json.value("firstRunDone", s.firstRunDone);
+    s.theme = json.value("theme", s.theme);
+    s.accent = json.value("accent", s.accent);
     if (const auto it = json.find("server"); it != json.end() && it->is_object()) {
         s.server.enabled = it->value("enabled", s.server.enabled);
         s.server.port = it->value("port", s.server.port);
@@ -83,6 +92,12 @@ std::vector<FieldError> validate(const Settings& s) {
     }
     if (!oneOf(s.interfaceMode, {"user", "power", "developer"})) {
         errors.push_back({"interfaceMode", "must be user, power or developer"});
+    }
+    if (!oneOf(s.theme, {"system", "light", "dark"})) {
+        errors.push_back({"theme", "must be system, light or dark"});
+    }
+    if (!s.accent.empty() && !validAccent(s.accent)) {
+        errors.push_back({"accent", "must be empty or a colour like #2b6cb0"});
     }
     if (s.server.port < 1 || s.server.port > 65535) {
         errors.push_back({"server.port", "must be between 1 and 65535"});

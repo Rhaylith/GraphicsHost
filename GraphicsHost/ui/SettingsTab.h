@@ -6,6 +6,7 @@ class QCheckBox;
 class QComboBox;
 class QLabel;
 class QLineEdit;
+class QPushButton;
 class QSpinBox;
 class QTableWidget;
 
@@ -46,6 +47,9 @@ private:
     QSpinBox* threads_ = nullptr;
     QLineEdit* modelsDir_ = nullptr;
     QComboBox* mode_ = nullptr;
+    QComboBox* theme_ = nullptr;
+    QPushButton* accent_ = nullptr;
+    QString accentValue_;
     QCheckBox* serverEnabled_ = nullptr;
     QSpinBox* port_ = nullptr;
     QCheckBox* lan_ = nullptr;

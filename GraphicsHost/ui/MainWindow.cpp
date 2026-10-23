@@ -7,6 +7,7 @@
 #include "LogsTab.h"
 #include "MonitorTab.h"
 #include "SettingsTab.h"
+#include "Theme.h"
 #include "UiUtil.h"
 #include "core/Log.h"
 #include "host/AppHost.h"
@@ -92,6 +93,7 @@ void MainWindow::buildTabs() {
     tabs_->addTab(settings, tr("Settings"));
     connect(settings, &SettingsTab::applied, this, [this] {
         serverError_ = applyServerSettings();
+        gh::ui::applyTheme(*qApp, host_.settings());
         generate_->applyInterfaceMode();
         generate_->refreshLists();
         refreshStatus();

@@ -400,7 +400,8 @@ Goal: retire the biggest risk (§10) before any application code exists.
 
 - [x] 6.1 First-run wizard: hardware survey, recommended model, models folder (M)
   - `recommendCheckpoint` (Core, unit-tested: SDXL when the GPU holds it, else the lightest model) feeds a three-page wizard (computer, models folder with free space, first model + download + interface mode). Shown once (`firstRunDone`); Skip counts. Pages are rendered by the screenshot/`[ui]` check; the Finish/download path was not clicked through automatically.
-- [ ] 6.2 Themes (light/dark/accent), interface modes (User / Power user / Developer), translation scaffolding (`.ts`) (M)
+- [x] 6.2 Themes (light/dark/accent), interface modes (User / Power user / Developer), translation scaffolding (`.ts`) (M)
+  - `theme` (system/light/dark) and `accent` settings, applied live from the Settings tab (Fusion style + palettes; checked on a dark screenshot with an orange accent). Interface modes existed since 4.7. Translations: `GraphicsHost/translations/graphicshost_de.ts` (344 strings from lupdate, the main tab and button names translated), compiled to `.qm` by the build and loaded for the Windows language; the actual German display was not checked (no way to switch the offscreen platform's locale here).
 - [ ] 6.3 HTTPS (OpenSSL, generated or user certificate), IP allow-list, rate limits (M)
 - [ ] 6.4 Notifications (download done, generation done), daemon / Windows service mode (M)
 - [ ] 6.5 Installer (WiX or MSIX) packaging the exe, vcpkg and Qt DLLs, runtime DLLs and the VC++ Redistributable (M)

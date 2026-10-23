@@ -3,6 +3,7 @@
 #include "ui/FirstRunWizard.h"
 #include "ui/GenerateTab.h"
 #include "ui/MaskEditor.h"
+#include "ui/Theme.h"
 #include "ui/MainWindow.h"
 
 #include <QApplication>
@@ -83,6 +84,8 @@ int runGui(int argc, char* argv[]) {
     QApplication::setQuitOnLastWindowClosed(true);
 
     gh::host::AppHost host;
+    gh::ui::installTranslations(app);
+    gh::ui::applyTheme(app, host.settings());
     gh::ui::MainWindow window(host);
     window.show();
     // the first time: a short wizard (not in the automated modes)

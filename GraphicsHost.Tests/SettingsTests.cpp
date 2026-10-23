@@ -165,3 +165,20 @@ TEST_CASE("paths: ensureDirectories creates the whole layout", "[unit][paths]") 
         CHECK(std::filesystem::is_directory(p));
     }
 }
+
+TEST_CASE("settings: theme and accent are validated and round-trip", "[unit][settings]") {
+    gh::core::Settings s;
+    CHECK(s.theme == "system");
+    CHECK(s.accent.empty());
+    CHECK(gh::core::validate(s).empty());
+    s.theme = "dark";
+    s.accent = "#2B6cb0";
+    CHECK(gh::core::validate(s).empty());
+    const auto back = gh::core::settingsFromJson(gh::core::toJson(s));
+    CHECK(back.theme == "dark");
+    CHECK(back.accent == "#2B6cb0");
+    s.theme = "neon";
+    s.accent = "blue";
+    const auto errors = gh::core::validate(s);
+    CHECK(errors.size() == 2);
+}

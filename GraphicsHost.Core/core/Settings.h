@@ -36,6 +36,8 @@ struct Settings {
     std::string modelsDir;               // empty = AppPaths::defaultModelsDir()
     std::string interfaceMode = "user";  // user|power|developer
     bool firstRunDone = false;           // the first-run wizard has been shown
+    std::string theme = "system";        // system|light|dark
+    std::string accent;                  // "" = the default blue, or a colour such as #2b6cb0
     ServerSettings server;
     LoggingSettings logging;
     SafetySettings safety;

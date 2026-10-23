@@ -36,6 +36,8 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="ui\MainWindow.cpp" />
     <ClCompile Include="ui\UiUtil.cpp" />
+    <ClCompile Include="ui\Theme.cpp" />
+    <ClInclude Include="ui\Theme.h" />
     <ClCompile Include="ui\FirstRunWizard.cpp" />
     <ClInclude Include="ui\FirstRunWizard.h" />
     <QtMoc Include="ui\FirstRunWizard.h" />
@@ -44,6 +46,7 @@
     <QtMoc Include="ui\MonitorTab.h" />
     <ClCompile Include="ui\MaskEditor.cpp" />
     <ClInclude Include="ui\MaskEditor.h" />
+    <QtMoc Include="ui\MaskEditor.h" />
     <ClCompile Include="ui\GalleryTab.cpp" />
     <ClInclude Include="ui\GalleryTab.h" />
     <QtMoc Include="ui\GalleryTab.h" />
@@ -70,4 +73,12 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <Import Project="$(RepoRoot)props\Data.targets" />
   <Import Project="$(RepoRoot)props\Qt.targets" />
+  <!-- translations\*.ts (made with lupdate, see translations\README.md) become translations\*.qm next to the exe -->
+  <Target Name="CompileTranslations" AfterTargets="Build" Condition="Exists('$(QtToolsDir)lrelease.exe')">
+    <ItemGroup>
+      <TsFile Include="$(MSBuildProjectDirectory)\translations\*.ts" />
+    </ItemGroup>
+    <MakeDir Directories="$(OutDir)translations" />
+    <Exec Command="&quot;$(QtToolsDir)lrelease.exe&quot; -silent &quot;%(TsFile.FullPath)&quot; -qm &quot;$(OutDir)translations\%(TsFile.Filename).qm&quot;" Condition="'@(TsFile)' != ''" />
+  </Target>
 </Project>

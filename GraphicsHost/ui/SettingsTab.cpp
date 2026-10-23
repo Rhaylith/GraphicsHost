@@ -7,6 +7,7 @@
 
 #include <QApplication>
 #include <QCheckBox>
+#include <QColorDialog>
 #include <QClipboard>
 #include <QComboBox>
 #include <QDialog>
@@ -75,6 +76,27 @@ SettingsTab::SettingsTab(gh::host::AppHost& host, QWidget* parent) : QWidget(par
     engineForm->addRow(tr("CPU threads"), threads_);
     engineForm->addRow(tr("Models folder"), dirRow);
     engineForm->addRow(tr("Interface"), mode_);
+    theme_ = new QComboBox(engineBox);
+    theme_->addItem(tr("Follow Windows"), QStringLiteral("system"));
+    theme_->addItem(tr("Light"), QStringLiteral("light"));
+    theme_->addItem(tr("Dark"), QStringLiteral("dark"));
+    accent_ = new QPushButton(tr("Default blue"), engineBox);
+    accent_->setToolTip(tr("Pick the accent colour (selection, links); click with Shift held to go back to the default"));
+    auto* themeRow = new QHBoxLayout();
+    themeRow->addWidget(theme_, 1);
+    themeRow->addWidget(accent_);
+    engineForm->addRow(tr("Theme"), themeRow);
+    connect(accent_, &QPushButton::clicked, this, [this] {
+        if (QApplication::keyboardModifiers() & Qt::ShiftModifier) {
+            accentValue_.clear();
+        } else {
+            const QColor c = QColorDialog::getColor(accentValue_.isEmpty() ? QColor(0x2b, 0x6c, 0xb0) : QColor(accentValue_), this, tr("Accent colour"));
+            if (!c.isValid()) return;
+            accentValue_ = c.name();
+        }
+        accent_->setText(accentValue_.isEmpty() ? tr("Default blue") : accentValue_);
+        accent_->setStyleSheet(accentValue_.isEmpty() ? QString() : QStringLiteral("QPushButton { border-left: 12px solid %1; }").arg(accentValue_));
+    });
     layout->addWidget(engineBox);
     connect(browse, &QPushButton::clicked, this, [this] {
         const QString dir = QFileDialog::getExistingDirectory(this, tr("Models folder"), modelsDir_->text());
@@ -171,6 +193,9 @@ void SettingsTab::loadFromSettings() {
     threads_->setValue(st.threads);
     modelsDir_->setText(q(st.modelsDir));
     mode_->setCurrentIndex(std::max(0, mode_->findData(q(st.interfaceMode))));
+    theme_->setCurrentIndex(std::max(0, theme_->findData(q(st.theme))));
+    accentValue_ = q(st.accent);
+    accent_->setText(accentValue_.isEmpty() ? tr("Default blue") : accentValue_);
     serverEnabled_->setChecked(st.server.enabled);
     port_->setValue(st.server.port);
     lan_->setChecked(st.server.lan);
@@ -186,6 +211,8 @@ void SettingsTab::apply() {
     st.threads = threads_->value();
     st.modelsDir = s(modelsDir_->text().trimmed());
     st.interfaceMode = s(mode_->currentData().toString());
+    st.theme = s(theme_->currentData().toString());
+    st.accent = s(accentValue_);
     st.server.enabled = serverEnabled_->isChecked();
     st.server.port = port_->value();
     st.server.lan = lan_->isChecked();
