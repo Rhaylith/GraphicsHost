@@ -53,6 +53,7 @@
     <ClCompile Include="JobQueueTests.cpp" />
     <ClCompile Include="ImageCodecTests.cpp" />
     <ClCompile Include="GalleryTests.cpp" />
+    <ClCompile Include="ModelManagerTests.cpp" />
     <ClInclude Include="ModelFixture.h" />
     <ClInclude Include="TestUtil.h" />
   </ItemGroup>

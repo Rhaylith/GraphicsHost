@@ -117,6 +117,11 @@ size_t JobQueue::pending() const {
     return queue_.size();
 }
 
+size_t JobQueue::active() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return static_cast<size_t>(std::count_if(jobs_.begin(), jobs_.end(), [](const auto& j) { return !j->finished(); }));
+}
+
 void JobQueue::setObserver(Observer observer) {
     std::lock_guard<std::mutex> lock(mutex_);
     observer_ = std::move(observer);

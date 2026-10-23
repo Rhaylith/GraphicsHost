@@ -81,6 +81,7 @@ public:
     std::vector<std::shared_ptr<Job>> list() const;
     bool cancel(uint64_t id);
     size_t pending() const;  // queued, not yet running
+    size_t active() const;   // queued or running: zero means the queue is idle
 
     void setObserver(Observer observer);
 
