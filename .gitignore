@@ -33,3 +33,9 @@ GraphicsHost/webview2/
 
 # MSBuild output of the native projects
 build/
+
+# Downloaded model files for the spike
+models/
+
+# Spike outputs
+spike/out/
