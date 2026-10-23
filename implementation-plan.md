@@ -322,7 +322,7 @@ Goal: retire the biggest risk (§10) before any application code exists.
 - [x] 1.10 `docs/adding-options.md` (option-plumbing checklist) and a README with the build instructions (S) — `docs/adding-options.md`, README with build, run, test and layout
 - [x] 1.11 CI: build the solution, run the unit tests, `/analyze`, vcpkg binary cache (M) — `.github/workflows/build.yml` (build, unit and integration tests, /analyze via `-p:GhAnalyze=true`, vcpkg binary cache); /analyze verified locally on Core, the workflow itself has NOT run on GitHub yet
 
-**Exit:** a clean checkout builds in one step; the app starts, lists GPUs, picks CPU or Vulkan, loads a runtime DLL; unit tests pass.
+**Exit:** a clean checkout builds in one step; the app starts, lists GPUs, picks CPU or Vulkan, loads a runtime DLL; unit tests pass. *Status: the whole solution builds in one step at /W4 with no warnings and /analyze is clean on the first-party code; the running parts (unit tests, app start, CLI, runtime load from the app) are written but not yet seen running because Windows Application Control blocks the freshly built binaries here, see the owed-verification list in docs/environment-notes.md.*
 
 ### Phase 2 — Engine: generate from the command line (L)
 

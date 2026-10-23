@@ -41,3 +41,17 @@ folders or extensions. Vcpkg's DLLs are unsigned and locally built, so any of th
 options are signing the build output, or having the policy owner allow the build folder; both are decisions for the
 machine's owner, not something the build scripts should try to avoid.
 | 21:40 | `spdlog.dll` again (loaded by `GraphicsHost.Tests.exe`) | blocked again; Qt DLLs, the runtime DLLs and the spike all load |
+| 21:42 | `GraphicsHost.Tests.exe` (first build) | blocked at launch |
+
+### Verification that is still owed (Phase 1)
+
+Everything below builds, but could not be run on 2026-10-22 because of the blocks above. Run these once the binaries
+load (a rebuild, signing, or an allow rule from the machine's owner), and tick Phase 1.9 in the plan when they pass:
+
+```
+build\bin\x64\Release\GraphicsHost.Tests.exe "[unit]"          # about 45 test cases: settings, migrations, log, engine selection, CLI
+build\bin\x64\Release\GraphicsHost.Tests.exe "[integration]"   # loads a real runtime DLL
+build\bin\x64\Release\GraphicsHost.exe --json hardware          # CLI path of the app
+build\bin\x64\Release\GraphicsHost.exe runtime info             # app loads the selected runtime
+build\bin\x64\Release\GraphicsHost.exe --smoke-test             # opens the Qt window and exits (QT_QPA_PLATFORM=offscreen is fine)
+```
