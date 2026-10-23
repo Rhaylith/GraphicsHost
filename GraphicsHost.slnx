@@ -5,6 +5,14 @@
   <Folder Name="/engine/">
     <Project Path="ggml/ggml.vcxproj" />
     <Project Path="stable-diffusion/stable-diffusion.vcxproj" />
+    <Project Path="ggml/vulkan-shaders-gen.vcxproj">
+      <BuildType Solution="Debug|*" Project="Release" />
+    </Project>
+  </Folder>
+  <Folder Name="/runtime/">
+    <Project Path="runtime/sd-cpu-avx2.vcxproj" />
+    <Project Path="runtime/sd-cpu-noavx.vcxproj" />
+    <Project Path="runtime/sd-vulkan.vcxproj" />
   </Folder>
   <Folder Name="/spike/">
     <Project Path="spike/spike.vcxproj" />

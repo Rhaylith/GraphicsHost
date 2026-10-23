@@ -82,11 +82,6 @@
     <ClCompile Include="$(SdSrc)thirdparty\oniguruma\unicode_unfold_key.c" />
     <ClCompile Include="$(SdSrc)thirdparty\oniguruma\utf8.c" />
   </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\ggml\ggml.vcxproj">
-      <Project>{7B3D1E0A-5C2F-4E7A-9A11-0F6E2D4C8A01}</Project>
-    </ProjectReference>
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <!-- Same-named sources live in different folders: make every object name unique. -->
   <Target Name="UniqueObjectNames" BeforeTargets="SelectClCompile">

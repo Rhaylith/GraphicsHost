@@ -34,6 +34,9 @@
     <GgmlSrc>$(Sdcpp)ggml\</GgmlSrc>
     <!-- same-named sources get unique object names in the UniqueObjectNames target below -->
     <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);MSB8027</MSBuildWarningsAsMessages>
+    <!-- one library per variant: ggml-cpu-avx2.lib, ggml-cpu-noavx.lib (and ggml-vulkan.lib below) -->
+    <TargetName>ggml-cpu-$(GgmlCpuVariant)</TargetName>
+    <IntDir>$(RepoRoot)build\obj\ggml-cpu-$(GgmlCpuVariant)\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <!-- Vulkan variant (msbuild /p:GgmlVulkan=true): separate library name and object folder, so both variants coexist. -->
   <PropertyGroup Condition="'$(GgmlVulkan)'=='true'">
