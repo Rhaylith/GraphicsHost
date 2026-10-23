@@ -289,15 +289,132 @@ No verb = open the desktop window with the API running.
 
 ## 10. Phasing, testing and decisions
 
-| Phase | Deliverable | Effort |
+Each step is a checkbox (`- [ ]`); tick it and add the commit hash when done. A phase is finished only when its **exit
+criterion** holds. Effort tags: **S** ≤ 2 d · **M** 3–5 d · **L** 6–10 d · **XL** > 10 d. Steps marked *(AMD)* need the AMD test
+machine; steps marked *(stretch)* can slip past v1 without breaking it.
+
+### Phase 0 — Spike: prove the engine builds and runs without CMake (M–L)
+
+Goal: retire the biggest risk (§10) before any application code exists.
+
+- [ ] 0.1 Install the toolchain: VS2026 C++ workload, Vulkan SDK (or vcpkg `shaderc`), Git; bootstrap the existing `D:\code\vcpkg` (S)
+- [ ] 0.2 Add `extern/stable-diffusion.cpp` (+ `ggml`) as a pinned submodule; record the commit (S)
+- [ ] 0.3 `ggml.vcxproj`: static library, ggml core + CPU backend, builds clean with `/W3` (M)
+- [ ] 0.4 `stable-diffusion.vcxproj`: static library on top of `ggml.vcxproj` (S)
+- [ ] 0.5 Console spike project: load an SD1.5 model, generate a 512×512 image on **CPU**, save PNG (S)
+- [ ] 0.6 Vulkan backend: build `vulkan-shaders-gen` as its own `.vcxproj`, run it with `glslc` in a pre-build step, add the generated sources to `ggml.vcxproj` (L)
+- [ ] 0.7 Generate the same SD1.5 prompt on the AMD GPU *(AMD)*; then one SDXL 1024² image on CPU and GPU; record time, VRAM and any driver errors (M)
+- [ ] 0.8 **Go/no-go:** if 0.6 is too fragile, switch `sd-vulkan.dll` to the prebuilt-release fallback and note it in §10 (S)
+
+**Exit:** one SD1.5 and one SDXL image generated on CPU and on AMD Vulkan, timings recorded, shader build step documented.
+
+### Phase 1 — Foundations: solution, dependencies, plumbing (M–L)
+
+- [ ] 1.1 Remove the empty C# WPF project and `GraphicsHost.slnx`; create the new `.slnx` with the project set from §3 (S)
+- [ ] 1.2 `Directory.Build.props`: C++20, `/W4 /permissive-`, output folders, vcpkg switches; `vcpkg.json` with the §11 packages; `vcpkg integrate install` (S)
+- [ ] 1.3 Move the spike's static libs into the solution; add the three runtime projects `sd-cpu-avx2`, `sd-cpu-noavx`, `sd-vulkan` exporting the C ABI shim (`gh_load`, `gh_generate`, `gh_free`, cancel) (M)
+- [ ] 1.4 `GraphicsHost.vcxproj` with Qt Visual Studio Tools: a main window that opens and closes; `windeployqt` post-build step (M)
+- [ ] 1.5 `core/`: paths (`%USERPROFILE%\.graphicshost`), `Settings` with `schemaVersion` + migrations + validator, atomic file writes (M)
+- [ ] 1.6 `core/`: spdlog logging (JSON-lines file sink, ring buffer for the UI), native log callback routed in (S)
+- [ ] 1.7 `core/`: `AppHost` composition root; command-line entry (`CLI11`) and GUI/CLI mode switch (S)
+- [ ] 1.8 `engine/`: `GpuDevices` (Vulkan enumeration, AMD flag, VRAM), CPU feature detection, `RuntimeLoader` choosing and loading one `sd-*.dll` (M)
+- [ ] 1.9 `GraphicsHost.Tests` project with Catch2 and the `[unit]/[api]/[integration]` tags; first tests for settings and migrations (S)
+- [ ] 1.10 `docs/adding-options.md` (option-plumbing checklist) and a README with the build instructions (S)
+- [ ] 1.11 CI: build the solution, run the unit tests, `/analyze`, vcpkg binary cache (M)
+
+**Exit:** a clean checkout builds in one step; the app starts, lists GPUs, picks CPU or Vulkan, loads a runtime DLL; unit tests pass.
+
+### Phase 2 — Engine: generate from the command line (L)
+
+- [ ] 2.1 `GenerationRequest` struct (§5), defaults, JSON (de)serialisation in one place, validator returning `{field, message}` (M)
+- [ ] 2.2 `IImageEngine` / `ILoadedModel` implemented over the runtime DLL: load with `LoadOptions`, unload (M)
+- [ ] 2.3 Engine thread per loaded model, `JobQueue`, progress callback per step, cancellation via the step callback (M)
+- [ ] 2.4 txt2img for SD1.5 and SDXL with sampler/scheduler/seed/steps/CFG/size/batch; returned seed is the real seed (M)
+- [ ] 2.5 Output: PNG with parameter text chunk (`libpng`), JPEG, WebP; reproducibility test (same seed gives the same image on CPU) (S)
+- [ ] 2.6 Gallery store: `outputs/YYYY/MM/DD`, sidecar JSON, SQLite index (M)
+- [ ] 2.7 `ModelManager`: load, unload, idle TTL, one-model-loaded policy with eviction (S)
+- [ ] 2.8 Fit estimator v1 (weights + VAE + activations at W×H×batch) with the low-VRAM suggestions (`vae_tiling`, `offload_params_to_cpu`) (M)
+- [ ] 2.9 CPU→Vulkan fallback *offer* on load failure; error codes and the exit-code table (S)
+- [ ] 2.10 CLI verbs `gen`, `ls`, `load`/`unload`/`ps`, `hardware`, `config`, `--json` (M)
+- [ ] 2.11 Per-model defaults and presets (files, live reload) (S)
+
+**Exit:** `graphicshost gen "a lighthouse" --model sd15 --steps 20 --seed 1` writes an image on CPU and on AMD Vulkan; cancel works; the engine integration test passes.
+
+### Phase 3 — Models: discover, download, library (L)
+
+- [ ] 3.1 Safetensors header reader and GGUF header reader (port of LLMHost `Gguf.cs`); family detection SD1.5 / SDXL (SD3/FLUX detected and reported unsupported) (M)
+- [ ] 3.2 `ModelLibrary`: folder watching, `publisher/repo/file` layout, `ModelCard` (family, default size/steps/CFG/sampler, companions) (M)
+- [ ] 3.3 `DownloadManager` on libcurl: queue, range resume, pause/resume, free-space check, SHA-256 (CNG), progress events (L)
+- [ ] 3.4 Embedded `catalog.json` (curated SD1.5 / SDXL / Turbo / Lightning entries) and `Catalog` loader (S)
+- [ ] 3.5 `HuggingFace` client: search by `text-to-image` tag, file listing, licence and gating info; HF token in Windows Credential Manager; gated-model flow (M)
+- [ ] 3.6 Companion resolution: a separate VAE is downloaded and linked automatically with the model (S)
+- [ ] 3.7 Fit hints in search results and catalog ("fits this GPU / needs offload / CPU only") (S)
+- [ ] 3.8 Model update check (repo revision) (S)
+- [ ] 3.9 CLI verbs `catalog`, `search`, `get`, `downloads` (S)
+
+**Exit:** `graphicshost get <catalog key>` downloads, verifies and registers a model, with its VAE if needed; `gen` can use it; downloads resume after being killed.
+
+### Phase 4 — API and both UIs (XL)
+
+- [ ] 4.1 HTTP server (`cpp-httplib`): routing, JSON errors, SSE helper, body-size caps before parsing (M)
+- [ ] 4.2 Auth: API tokens (hashed, permissions), localhost-only default, `--lan` flag (M)
+- [ ] 4.3 OpenAI endpoints: `/v1/images/generations`, `/v1/images/edits` (stub until img2img), `/v1/models` (M)
+- [ ] 4.4 Native `/api/v1`: generate + job poll/stream/cancel, models load/unload, downloads, discover, gallery, outputs (L)
+- [ ] 4.5 Request log, `/api/requests`, `/metrics` (S)
+- [ ] 4.6 Qt shell: main window, tabs, tray icon, single instance, window-state memory, services → view-model wiring (M)
+- [ ] 4.7 Qt **Generate** tab: prompt boxes, parameter panel with interface-mode gating, model/device picker, live progress and preview, results, context menus (L)
+- [ ] 4.8 Qt **My Models** and **Discover** tabs, download queue (L)
+- [ ] 4.9 Qt **Settings** tab (server, tokens, runtime/backend, GPU device, models folder) and **Logs** tab (M)
+- [ ] 4.10 Browser UI: embedded static files served at `/`, with Generate, Gallery, My Models, Discover and Settings against `/api/v1` (L)
+- [ ] 4.11 API contract tests (server on an ephemeral port) and UI smoke checks (M)
+
+**Exit:** the same generation can be started from the Qt window, the browser UI, an OpenAI client and the CLI; models can be discovered and downloaded from either UI.
+
+### Phase 5 — Depth: more of what an image host needs (L)
+
+- [ ] 5.1 Qt and browser **Gallery** tab: lazy thumbnails, search by prompt, reuse parameters, delete, export (M)
+- [ ] 5.2 img2img (`init_image`, `strength`) and `/v1/images/edits` (M)
+- [ ] 5.3 Inpainting with `mask_image`; mask drawing in the Qt UI (browser UI may follow later) (M)
+- [ ] 5.4 LoRA support: library scan, `loras[]` parameter, `<lora:name:w>` prompt syntax (M)
+- [ ] 5.5 Presets import/export; hardware monitor graphs (GPU utilisation, VRAM) with Qt Charts (M)
+- [ ] 5.6 Optional safety filter: `ISafetyFilter`, first implementation, per-request override, off by default (M)
+- [ ] 5.7 ESRGAN upscaler *(stretch)*; ControlNet *(stretch)*
+
+**Exit:** the standard parameter set from §5 is fully usable from the API and both UIs, except the stretch items.
+
+### Phase 6 — Polish and release (L)
+
+- [ ] 6.1 First-run wizard: hardware survey, recommended model, models folder (M)
+- [ ] 6.2 Themes (light/dark/accent), interface modes (User / Power user / Developer), translation scaffolding (`.ts`) (M)
+- [ ] 6.3 HTTPS (OpenSSL, generated or user certificate), IP allow-list, rate limits (M)
+- [ ] 6.4 Notifications (download done, generation done), daemon / Windows service mode (M)
+- [ ] 6.5 Installer (WiX or MSIX) packaging the exe, vcpkg and Qt DLLs, runtime DLLs and the VC++ Redistributable (M)
+- [ ] 6.6 Auto-update (feed, signed package, rollback) *(stretch)*
+- [ ] 6.7 Hardware cross-check: RDNA GPU, an older GCN card if available, an APU; a CPU-only machine without AVX2; clean-VM install test *(AMD)* (M)
+- [ ] 6.8 Docs: README with feature table, per-feature docs as in LLMHost, API reference (S)
+
+**Exit:** an installer installs on a clean Windows machine and passes the smoke checklist on CPU and AMD Vulkan.
+
+### Critical path and ordering
+
+`0 → 1 → 2 → 3` is strictly sequential (each needs the previous layer). Inside phase 4, `4.1–4.5` (server) come before `4.10`
+(browser UI) and can run in parallel with `4.6–4.9` (Qt UI) once the services exist. Phase 5 items are independent of each
+other. Phase 6 can start in part once Phase 4 is done (installer, wizard).
+
+### Rough timeline (one engineer)
+
+| Phase | Effort | Cumulative |
 |---|---|---|
-| **0 Spike** | `ggml.vcxproj` + `stable-diffusion.vcxproj` build with the Vulkan backend (shader compile step solved without CMake); generate one SD1.5 and one SDXL image from a console `main()` on **CPU and on an AMD GPU**; record timings and VRAM use | M |
-| **1 Foundations** | Remove C# project, `.slnx`/`.vcxproj` set + `Directory.Build.props`, vcpkg manifest, Qt VS Tools, `AppHost`, settings + migrations, logging, hardware/GPU info, runtime DLL shim + `RuntimeLoader`, `docs/adding-options.md`, CI | M |
-| **2 Engine** | `IImageEngine`, load/unload, `GenerationRequest` + validator, job queue, progress/cancel, PNG metadata, gallery store. CLI `gen` works end to end | L |
-| **3 Models** | (SD1.5 + SDXL only) Library scan + family detection, catalog, HF discovery, libcurl downloader, companion resolution, fit estimator | L |
-| **4 API + UI** | OpenAI/native endpoints, tokens; Qt Generate, My Models, Discover, Settings; browser UI for the same tabs | XL |
-| **5 Depth** | img2img/inpaint, LoRA, ControlNet, upscaler, presets, gallery tab, multi-model, hardware monitor | L |
-| **6 Polish** | First-run wizard, themes/interface modes, HTTPS/limits, installer (WiX/MSIX), auto-update, notifications | L |
+| 0 Spike | 2–3 wk | 2–3 wk |
+| 1 Foundations | 2 wk | 4–5 wk |
+| 2 Engine | 2 wk | 6–7 wk |
+| 3 Models | 2 wk | 8–9 wk |
+| 4 API + UIs | 5–6 wk | 13–15 wk |
+| 5 Depth | 2–3 wk | 15–18 wk |
+| 6 Polish | 2–3 wk | 17–21 wk |
+
+Phase 0 dominates the uncertainty. If it ends in the prebuilt-Vulkan fallback, subtract roughly one week; if shader
+generation proves intractable, CPU-only ships first and Vulkan moves to a fast follow-up.
 
 **Tests** (Catch2, run from Test Explorer; tags `[unit]`, `[api]`, `[integration]`): validators, JSON round-trips, family detection from
 header fixtures, catalog parsing, download resume against a local test server, API contract tests (HTTP server started on an
