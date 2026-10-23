@@ -1,0 +1,98 @@
+name: build
+
+# Builds the solution with MSBuild, runs the unit tests and the static analysis.
+#
+# NOT YET RUN ON GITHUB. Things to check on the first run:
+#  - the runner needs Visual Studio 2026 (platform toolset v145); if "windows-latest" still ships an older Visual Studio,
+#    use a runner image that has VS 2026 or a self-hosted runner;
+#  - the vcpkg packages (Qt among them) compile from source on a cold cache, which takes a long time; the cache step
+#    below keeps vcpkg's binary packages between runs.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  VCPKG_ROOT: C:\vcpkg
+  VCPKG_INSTALLED: C:\vcpkg\installed\x64-windows
+  VCPKG_DEFAULT_BINARY_CACHE: C:\vcpkg-cache
+  VCPKG_PACKAGES: >-
+    qtbase qtcharts qtsvg qttools qtimageformats
+    cpp-httplib[openssl] openssl curl[ssl] nlohmann-json spdlog cli11 sqlite3
+    libpng libjpeg-turbo libwebp catch2 vulkan-headers vulkan-loader shaderc
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Restore the vcpkg binary cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: vcpkg-x64-windows-${{ hashFiles('vcpkg.json') }}
+          restore-keys: vcpkg-x64-windows-
+
+      - name: Install the vcpkg packages (classic mode, dynamic x64-windows)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force $env:VCPKG_DEFAULT_BINARY_CACHE | Out-Null
+          & "$env:VCPKG_ROOT\vcpkg.exe" install --triplet x64-windows ($env:VCPKG_PACKAGES -split '\s+')
+          & "$env:VCPKG_ROOT\vcpkg.exe" integrate install
+
+      - name: Set up MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build
+        shell: pwsh
+        run: msbuild GraphicsHost.slnx -p:Configuration=Release -p:Platform=x64 -m -nologo -v:m
+
+      - name: Unit tests
+        shell: pwsh
+        run: build\bin\x64\Release\GraphicsHost.Tests.exe "[unit]" --reporter junit --out test-results.xml
+
+      - name: Integration tests (skipped by the tests when no runtime can be loaded)
+        shell: pwsh
+        run: build\bin\x64\Release\GraphicsHost.Tests.exe "[integration]"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results.xml
+
+  analyze:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Restore the vcpkg binary cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: vcpkg-x64-windows-${{ hashFiles('vcpkg.json') }}
+          restore-keys: vcpkg-x64-windows-
+
+      - name: Install the vcpkg packages
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force $env:VCPKG_DEFAULT_BINARY_CACHE | Out-Null
+          & "$env:VCPKG_ROOT\vcpkg.exe" install --triplet x64-windows ($env:VCPKG_PACKAGES -split '\s+')
+          & "$env:VCPKG_ROOT\vcpkg.exe" integrate install
+
+      - name: Set up MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Static analysis (/analyze) of the first-party code
+        shell: pwsh
+        run: |
+          foreach ($p in 'GraphicsHost.Core\GraphicsHost.Core.vcxproj', 'GraphicsHost\GraphicsHost.vcxproj') {
+            msbuild $p -p:Configuration=Release -p:Platform=x64 -p:GhAnalyze=true -nologo -v:m
+          }

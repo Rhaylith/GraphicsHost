@@ -320,7 +320,7 @@ Goal: retire the biggest risk (§10) before any application code exists.
 - [x] 1.8 `engine/`: `GpuDevices` (Vulkan enumeration, AMD flag, VRAM), CPU feature detection, `RuntimeLoader` choosing and loading one `sd-*.dll` (M) — `engine/CpuFeatures`, `GpuDevices` (dynamic vulkan-1.dll, AMD-only support flag), `RuntimeLoader` (discovery, pure `chooseRuntime`, DLL wrapper with Application Control hint); tests follow in 1.9
 - [ ] 1.9 `GraphicsHost.Tests` project with Catch2 and the `[unit]/[api]/[integration]` tags; first tests for settings and migrations (S) — written and building (settings, migrations, log, engine selection, CLI; ~45 test cases), NOT yet run: Application Control blocks spdlog.dll on this machine (docs/environment-notes.md)
 - [x] 1.10 `docs/adding-options.md` (option-plumbing checklist) and a README with the build instructions (S) — `docs/adding-options.md`, README with build, run, test and layout
-- [ ] 1.11 CI: build the solution, run the unit tests, `/analyze`, vcpkg binary cache (M)
+- [x] 1.11 CI: build the solution, run the unit tests, `/analyze`, vcpkg binary cache (M) — `.github/workflows/build.yml` (build, unit and integration tests, /analyze via `-p:GhAnalyze=true`, vcpkg binary cache); /analyze verified locally on Core, the workflow itself has NOT run on GitHub yet
 
 **Exit:** a clean checkout builds in one step; the app starts, lists GPUs, picks CPU or Vulkan, loads a runtime DLL; unit tests pass.
 

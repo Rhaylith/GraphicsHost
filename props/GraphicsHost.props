@@ -15,6 +15,8 @@
       <ExceptionHandling>Sync</ExceptionHandling>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <SDLCheck>true</SDLCheck>
+      <!-- msbuild -p:GhAnalyze=true runs MSVC static analysis (/analyze) on the first-party code -->
+      <EnablePREfast Condition="'$(GhAnalyze)'=='true'">true</EnablePREfast>
       <TreatAngleIncludeAsExternal>true</TreatAngleIncludeAsExternal>
       <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
       <AdditionalOptions>/utf-8 /permissive- /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
