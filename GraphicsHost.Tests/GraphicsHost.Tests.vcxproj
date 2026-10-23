@@ -48,6 +48,7 @@
     <ClCompile Include="LogTests.cpp" />
     <ClCompile Include="EngineTests.cpp" />
     <ClCompile Include="CliTests.cpp" />
+    <ClCompile Include="GenerationRequestTests.cpp" />
     <ClInclude Include="TestUtil.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

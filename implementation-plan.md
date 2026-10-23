@@ -326,7 +326,7 @@ Goal: retire the biggest risk (§10) before any application code exists.
 
 ### Phase 2 — Engine: generate from the command line (L)
 
-- [ ] 2.1 `GenerationRequest` struct (§5), defaults, JSON (de)serialisation in one place, validator returning `{field, message}` (M)
+- [x] 2.1 `GenerationRequest` struct (§5), defaults, JSON (de)serialisation in one place, validator returning `{field, message}` (M) — `engine/GenerationRequest` (+ `LoadOptions`): defaults mean "model default", `resolve()` fills from family defaults, partial-JSON apply for presets, validator with field names; 10 test cases
 - [ ] 2.2 `IImageEngine` / `ILoadedModel` implemented over the runtime DLL: load with `LoadOptions`, unload (M)
 - [ ] 2.3 Engine thread per loaded model, `JobQueue`, progress callback per step, cancellation via the step callback (M)
 - [ ] 2.4 txt2img for SD1.5 and SDXL with sampler/scheduler/seed/steps/CFG/size/batch; returned seed is the real seed (M)
