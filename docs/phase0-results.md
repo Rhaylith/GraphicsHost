@@ -45,3 +45,26 @@ Memory/VRAM figures for the GPU runs are still missing for the same reason.
 Phase 0 closed as CPU-verified (user decision): GPU measurements are skipped for now. Open item: run `spike-vulkan` on a working RX 7900 XTX and fill in the table above.
 
 **Update 2026-10-23:** the RX 7900 XTX now initialises in Vulkan (`runtime info` lists `Vulkan0 AMD Radeon RX 7900 XTX`), so the GPU rows above can be measured with `spike-vulkan.exe`; not done yet.
+
+## Step 0.7 completed: GPU measurements (2026-10-23)
+
+Driver repaired (the card initialises in Vulkan: `ggml_vulkan: 0 = AMD Radeon RX 7900 XTX (AMD proprietary driver) | fp16: 1 | bf16: 1 | warp size: 64 | matrix cores: KHR_coopmat`, 24 GiB).
+`spike-vulkan.exe --backend vulkan0`, same prompt, seed 1, 20 steps, CFG 7 as the CPU runs.
+
+| Model | Backend | Size | Load | Generate | Sampling | VAE decode | s/step (total) | Weights in VRAM |
+|---|---|---|---|---|---|---|---|---|
+| SD1.5 | cpu (AVX2) | 512x512 | 0.12 s | 18.17 s | 14.5 s | 1.95 s | 0.909 | - |
+| SD1.5 | **vulkan0** | 512x512 | 1.22 s | **6.94 s** | 5.64 s | 0.73 s | 0.347 | 2 784 MB |
+| SDXL base 1.0 | cpu (AVX2) | 1024x1024 | 0.11 s | 102.95 s | 94.8 s | 6.8 s | 5.148 | - |
+| SDXL base 1.0 | **vulkan0** | 1024x1024 | 0.21 s | **25.57 s** | 18.25 s | 5.40 s | 1.279 | 6 624 MB |
+
+* Speed-up on the 7900 XTX over the 96-core CPU: SD1.5 2.6x, SDXL 4.0x. The CPU is strong here (AVX2 on 192 threads), so
+  the ratio is smaller than on a typical desktop.
+* Both GPU images were checked by eye and match the CPU images (same composition for the same seed).
+* The first SD1.5 run on the GPU takes longer to load (1.2 s) than later runs: shader pipelines are built on first use.
+* Peak VRAM including activations was not measured; only the weight sizes the engine prints. Both models fit in 24 GiB
+  with a lot of room; the estimator in step 2.8 needs a measured activation figure (see the TODO there).
+* ggml printed `Failed to allocate pinned memory` twice during the SDXL VAE decode and carried on (the result is correct);
+  it means a host-visible staging buffer was refused and a slower path was used. Worth watching in later phases.
+* `conv3d direct auto: Vulkan0 -> off (probe output check failed)`: the engine's own probe disables one optimisation on
+  this GPU/driver. Harmless for image models.
