@@ -14,6 +14,11 @@
     <VcpkgInstalled Condition="'$(VcpkgInstalled)'=='' And '$(VCPKG_INSTALLED)'!=''">$(VCPKG_INSTALLED)\</VcpkgInstalled>
     <VcpkgInstalled Condition="'$(VcpkgInstalled)'==''">D:\code\vcpkg\installed\x64-windows\</VcpkgInstalled>
     <Glslc Condition="'$(Glslc)'==''">$(VcpkgInstalled)tools\shaderc\glslc.exe</Glslc>
+    <!-- classic mode: use the existing install instead of building vcpkg.json into the repo (see vcpkg.json) -->
+    <VcpkgEnableManifest>false</VcpkgEnableManifest>
+    <VcpkgTriplet>x64-windows</VcpkgTriplet>
+    <!-- first-party projects import this for C++20, /W4, vcpkg paths -->
+    <GhProps>$(MSBuildThisFileDirectory)props\GraphicsHost.props</GhProps>
   </PropertyGroup>
 
   <!--

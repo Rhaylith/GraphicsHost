@@ -311,7 +311,7 @@ Goal: retire the biggest risk (§10) before any application code exists.
 ### Phase 1 — Foundations: solution, dependencies, plumbing (M–L)
 
 - [x] 1.1 Remove the empty C# WPF project and `GraphicsHost.slnx`; create the new `.slnx` with the project set from §3 (S) — `GraphicsHost.slnx` builds the native projects; more projects are added by later steps
-- [ ] 1.2 `Directory.Build.props`: C++20, `/W4 /permissive-`, output folders, vcpkg switches; `vcpkg.json` with the §11 packages; `vcpkg integrate install` (S)
+- [x] 1.2 `Directory.Build.props`: C++20, `/W4 /permissive-`, output folders, vcpkg switches; `vcpkg.json` with the §11 packages; `vcpkg integrate install` (S) — `props/GraphicsHost.props` (first-party only), `vcpkg.json` documents the set; MSBuild stays in classic mode (`VcpkgEnableManifest=false`) so Qt is never rebuilt from source
 - [ ] 1.3 Move the spike's static libs into the solution; add the three runtime projects `sd-cpu-avx2`, `sd-cpu-noavx`, `sd-vulkan` exporting the C ABI shim (`gh_load`, `gh_generate`, `gh_free`, cancel) (M)
 - [ ] 1.4 `GraphicsHost.vcxproj` with Qt Visual Studio Tools: a main window that opens and closes; `windeployqt` post-build step (M)
 - [ ] 1.5 `core/`: paths (`%USERPROFILE%\.graphicshost`), `Settings` with `schemaVersion` + migrations + validator, atomic file writes (M)

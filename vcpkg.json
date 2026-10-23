@@ -1,0 +1,26 @@
+{
+  "$comment": "Documents the dependency set. MSBuild uses the classic-mode install at D:\\code\\vcpkg\\installed\\x64-windows (VcpkgEnableManifest stays off, so building never rebuilds Qt from source). To switch to manifest mode, set VcpkgEnableManifest=true.",
+  "name": "graphicshost",
+  "version-string": "0.1.0",
+  "dependencies": [
+    "qtbase",
+    "qtcharts",
+    "qtsvg",
+    "qttools",
+    "qtimageformats",
+    { "name": "cpp-httplib", "features": [ "openssl" ] },
+    "openssl",
+    { "name": "curl", "features": [ "ssl" ] },
+    "nlohmann-json",
+    "spdlog",
+    "cli11",
+    "sqlite3",
+    "libpng",
+    "libjpeg-turbo",
+    "libwebp",
+    "catch2",
+    "vulkan-headers",
+    "vulkan-loader",
+    "shaderc"
+  ]
+}
