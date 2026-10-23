@@ -450,26 +450,26 @@ CI builds with `/analyze`, clang-tidy and an ASan configuration.
 Manifest (`vcpkg.json`) for the stock triplet `x64-windows` (§2): every library is dynamic. Package and feature
 names are from memory of the vcpkg registry; run `vcpkg search <name>` once to confirm each before the first install.
 
-| Package (features) | Used for |
-|---|---|
-| `qtbase` | Qt Core, Gui, Widgets, Network; also provides `moc`, `uic`, `rcc` |
-| `qtcharts` | hardware-monitor graphs |
-| `qtsvg` | SVG icons |
-| `qttools` | Linguist (`lupdate`/`lrelease`), `windeployqt` |
-| `qtimageformats` | WebP / TIFF in the gallery and previews |
-| `cpp-httplib` (`openssl`) | HTTP/HTTPS server, SSE, hosting the browser UI |
-| `openssl` | HTTPS certificates, TLS for the server |
-| `curl` (`ssl`; Schannel on Windows) | resumable downloads, Hugging Face API |
-| `nlohmann-json` | settings, presets, catalog, API payloads |
-| `spdlog` (brings `fmt`) | logging, JSON-lines sink |
-| `cli11` | command-line parsing |
-| `sqlite3` | gallery index and search |
-| `libpng` (brings `zlib`) | PNG with parameter text chunks |
-| `libjpeg-turbo` | JPEG output |
-| `libwebp` | WebP output |
-| `catch2` | tests |
-| `vulkan-headers`, `vulkan-loader` | Vulkan build headers and loader for the ggml Vulkan backend and `GpuDevices` |
-| `shaderc` | provides `glslc` to compile ggml's Vulkan shaders (not needed if the Vulkan SDK is installed) |
+| Package (features) | Used for | Installed in the vcpkg checkout (checked 2026-10-22, all present) |
+|---|---|---|
+| `qtbase` | Qt Core, Gui, Widgets, Network; also provides `moc`, `uic`, `rcc` | ✅ x64-windows |
+| `qtcharts` | hardware-monitor graphs | ✅ x64-windows |
+| `qtsvg` | SVG icons | ✅ x64-windows |
+| `qttools` | Linguist (`lupdate`/`lrelease`), `windeployqt` | ✅ x64-windows |
+| `qtimageformats` | WebP / TIFF in the gallery and previews | ✅ x64-windows |
+| `cpp-httplib` (`openssl`) | HTTP/HTTPS server, SSE, hosting the browser UI | ✅ x64-windows |
+| `openssl` | HTTPS certificates, TLS for the server | ✅ x64-windows |
+| `curl` (`ssl`; Schannel on Windows) | resumable downloads, Hugging Face API | ✅ x64-windows |
+| `nlohmann-json` | settings, presets, catalog, API payloads | ✅ x64-windows |
+| `spdlog` (brings `fmt`) | logging, JSON-lines sink | ✅ x64-windows |
+| `cli11` | command-line parsing | ✅ x64-windows |
+| `sqlite3` | gallery index and search | ✅ x64-windows |
+| `libpng` (brings `zlib`) | PNG with parameter text chunks | ✅ x64-windows |
+| `libjpeg-turbo` | JPEG output | ✅ x64-windows |
+| `libwebp` | WebP output | ✅ x64-windows |
+| `catch2` | tests | ✅ x64-windows |
+| `vulkan-headers`, `vulkan-loader` | Vulkan build headers and loader for the ggml Vulkan backend and `GpuDevices` | ✅ x64-windows |
+| `shaderc` | provides `glslc` to compile ggml's Vulkan shaders (not needed if the Vulkan SDK is installed) | ✅ x64-windows |
 
 Not from vcpkg (install separately):
 
