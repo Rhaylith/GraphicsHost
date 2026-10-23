@@ -60,6 +60,8 @@
     <ClCompile Include="CliGenTests.cpp" />
     <ClCompile Include="ModelCardTests.cpp" />
     <ClCompile Include="ModelLibraryTests.cpp" />
+    <ClCompile Include="DownloadTests.cpp" />
+    <ClInclude Include="TestHttpServer.h" />
     <ClInclude Include="SafetensorsFixture.h" />
     <ClInclude Include="ModelFixture.h" />
     <ClInclude Include="TestUtil.h" />
