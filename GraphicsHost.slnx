@@ -1,3 +1,12 @@
 <Solution>
-  <Project Path="GraphicsHost/GraphicsHost.csproj" />
+  <Configurations>
+    <Platform Name="x64" />
+  </Configurations>
+  <Folder Name="/engine/">
+    <Project Path="ggml/ggml.vcxproj" />
+    <Project Path="stable-diffusion/stable-diffusion.vcxproj" />
+  </Folder>
+  <Folder Name="/spike/">
+    <Project Path="spike/spike.vcxproj" />
+  </Folder>
 </Solution>
