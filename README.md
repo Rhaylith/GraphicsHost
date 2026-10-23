@@ -5,9 +5,10 @@ runs them in-process on **CPU or Vulkan (AMD GPUs)**, exposes one standard set o
 them through a Qt desktop window, a browser UI, a CLI and an HTTP API. Modelled on LLMHost; the engine is
 [stable-diffusion.cpp](https://github.com/leejet/stable-diffusion.cpp).
 
-Status: **Phase 1 (foundations)**. Done: the engine builds without CMake and generates on CPU, the runtime DLLs and their
-C ABI, settings and logging, hardware detection, the runtime loader, a CLI skeleton and an empty Qt window. Image
-generation from the app, model management and the HTTP API come in phases 2 to 4. See
+Status: **Phase 2 (engine) is done**: images are generated from the command line on CPU and on the AMD GPU (Vulkan), for
+SD 1.x and SDXL, with all samplers and schedulers, a job queue with cancellation, PNG/JPEG/WebP output with the
+parameters embedded, a gallery, presets, per-model defaults and a memory estimate. The Qt window is still empty; model
+discovery and downloads (phase 3), the HTTP API and both UIs (phase 4) are next. See
 [implementation-plan.md](implementation-plan.md) for the plan and what is ticked off.
 
 ## Build
@@ -54,6 +55,27 @@ GraphicsHost.exe config show           # settings (config set <key> <value> chan
 GraphicsHost.exe --home D:\tmp\gh ...  # use another data folder
 ```
 
+Generating images (checkpoints are looked for in the models folder, `config set modelsDir <folder>`; a path also works):
+
+```
+GraphicsHost.exe ls                                          # checkpoints found
+GraphicsHost.exe gen "a lighthouse at sunset" -m v1-5        # name, file name or unique prefix; result goes to the gallery
+GraphicsHost.exe gen "a red fox" -m sdxl --size 1024x768 --steps 30 --sampler dpm++2m --scheduler karras -b 4 -o D:\out
+GraphicsHost.exe gen "..." -m v1-5 --device cpu              # auto (default) | cpu | vulkan0
+GraphicsHost.exe gen "..." -m v1-5 --size 768x768 --flash-attn   # SD 1.x above 512 is about 5x faster with it on the GPU
+GraphicsHost.exe gen "..." -m sdxl --dry-run                 # resolved parameters and memory estimate, nothing is generated
+GraphicsHost.exe preset set portrait width 512 height 768 steps 30 load.flashAttention true
+GraphicsHost.exe gen "..." -m v1-5 --preset portrait --steps 40   # model defaults < preset < flags
+GraphicsHost.exe defaults set v1-5-pruned-emaonly.safetensors sampler euler_a
+GraphicsHost.exe gallery list lighthouse                     # also: show ID, rm ID, rescan
+```
+
+`gen` prints progress on stderr and the result on stdout (`--json` for scripts). Ctrl+C cancels at the next sampling
+step. The seed that was actually used is always reported; the same prompt, parameters and seed give the same image on
+the same runtime. A model that does not fit the GPU is run with its weights in RAM (`--offload`) or on the CPU when the
+device is `auto`, with a note; an explicit `--device vulkan0` is never moved, and a failed load prints what you could
+try. The engine's own start-up lines (`ggml_vulkan: ...`) also appear on stderr.
+
 Data lives in `%USERPROFILE%\.graphicshost` (`GRAPHICSHOST_HOME` overrides it): `settings.json`, `logs\`, `runtimes\` for
 user-installed runtimes, `presets\`, `outputs\`, `models\`.
 
@@ -63,16 +85,23 @@ Exit codes: 0 ok, 1 failure, 2 usage, 3 not found, 4 not authorised, 5 server un
 ## Test
 
 ```
-build\bin\x64\Release\GraphicsHost.Tests.exe "[unit]"          # pure logic, settings, CLI
+build\bin\x64\Release\GraphicsHost.Tests.exe "[unit]"          # pure logic, settings, CLI, queue, gallery, codecs
 build\bin\x64\Release\GraphicsHost.Tests.exe "[integration]"   # needs a built runtime DLL next to the exe
+build\bin\x64\Release\GraphicsHost.Tests.exe "[model]"         # real generation; needs checkpoints in models\ (see below)
+build\bin\x64\Release\GraphicsHost.Tests.exe                   # everything: 135 test cases, about 2 minutes
 ```
+
+The `[model]` tests look for `models\v1-5-pruned-emaonly.safetensors` (SD 1.5) and `models\sd_xl_base_1.0.safetensors`
+(SDXL) in the repository (or the file in `GRAPHICSHOST_TEST_MODEL`) and skip themselves when they are missing. They run
+on the CPU runtime, so no GPU is needed. `tools\measure-vram.ps1` measures GPU memory for the estimator
+([docs/vram-measurements.md](docs/vram-measurements.md)).
 
 ## Layout
 
 | Folder | What |
 |---|---|
 | `GraphicsHost/` | the application: `main.cpp`, Qt UI (`ui/`) |
-| `GraphicsHost.Core/` | everything that is not UI: `core/` settings, logging, paths; `engine/` hardware and runtime loader; `host/` the composition root `AppHost`; `cli/` |
+| `GraphicsHost.Core/` | everything that is not UI: `core/` settings, logging, paths; `engine/` hardware, runtime loader, `ImageEngine`, `JobQueue`, `ModelManager`, image codecs, fit estimator; `gallery/`; `presets/`; `host/` the composition root `AppHost`; `cli/` |
 | `GraphicsHost.Tests/` | Catch2 tests |
 | `runtime/` | the C ABI (`gh_runtime.h`) and the three runtime DLL projects |
 | `ggml/`, `stable-diffusion/` | MSBuild projects that build the engine from the submodule in `extern/` |

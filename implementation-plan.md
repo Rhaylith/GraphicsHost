@@ -338,7 +338,7 @@ Goal: retire the biggest risk (§10) before any application code exists.
 - [x] 2.10 CLI verbs `gen`, `ls`, `load`/`unload`/`ps`, `hardware`, `config`, `--json` (M) — `gen` (all parameters as flags, `--preset`, `--dry-run`, `-o`, Ctrl+C cancels), `ls`, `preset`, `defaults`, `gallery`, `--json`, exit codes, automatic offload/CPU choice only with a visible note, load failures print offers. **Deviation:** `load`/`unload`/`ps` are not in this phase: they only make sense with a long-lived process, so they come with the server in phase 4
 - [x] 2.11 Per-model defaults and presets (files, live reload) (S) — `presets/PresetStore` (files re-read on every call = live reload, safe names, validation incl. field paths, import/export) and `ModelDefaultsStore` (per checkpoint file name), `layerRequest/layerLoadOptions` (model defaults < preset < explicit); 8 test cases. CLI `preset` verbs come with 2.10
 
-**Exit:** `graphicshost gen "a lighthouse" --model sd15 --steps 20 --seed 1` writes an image on CPU and on AMD Vulkan; cancel works; the engine integration test passes.
+**Exit:** `graphicshost gen "a lighthouse" --model sd15 --steps 20 --seed 1` writes an image on CPU and on AMD Vulkan; cancel works; the engine integration test passes. *Met on 2026-10-23: the command (`gen "a lighthouse..." -m v1-5 --steps 20 --seed 1`) writes a correct image on `--device cpu` in 18.1 s and on `--device vulkan0` in 5.9 s through the real app; cancel is tested at engine, queue and manager level (Ctrl+C in the CLI is wired but not exercised by a test); the full suite (135 test cases) passes.*
 
 ### Phase 3 — Models: discover, download, library (L)
 
