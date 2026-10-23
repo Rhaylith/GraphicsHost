@@ -50,6 +50,7 @@
     <ClCompile Include="CliTests.cpp" />
     <ClCompile Include="GenerationRequestTests.cpp" />
     <ClCompile Include="EngineGenerateTests.cpp" />
+    <ClCompile Include="JobQueueTests.cpp" />
     <ClInclude Include="ModelFixture.h" />
     <ClInclude Include="TestUtil.h" />
   </ItemGroup>
