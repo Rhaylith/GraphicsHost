@@ -40,3 +40,4 @@ The pattern looks like a per-file verdict (reputation or managed-installer based
 folders or extensions. Vcpkg's DLLs are unsigned and locally built, so any of them can be affected. If blocks persist the
 options are signing the build output, or having the policy owner allow the build folder; both are decisions for the
 machine's owner, not something the build scripts should try to avoid.
+| 21:40 | `spdlog.dll` again (loaded by `GraphicsHost.Tests.exe`) | blocked again; Qt DLLs, the runtime DLLs and the spike all load |

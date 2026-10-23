@@ -318,7 +318,7 @@ Goal: retire the biggest risk (§10) before any application code exists.
 - [x] 1.6 `core/`: spdlog logging (JSON-lines file sink, ring buffer for the UI), native log callback routed in (S) — `core/Log`: JSON-lines rotating file + 2000-entry ring buffer for the UI, engine log hook (`nativeLog`); tests follow in 1.9
 - [x] 1.7 `core/`: `AppHost` composition root; command-line entry (`CLI11`) and GUI/CLI mode switch (S) — `host/AppHost` (composition root), `cli/Cli` (CLI11: version, hardware, runtime info, config show|path|set, `--json`, exit-code table), GUI by default and CLI when arguments are given; builds; first run blocked by Application Control on spdlog.dll (docs/environment-notes.md), CLI tests follow in 1.9
 - [x] 1.8 `engine/`: `GpuDevices` (Vulkan enumeration, AMD flag, VRAM), CPU feature detection, `RuntimeLoader` choosing and loading one `sd-*.dll` (M) — `engine/CpuFeatures`, `GpuDevices` (dynamic vulkan-1.dll, AMD-only support flag), `RuntimeLoader` (discovery, pure `chooseRuntime`, DLL wrapper with Application Control hint); tests follow in 1.9
-- [ ] 1.9 `GraphicsHost.Tests` project with Catch2 and the `[unit]/[api]/[integration]` tags; first tests for settings and migrations (S)
+- [ ] 1.9 `GraphicsHost.Tests` project with Catch2 and the `[unit]/[api]/[integration]` tags; first tests for settings and migrations (S) — written and building (settings, migrations, log, engine selection, CLI; ~45 test cases), NOT yet run: Application Control blocks spdlog.dll on this machine (docs/environment-notes.md)
 - [ ] 1.10 `docs/adding-options.md` (option-plumbing checklist) and a README with the build instructions (S)
 - [ ] 1.11 CI: build the solution, run the unit tests, `/analyze`, vcpkg binary cache (M)
 

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Unit, CLI and integration tests (Catch2). Tags: [unit] pure logic, [cli] command line, [integration] needs a built
+  runtime DLL next to the test exe (skipped when it is missing or cannot be loaded).
+  Run: build\bin\x64\Release\GraphicsHost.Tests.exe "[unit]"
+-->
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>18.0</VCProjectVersion>
+    <ProjectGuid>{7B3D1E0A-5C2F-4E7A-9A11-0F6E2D4C8A0A}</ProjectGuid>
+    <RootNamespace>GraphicsHostTests</RootNamespace>
+    <Keyword>Win32Proj</Keyword>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Debug'">true</UseDebugLibraries>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Release'">false</UseDebugLibraries>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <Import Project="$(GhProps)" />
+  <Import Project="$(RepoRoot)props\Core.props" />
+  <PropertyGroup>
+    <TargetName>GraphicsHost.Tests</TargetName>
+    <CatchLibDir Condition="'$(Configuration)'=='Debug'">$(VcpkgInstalled)debug\lib\manual-link\</CatchLibDir>
+    <CatchLibDir Condition="'$(Configuration)'!='Debug'">$(VcpkgInstalled)lib\manual-link\</CatchLibDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <AdditionalLibraryDirectories>$(CatchLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>Catch2$(VcpkgDebugSuffix).lib;Catch2Main$(VcpkgDebugSuffix).lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="SettingsTests.cpp" />
+    <ClCompile Include="LogTests.cpp" />
+    <ClCompile Include="EngineTests.cpp" />
+    <ClCompile Include="CliTests.cpp" />
+    <ClInclude Include="TestUtil.h" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>
