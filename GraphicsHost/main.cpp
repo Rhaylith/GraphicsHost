@@ -1,5 +1,6 @@
 #include "cli/Cli.h"
 #include "host/AppHost.h"
+#include "ui/GenerateTab.h"
 #include "ui/MainWindow.h"
 
 #include <QApplication>
@@ -88,10 +89,14 @@ int runGui(int argc, char* argv[]) {
         QTimer::singleShot(0, &app, &QCoreApplication::quit);
     }
     // --screenshot-dir <dir>: save a picture of every tab and exit (the UI checks in the test plan).
+    // --generate-prompt <text>: first generate a small image on the Generate tab and wait for it, so the picture shows
+    // a finished generation (the model must be in the data folder; use GRAPHICSHOST_HOME to point at a prepared one).
     const int shotArg = static_cast<int>(args.indexOf(QStringLiteral("--screenshot-dir")));
+    const int promptArg = static_cast<int>(args.indexOf(QStringLiteral("--generate-prompt")));
     if (shotArg >= 0 && shotArg + 1 < args.size()) {
         const QString dir = args[shotArg + 1];
-        QTimer::singleShot(300, &app, [&window, &app, dir] {
+        const QString prompt = promptArg >= 0 && promptArg + 1 < args.size() ? args[promptArg + 1] : QString();
+        auto takeShots = [&window, &app, dir] {
             QDir().mkpath(dir);
             for (int i = 0; i < window.tabs()->count(); ++i) {
                 window.tabs()->setCurrentIndex(i);
@@ -100,6 +105,26 @@ int runGui(int argc, char* argv[]) {
                 window.grab().save(dir + QStringLiteral("/") + QString::number(i + 1) + QStringLiteral("-") + name + QStringLiteral(".png"));
             }
             app.quit();
+        };
+        QTimer::singleShot(300, &app, [&window, &app, takeShots, prompt] {
+            if (prompt.isEmpty()) {
+                takeShots();
+                return;
+            }
+            auto* tab = window.generateTab();
+            tab->loadParameters({{"prompt", prompt.toStdString()}, {"width", 128}, {"height", 128}, {"steps", 4}, {"seed", 7}}, QString());
+            tab->onGenerate();
+            auto* wait = new QTimer(&app);
+            auto* ticks = new int(0);
+            QObject::connect(wait, &QTimer::timeout, &app, [=, &window] {
+                ++*ticks;
+                if (!window.generateTab()->busy() || *ticks > 1200) {   // up to 10 minutes
+                    wait->stop();
+                    std::cout << "generate: " << window.generateTab()->statusText().toStdString() << std::endl;
+                    takeShots();
+                }
+            });
+            wait->start(500);
         });
     }
     const int code = app.exec();

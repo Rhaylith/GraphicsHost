@@ -9,6 +9,10 @@ class QSystemTrayIcon;
 class QTabWidget;
 class QTimer;
 
+namespace gh::ui {
+class GenerateTab;
+}
+
 namespace gh::host {
 class AppHost;
 }
@@ -34,6 +38,7 @@ public:
     QString applyServerSettings();
 
     QTabWidget* tabs() const { return tabs_; }
+    GenerateTab* generateTab() const { return generate_; }
 
     // The window message a second instance broadcasts so that the running one shows itself.
     static unsigned raiseMessageId();
@@ -58,6 +63,7 @@ private:
     std::unique_ptr<gh::server::ApiServer> server_;
     QString serverError_;
     QTabWidget* tabs_ = nullptr;
+    GenerateTab* generate_ = nullptr;
     QSystemTrayIcon* tray_ = nullptr;
     QTimer* statusTimer_ = nullptr;
     QLabel* serverLabel_ = nullptr;

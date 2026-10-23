@@ -365,7 +365,8 @@ Goal: retire the biggest risk (§10) before any application code exists.
 - [x] 4.5 Request log, `/api/v1/requests` (admin, no query strings kept), `/metrics` (Prometheus text) (S)
 - [x] 4.6 Qt shell: main window, tabs, tray icon (closing keeps the API server running), single instance (named mutex + broadcast message), window-state memory (window.ini), the API server started from the settings, status bar (M)
   - `tools/ui-shots.ps1` saves a picture of every tab (offscreen) for checking layouts. Single instance and the tray are not exercised by an automated check (they need a real desktop).
-- [ ] 4.7 Qt **Generate** tab: prompt boxes, parameter panel with interface-mode gating, model/device picker, live progress and preview, results, context menus (L)
+- [x] 4.7 Qt **Generate** tab: prompt boxes, parameter panel with interface-mode gating, model/device picker, live progress and preview, results, context menus (L)
+  - Auto fields show the model default ("Auto (512)"); the load checkboxes are tri-state (partly filled = the model default). Loading runs off the UI thread. Checked with `tools/ui-shots.ps1`-style runs: `--screenshot-dir <dir> --generate-prompt <text>` generates a small image first (needs a model in the data folder).
 - [ ] 4.8 Qt **My Models** and **Discover** tabs, download queue (L)
 - [ ] 4.9 Qt **Settings** tab (server, tokens, runtime/backend, GPU device, models folder) and **Logs** tab (M)
 - [ ] 4.10 Browser UI: embedded static files served at `/`, with Generate, Gallery, My Models, Discover and Settings against `/api/v1` (L)

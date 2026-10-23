@@ -196,7 +196,7 @@ bool wantsGui(int argc, char** argv) {
     }
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
-        if (arg == "--screenshot-dir") {
+        if (arg == "--screenshot-dir" || arg == "--generate-prompt") {
             ++i;   // its value is the folder
         } else if (arg != "--smoke-test" && arg != "gui") {
             return false;

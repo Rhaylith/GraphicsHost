@@ -1,5 +1,6 @@
 #include "MainWindow.h"
 
+#include "GenerateTab.h"
 #include "UiUtil.h"
 #include "core/Log.h"
 #include "host/AppHost.h"
@@ -66,7 +67,8 @@ void MainWindow::buildTabs() {
         label->setAlignment(Qt::AlignCenter);
         tabs_->addTab(label, title);
     };
-    placeholder(tr("Generate"), tr("Image generation arrives in step 4.7."));
+    generate_ = new GenerateTab(host_, tabs_);
+    tabs_->addTab(generate_, tr("Generate"));
     placeholder(tr("Gallery"), tr("The gallery arrives in phase 5."));
     placeholder(tr("My Models"), tr("The model library arrives in step 4.8."));
     placeholder(tr("Discover"), tr("Model discovery and downloads arrive in step 4.8."));
