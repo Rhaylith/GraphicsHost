@@ -31,3 +31,13 @@ Windows reports the AMD Radeon RX 7900 XTX (driver 32.0.21030.2001) in error sta
 `CM_PROB_FAILED_ADD` (Device Manager code 31: "Windows cannot load the drivers required for this device"), so no Vulkan
 ICD can initialise. The session also runs on a Remote Display Adapter (RDP). The GPU needs a driver reinstall or reboot
 before step 0.7 can measure Vulkan.
+
+## Step 0.7 (partial): SDXL on CPU; GPU runs blocked
+
+| Model | Backend | Size | Steps | Load | Generate | s/step | Notes |
+|---|---|---|---|---|---|---|---|
+| SD1.5 | cpu (AVX2) | 512x512 | 20 | 0.12 s | 18.17 s | 0.73 | from step 0.5 |
+| SDXL base 1.0 (fp16 safetensors) | cpu (AVX2) | 1024x1024 | 20 | 0.11 s | 102.95 s | 4.51 (sampling) | VAE decode 6.8 s; image checked by eye |
+| SD1.5 / SDXL | vulkan (RX 7900 XTX) | - | - | - | - | - | **not measured**: Vulkan cannot initialise, GPU in Device Manager code 31 |
+
+Memory/VRAM figures for the GPU runs are still missing for the same reason.
