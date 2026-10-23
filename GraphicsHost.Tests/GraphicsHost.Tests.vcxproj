@@ -51,6 +51,7 @@
     <ClCompile Include="GenerationRequestTests.cpp" />
     <ClCompile Include="EngineGenerateTests.cpp" />
     <ClCompile Include="JobQueueTests.cpp" />
+    <ClCompile Include="ImageCodecTests.cpp" />
     <ClInclude Include="ModelFixture.h" />
     <ClInclude Include="TestUtil.h" />
   </ItemGroup>
