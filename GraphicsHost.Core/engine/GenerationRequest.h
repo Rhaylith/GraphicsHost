@@ -5,11 +5,19 @@
 #include <nlohmann/json.hpp>
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <vector>
 
 namespace gh::engine {
+
+struct Image {
+    uint32_t width = 0;
+    uint32_t height = 0;
+    uint32_t channels = 3;       // 3 = RGB, 4 = RGBA
+    std::vector<uint8_t> data;   // width * height * channels bytes, row by row
+};
 
 // The standard parameter set, independent of model family and of the API it arrived through (see implementation plan,
 // section 5). A field a family does not support is ignored and reported in GenerationResult::warnings.
@@ -30,6 +38,10 @@ struct GenerationRequest {
     std::string format = "png";  // png | jpeg | webp
     bool embedMetadata = true;   // write the parameters into the image file
     bool safetyFilter = false;   // per request override of safety.enabled; off by default
+    // image to image: start from this picture instead of noise. It is not part of the JSON form (pictures travel as
+    // files); the JSON form only says whether there is one.
+    std::shared_ptr<const Image> initImage;
+    float strength = 0.75f;      // with initImage: how much of it is replaced, (0..1]; 1 ignores the picture
 };
 
 // How a model is put in memory. Changing it needs a reload. Mirrors gh_load_params in runtime/gh_runtime.h.

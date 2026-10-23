@@ -1,5 +1,6 @@
 #include "server/GenerateMapping.h"
 #include "server/HttpCommon.h"
+#include "server/InputImages.h"
 #include "server/RouteContext.h"
 
 #include <chrono>
@@ -63,6 +64,7 @@ void registerJobRoutes(httplib::Server& server, RouteContext& ctx) {
         host::GenerateCall call;
         try {
             call = callFromBody(body);
+            attachInputImages(ctx.host, body, call);
             call.addToGallery = body.value("store", true);
         } catch (const std::exception& e) {
             sendError(res, 400, "invalid_request_error", e.what(), "invalid_parameters");

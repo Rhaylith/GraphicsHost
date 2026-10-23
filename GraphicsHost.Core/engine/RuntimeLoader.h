@@ -72,6 +72,7 @@ public:
     const std::string& backend() const { return backend_; }
     const std::string& engineVersion() const { return engineVersion_; }
     const std::string& systemInfo() const { return systemInfo_; }
+    uint32_t features() const { return features_; }   // GH_FEATURE_* bits
     const Api& api() const { return api_; }
 
     // "name<TAB>description" lines of the ggml devices this runtime sees (the CPU, and GPUs for the Vulkan runtime).
@@ -83,6 +84,7 @@ private:
     void* module_ = nullptr;  // HMODULE
     Api api_;
     std::string id_, backend_, engineVersion_, systemInfo_;
+    uint32_t features_ = 0;
 };
 
 }  // namespace gh::engine

@@ -110,6 +110,9 @@ std::vector<core::FieldError> validate(const GenerationRequest& r) {
     if (r.clipSkip < -1 || r.clipSkip > 12) {
         errors.push_back({"clipSkip", "must be -1 (model default) or between 0 and 12"});
     }
+    if (r.initImage && !(r.strength > 0.0f && r.strength <= 1.0f)) {
+        errors.push_back({"strength", "must be above 0 and at most 1"});
+    }
     if (r.format != "png" && r.format != "jpeg" && r.format != "webp") {
         errors.push_back({"format", "must be png, jpeg or webp"});
     }
@@ -148,7 +151,9 @@ Json toJson(const GenerationRequest& r) {
             {"vaeTiling", r.vaeTiling},
             {"format", r.format},
             {"embedMetadata", r.embedMetadata},
-            {"safetyFilter", r.safetyFilter}};
+            {"safetyFilter", r.safetyFilter},
+            {"strength", r.strength},
+            {"hasInitImage", r.initImage != nullptr}};
 }
 
 GenerationRequest applyRequestJson(GenerationRequest r, const Json& json) {
@@ -170,6 +175,7 @@ GenerationRequest applyRequestJson(GenerationRequest r, const Json& json) {
     takeIf(json, "format", r.format);
     takeIf(json, "embedMetadata", r.embedMetadata);
     takeIf(json, "safetyFilter", r.safetyFilter);
+    takeIf(json, "strength", r.strength);
     return r;
 }
 

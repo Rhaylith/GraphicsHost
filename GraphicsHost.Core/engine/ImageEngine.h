@@ -13,13 +13,6 @@
 
 namespace gh::engine {
 
-struct Image {
-    uint32_t width = 0;
-    uint32_t height = 0;
-    uint32_t channels = 3;       // 3 = RGB, 4 = RGBA
-    std::vector<uint8_t> data;   // width * height * channels bytes, row by row
-};
-
 struct GenerationResult {
     GenerationRequest request;           // as generated: unset fields resolved, seed replaced by the real first seed
     std::vector<Image> images;

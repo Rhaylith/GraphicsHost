@@ -38,6 +38,8 @@ public slots:
 signals:
     // "Reuse parameters": the Generate tab should take these values (a request document and the model's file name).
     void reuseRequested(const nlohmann::json& request, const QString& model);
+    // "Use as source image": start an image to image generation from this picture.
+    void sourceRequested(const QImage& image);
 
 protected:
     void showEvent(QShowEvent* event) override;

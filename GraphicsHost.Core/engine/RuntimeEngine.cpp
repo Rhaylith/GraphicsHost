@@ -11,6 +11,14 @@ namespace gh::engine {
 
 namespace {
 
+// Image to image runs only the last part of the schedule: steps * strength steps (one fewer when that would be
+// all of them) plus one, which is how stable-diffusion.cpp counts and the progress callback reports it.
+int sampledSteps(int steps, float strength) {
+    int n = static_cast<int>(static_cast<float>(steps) * strength);
+    if (n >= steps) n = steps - 1;
+    return n + 1;   // the schedule keeps its starting point
+}
+
 bool looksLikeOutOfMemory(const std::string& text) {
     std::string lower = text;
     std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return std::tolower(c); });
@@ -59,6 +67,13 @@ public:
             warnings.push_back("the negative prompt has no effect when cfgScale is 1 or lower");
         }
 
+        if (request.initImage && (runtime_->features() & GH_FEATURE_IMG2IMG) == 0) {
+            throw EngineError(EngineErrorCode::InvalidRequest, "this runtime build does not support image to image: update the runtime DLLs");
+        }
+        if (request.initImage && (static_cast<int>(request.initImage->width) != request.width || static_cast<int>(request.initImage->height) != request.height)) {
+            throw EngineError(EngineErrorCode::InvalidRequest, "the source image must have the size of the result");
+        }
+
         gh_generate_params params{};
         params.struct_size = sizeof(params);
         params.prompt = request.prompt.c_str();
@@ -73,13 +88,22 @@ public:
         params.scheduler = request.scheduler.empty() ? nullptr : request.scheduler.c_str();
         params.clip_skip = request.clipSkip;
         params.vae_tiling = request.vaeTiling ? 1 : 0;
+        gh_image initView{};
+        if (request.initImage) {
+            initView.width = request.initImage->width;
+            initView.height = request.initImage->height;
+            initView.channels = request.initImage->channels;
+            initView.data = const_cast<uint8_t*>(request.initImage->data.data());   // read only for the runtime
+            params.init_image = &initView;
+            params.strength = request.strength;
+        }
 
         // The engine reports progress for weight loading and VAE decoding as well (totals such as 140 tensors).
         // Only the sampling loop has exactly as many steps as were asked for, so everything else is dropped.
         struct Trampoline {
             const ProgressSink* sink;
             int expectedSteps;
-        } trampoline{&progress, request.steps};
+        } trampoline{&progress, request.initImage ? sampledSteps(request.steps, request.strength) : request.steps};
         gh_progress_fn onProgress = [](int32_t step, int32_t steps, float seconds, void* user) {
             const auto* t = static_cast<Trampoline*>(user);
             if (t->sink && *t->sink && steps == t->expectedSteps && step >= 1) {  // reported as 1..steps

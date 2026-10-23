@@ -192,6 +192,7 @@ std::unique_ptr<Runtime> Runtime::load(const fs::path& dll, std::string& error) 
     runtime->backend_ = info.backend ? info.backend : "";
     runtime->engineVersion_ = info.engine_version ? info.engine_version : "";
     runtime->systemInfo_ = info.system_info ? info.system_info : "";
+    runtime->features_ = info.features;   // zero for a runtime that predates the field
     return runtime;
 }
 

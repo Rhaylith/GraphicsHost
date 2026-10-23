@@ -72,6 +72,7 @@
     <ClCompile Include="OpenAiApiTests.cpp" />
     <ClCompile Include="NativeApiTests.cpp" />
     <ClCompile Include="CliServeTests.cpp" />
+    <ClCompile Include="ImageToImageTests.cpp" />
     <ClCompile Include="ApiContractTests.cpp" />
     <ClCompile Include="UiSmokeTests.cpp" />
     <ClInclude Include="ApiTestUtil.h" />

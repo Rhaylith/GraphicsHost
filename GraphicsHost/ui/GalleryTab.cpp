@@ -108,6 +108,7 @@ GalleryTab::GalleryTab(gh::host::AppHost& host, QWidget* parent) : QWidget(paren
         if (!current()) return;
         QMenu menu(this);
         menu.addAction(tr("Reuse parameters"), this, [this] { reuse_->click(); });
+        menu.addAction(tr("Use as source image"), this, [this] { if (const auto* e = current()) emit sourceRequested(QImage(q(host_.gallery().absolutePath(*e).string()))); });
         menu.addAction(tr("Save as…"), this, &GalleryTab::saveSelectedAs);
         menu.addAction(tr("Show in folder"), this, [this] { folder_->click(); });
         menu.addSeparator();

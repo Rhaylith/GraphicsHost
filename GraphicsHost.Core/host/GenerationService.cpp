@@ -2,8 +2,12 @@
 
 #include "core/Log.h"
 #include "engine/FitEstimator.h"
+#include "engine/ImageCodec.h"
 #include "host/AppHost.h"
 #include "presets/PresetStore.h"
+
+#include <algorithm>
+#include <cmath>
 
 namespace gh::host {
 
@@ -94,6 +98,29 @@ GenerationService::Prepared GenerationService::prepare(const GenerateCall& call)
         load = presets::layerLoadOptions(loadLayers);
     } catch (const std::exception& e) {
         throw EngineError(EngineErrorCode::InvalidRequest, e.what());
+    }
+    if (call.initImage) {
+        // the result has the size of the picture unless the request says otherwise; the picture is scaled to the result
+        const engine::Image& in = *call.initImage;
+        if (in.width == 0 || in.height == 0) throw EngineError(EngineErrorCode::InvalidRequest, "the source image is empty");
+        auto round8 = [](double v) { return std::max(64, static_cast<int>(std::lround(v / 8.0)) * 8); };
+        const double aspect = static_cast<double>(in.width) / in.height;
+        if (request.width <= 0 && request.height <= 0) {
+            const int limit = 2 * std::max(card.defaults.width, card.defaults.height);   // keep a photo from becoming a huge job
+            const double scale = std::min(1.0, static_cast<double>(limit) / std::max(in.width, in.height));
+            request.width = round8(in.width * scale);
+            request.height = round8(in.height * scale);
+        } else if (request.height <= 0) {
+            request.height = round8(request.width / aspect);
+        } else if (request.width <= 0) {
+            request.width = round8(request.height * aspect);
+        }
+        try {
+            request.initImage = std::make_shared<const engine::Image>(
+                engine::resizeImage(in, static_cast<uint32_t>(request.width), static_cast<uint32_t>(request.height)));
+        } catch (const std::exception& e) {
+            throw EngineError(EngineErrorCode::InvalidRequest, std::string("the source image cannot be used: ") + e.what());
+        }
     }
     load.modelPath = card.path.string();
     if (load.vaePath.empty() && !card.vae.empty()) load.vaePath = (card.path.parent_path() / card.vae).string();

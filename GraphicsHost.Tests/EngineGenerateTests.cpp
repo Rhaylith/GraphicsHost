@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <set>
 
 using namespace gh::engine;
@@ -293,4 +294,63 @@ TEST_CASE("engine: SDXL generates at its own default family settings", "[model][
     REQUIRE(result.images.size() == 1);
     CHECK(result.images[0].width == 512);
     CHECK(result.request.cfgScale == 7.0f);  // SDXL family default filled in
+}
+
+namespace {
+
+// How far apart two same-sized pictures are: the mean absolute difference per byte.
+double meanDifference(const Image& a, const Image& b) {
+    REQUIRE(a.data.size() == b.data.size());
+    double sum = 0;
+    for (size_t i = 0; i < a.data.size(); ++i) sum += std::abs(static_cast<int>(a.data[i]) - static_cast<int>(b.data[i]));
+    return sum / static_cast<double>(a.data.size());
+}
+
+}  // namespace
+
+TEST_CASE("engine: image to image keeps the source the more the lower the strength", "[model][engine][img2img]") {
+    auto l = loadSd15OrSkip();
+
+    // the source: an ordinary text to image result
+    GenerationRequest source = tiny();
+    source.steps = 6;
+    const auto base = l.model->generate(source, {}, {});
+    REQUIRE(base.images.size() == 1);
+    const auto init = std::make_shared<const Image>(base.images[0]);
+
+    auto edit = [&](float strength, int* progressSteps = nullptr, int* lastStep = nullptr) {
+        GenerationRequest r = tiny();
+        r.prompt = "a green apple on a table";
+        r.steps = 8;
+        r.seed = 99;
+        r.initImage = init;
+        r.strength = strength;
+        std::atomic<int> total{0}, last{0};
+        const auto result = l.model->generate(r, [&](const StepProgress& p) { total = p.steps; last = p.step; }, {});
+        if (progressSteps) *progressSteps = total;
+        if (lastStep) *lastStep = last;
+        REQUIRE(result.images.size() == 1);
+        CHECK(result.images[0].width == 256);
+        CHECK(result.images[0].height == 256);
+        return result.images[0];
+    };
+
+    int steps = 0, last = 0;
+    const Image gentle = edit(0.3f, &steps, &last);
+    CHECK(steps == 3);    // 8 steps * 0.3 = 2, plus the starting point: only the last part of the schedule runs
+    CHECK(last == 3);     // and its progress is reported
+    const Image strong = edit(0.95f);
+    CHECK(meanDifference(*init, gentle) < meanDifference(*init, strong));
+    // the same inputs give the same picture
+    const Image again = edit(0.3f);
+    CHECK(meanDifference(gentle, again) == 0.0);
+    // a source that does not have the result's size is refused before anything runs
+    GenerationRequest wrong = tiny();
+    wrong.initImage = std::make_shared<const Image>(Image{64, 64, 3, std::vector<uint8_t>(64 * 64 * 3, 128)});
+    try {
+        l.model->generate(wrong, {}, {});
+        FAIL("expected an error");
+    } catch (const EngineError& e) {
+        CHECK(e.code() == EngineErrorCode::InvalidRequest);
+    }
 }

@@ -72,6 +72,10 @@ void MainWindow::buildTabs() {
     gallery_ = new GalleryTab(host_, tabs_);
     tabs_->addTab(gallery_, tr("Gallery"));
     connect(generate_, &GenerateTab::imagesAdded, gallery_, &GalleryTab::reload);
+    connect(gallery_, &GalleryTab::sourceRequested, this, [this](const QImage& image) {
+        generate_->setSourceImage(image);
+        tabs_->setCurrentWidget(generate_);
+    });
     connect(gallery_, &GalleryTab::reuseRequested, this, [this](const nlohmann::json& request, const QString& model) {
         generate_->loadParameters(request, model);
         tabs_->setCurrentWidget(generate_);

@@ -45,6 +45,9 @@ typedef enum gh_status {
     GH_ERR_INTERNAL = -5
 } gh_status;
 
+/* What a runtime can do beyond plain text-to-image (gh_runtime_info.features). */
+#define GH_FEATURE_IMG2IMG 0x1u   /* gh_generate_params.init_image + strength */
+
 typedef struct gh_model gh_model;
 
 /* Describes the runtime itself. Pointers stay valid until the DLL is unloaded. */
@@ -56,6 +59,7 @@ typedef struct gh_runtime_info {
     const char* engine_version; /* stable-diffusion.cpp version string */
     const char* engine_commit;
     const char* system_info;    /* CPU feature line reported by ggml */
+    uint32_t features;          /* GH_FEATURE_* bits; 0 when the DLL predates the field */
 } gh_runtime_info;
 
 typedef struct gh_load_params {
@@ -84,6 +88,9 @@ typedef struct gh_generate_params {
     const char* scheduler;      /* e.g. "karras"; NULL = model default */
     int32_t clip_skip;          /* -1 = model default */
     int32_t vae_tiling;         /* 0/1 */
+    /* appended in step 5.2: needs GH_FEATURE_IMG2IMG */
+    const struct gh_image* init_image; /* start from this picture (RGB); NULL = text to image */
+    float strength;             /* 0..1: how much of init_image is replaced (1 = ignore it); used with init_image */
 } gh_generate_params;
 
 typedef struct gh_image {

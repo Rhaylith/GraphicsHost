@@ -28,7 +28,7 @@ exist answers 404 with `"code": null`.
 |---|---|---|
 | `GET /v1/models` | read | the checkpoints that can run, `loaded` marks the one in memory |
 | `POST /v1/images/generations` | generate | waits for the image(s). Hanging up cancels the generation |
-| `POST /v1/images/edits` | generate | 501 until image-to-image (phase 5) |
+| `POST /v1/images/edits` | generate | image to image, see below |
 
 `POST /v1/images/generations` body (all optional except `prompt`):
 
@@ -50,6 +50,19 @@ spellings (`width`, `height`, `batchCount`, `cfgScale`, `negativePrompt`, …) w
 
 Parameters are layered: the model's defaults, then the preset, then the request. An image that cannot fit in memory is
 refused with 507 `out_of_memory`; a different model is loaded on demand when no generation is running.
+
+## Image to image
+
+Add a source picture to a generation and it becomes image to image: the result starts from the picture instead of noise.
+
+* `POST /v1/images/edits`: OpenAI's route. `multipart/form-data` with `image` (a PNG, JPEG or WebP file), `prompt`, and
+  the same optional fields as above (`model`, `n`, `size`, `strength`, `steps`, …), or a JSON body with `image` as base64.
+* `POST /v1/images/generations` and `POST /api/v1/generate` accept `init_image` (base64, a `data:` URL is fine) or
+  `init_image_gallery_id` (an image that is already in the gallery) next to the usual fields.
+* `strength` (0.05 to 1, default 0.75) says how much of the picture is replaced: low keeps it, 1 ignores it.
+* Without `size`/`width`/`height` the result has the picture's size (rounded to a multiple of 8, at most twice the
+  model's default size); with a size, the picture is scaled to it.
+* A runtime DLL built before this feature answers 400 (`invalid_parameters`): update the DLLs in `runtimes\`.
 
 ## Native API (`/api/v1`)
 

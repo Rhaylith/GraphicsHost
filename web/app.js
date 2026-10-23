@@ -146,7 +146,7 @@ async function fillSamplers() {
   } catch (e) { /* the form still works with the defaults */ }
 }
 
-function readForm() {
+async function readForm() {
   const body = { model: $('g-model').value, prompt: $('g-prompt').value.trim() };
   if ($('g-preset').value) body.preset = $('g-preset').value;
   if ($('g-negative').value.trim()) body.negativePrompt = $('g-negative').value.trim();
@@ -158,6 +158,11 @@ function readForm() {
     if ($('g-sampler').value) body.sampler = $('g-sampler').value;
     if ($('g-scheduler').value) body.scheduler = $('g-scheduler').value;
   }
+  const file = $('g-source').files[0];
+  if (file) {
+    body.init_image = await new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(r.result); r.onerror = () => reject(new Error("cannot read the source image")); r.readAsDataURL(file); });
+  } else if (state.sourceGalleryId) body.init_image_gallery_id = state.sourceGalleryId;
+  if (body.init_image || body.init_image_gallery_id) body.strength = parseFloat($('g-strength').value) || 0.75;
   return body;
 }
 
@@ -210,7 +215,8 @@ function finishGenerate(text, isError = false) {
 $('gen-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   if (state.job) return;
-  const body = readForm();
+  let body;
+  try { body = await readForm(); } catch (err) { return say($('g-status'), err.message, 'error'); }
   if (!body.model) return say($('g-status'), 'There is no model to generate with yet.', 'error');
   if (!body.prompt) return say($('g-status'), 'Write a prompt first.', 'error');
   $('g-go').disabled = true; $('g-cancel').disabled = false; $('g-model').disabled = true;
@@ -231,6 +237,16 @@ $('g-cancel').addEventListener('click', async () => {
 });
 
 loaders.generate = loadGenerate;
+
+// ---- image to image: the source picture -----------------------------------------------------------------------
+function setSourceNote() {
+  const file = $('g-source').files[0];
+  $('g-source-note').textContent = file ? file.name : state.sourceGalleryId ? `gallery image #${state.sourceGalleryId}` : '';
+  $('g-source-clear').hidden = !(file || state.sourceGalleryId);
+}
+$('g-source').addEventListener('change', () => { state.sourceGalleryId = 0; setSourceNote(); });
+$('g-source-clear').addEventListener('click', () => { $('g-source').value = ''; state.sourceGalleryId = 0; setSourceNote(); });
+function useAsSource(id) { $('g-source').value = ''; state.sourceGalleryId = id; setSourceNote(); showTab('generate'); }
 
 // ---- Gallery -----------------------------------------------------------------------------------------------------
 
@@ -268,6 +284,7 @@ async function openImage(id) {
       pre,
       h('div', { class: 'buttons' },
         h('button', { class: 'primary', onclick: () => { closeDialog(); showTab('generate'); fillForm(params.request || {}, item.model); } }, 'Reuse parameters'),
+        h('button', { onclick: () => { closeDialog(); useAsSource(id); } }, 'Use as source'),
         download,
         h('button', { class: 'danger', onclick: async () => {
           if (!confirm('Delete this image?')) return;

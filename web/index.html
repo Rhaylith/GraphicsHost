@@ -37,6 +37,11 @@
             <label>Images <input id="g-count" type="number" min="1" max="16" value="1"></label>
             <label>Seed <input id="g-seed" type="number" min="-1" placeholder="random"></label>
           </div>
+          <label>Source image (optional, for image to image)
+            <input id="g-source" type="file" accept="image/*">
+            <span id="g-source-note" class="muted"></span> <button type="button" id="g-source-clear" class="small" hidden>Clear</button>
+          </label>
+          <label>Strength (how much of the source is replaced) <input id="g-strength" type="number" min="0.05" max="1" step="0.05" value="0.75"></label>
           <div class="advanced">
             <div class="row">
               <label>Steps <input id="g-steps" type="number" min="1" max="150" placeholder="auto"></label>

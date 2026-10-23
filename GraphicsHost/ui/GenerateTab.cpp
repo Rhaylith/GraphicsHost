@@ -37,6 +37,7 @@
 
 #include <algorithm>
 #include <climits>
+#include <cstring>
 #include <QDir>
 #include <QFileInfo>
 #include <thread>
@@ -130,6 +131,42 @@ void GenerateTab::buildUi() {
     seedRow->addWidget(dice);
     basics->addRow(tr("Seed"), seedRow);
     leftLayout->addLayout(basics);
+
+    // image to image: a picture to start from
+    auto* sourceBox = new QGroupBox(tr("Source image (optional)"), left);
+    auto* sourceLayout = new QHBoxLayout(sourceBox);
+    sourceView_ = new QLabel(tr("none"), sourceBox);
+    sourceView_->setFixedSize(72, 72);
+    sourceView_->setAlignment(Qt::AlignCenter);
+    sourceView_->setFrameShape(QFrame::StyledPanel);
+    auto* sourceButtons = new QVBoxLayout();
+    auto* choose = new QPushButton(tr("Choose…"), sourceBox);
+    clearSource_ = new QPushButton(tr("Clear"), sourceBox);
+    clearSource_->setEnabled(false);
+    strength_ = new QDoubleSpinBox(sourceBox);
+    strength_->setRange(0.05, 1.0);
+    strength_->setSingleStep(0.05);
+    strength_->setDecimals(2);
+    strength_->setValue(0.75);
+    strength_->setPrefix(tr("Strength "));
+    strength_->setToolTip(tr("How much of the picture is replaced: low keeps it, 1 ignores it"));
+    sourceButtons->addWidget(choose);
+    sourceButtons->addWidget(clearSource_);
+    sourceLayout->addWidget(sourceView_);
+    sourceLayout->addLayout(sourceButtons);
+    sourceLayout->addWidget(strength_, 1);
+    leftLayout->addWidget(sourceBox);
+    connect(choose, &QPushButton::clicked, this, [this] {
+        const QString file = QFileDialog::getOpenFileName(this, tr("Source image"), QString(), tr("Images (*.png *.jpg *.jpeg *.webp *.bmp)"));
+        if (file.isEmpty()) return;
+        QImage image(file);
+        if (image.isNull()) {
+            status_->setText(tr("That file cannot be read as an image."));
+            return;
+        }
+        setSourceImage(image);
+    });
+    connect(clearSource_, &QPushButton::clicked, this, [this] { setSourceImage(QImage()); });
 
     // power mode: the sampling parameters
     powerWidgets_ = new QWidget(left);
@@ -308,6 +345,17 @@ gh::host::GenerateCall GenerateTab::currentCall() const {
         if (!sampler_->currentData().toString().isEmpty()) r["sampler"] = s(sampler_->currentData().toString());
         if (!scheduler_->currentData().toString().isEmpty()) r["scheduler"] = s(scheduler_->currentData().toString());
     }
+    if (!source_.isNull()) {
+        const QImage rgb = source_.convertToFormat(QImage::Format_RGB888);
+        auto image = std::make_shared<gh::engine::Image>();
+        image->width = static_cast<uint32_t>(rgb.width());
+        image->height = static_cast<uint32_t>(rgb.height());
+        image->channels = 3;
+        image->data.resize(static_cast<size_t>(rgb.width()) * rgb.height() * 3);
+        for (int y = 0; y < rgb.height(); ++y) std::memcpy(image->data.data() + static_cast<size_t>(y) * rgb.width() * 3, rgb.constScanLine(y), static_cast<size_t>(rgb.width()) * 3);
+        call.initImage = image;
+        r["strength"] = strength_->value();
+    }
     Json& l = call.loadOptions;
     if (advancedLoad_->isVisible()) {
         if (clipSkip_->value() >= 0) r["clipSkip"] = clipSkip_->value();
@@ -479,6 +527,7 @@ void GenerateTab::resultMenu(const QPoint& where) {
         }
     });
     menu.addAction(tr("Copy image"), this, [r] { QApplication::clipboard()->setImage(r.image); });
+    menu.addAction(tr("Use as source image"), this, [this, r] { setSourceImage(r.image); });
     menu.addAction(tr("Use this seed"), this, [this, r] { seed_->setValue(static_cast<int>(std::clamp<qint64>(r.seed, -1, INT_MAX))); });
     if (!r.path.isEmpty()) {
         menu.addAction(tr("Show in folder"), this, [r] { QProcess::startDetached(QStringLiteral("explorer.exe"), {QStringLiteral("/select,"), QDir::toNativeSeparators(r.path)}); });
@@ -517,6 +566,21 @@ namespace gh::ui {
 
 QString GenerateTab::statusText() const {
     return status_->text();
+}
+
+}  // namespace gh::ui
+
+namespace gh::ui {
+
+void GenerateTab::setSourceImage(const QImage& image) {
+    source_ = image;
+    clearSource_->setEnabled(!image.isNull());
+    if (image.isNull()) {
+        sourceView_->setPixmap(QPixmap());
+        sourceView_->setText(tr("none"));
+        return;
+    }
+    sourceView_->setPixmap(QPixmap::fromImage(image.scaled(sourceView_->size() - QSize(4, 4), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
 }
 
 }  // namespace gh::ui

@@ -48,6 +48,8 @@ public:
     gh::host::GenerateCall currentCall() const;
     // Fills the widgets from a request document (used by "reuse parameters" in the gallery).
     void loadParameters(const nlohmann::json& request, const QString& model);
+    // Image to image: start from this picture (a null image clears it).
+    void setSourceImage(const QImage& image);
 
 signals:
     // A generation finished and its images are in the gallery.
@@ -111,6 +113,10 @@ private:
     QWidget* advancedLoad_ = nullptr;
     QWidget* powerWidgets_ = nullptr;
     QPushButton* showJson_ = nullptr;
+    QImage source_;
+    QLabel* sourceView_ = nullptr;
+    QDoubleSpinBox* strength_ = nullptr;
+    QPushButton* clearSource_ = nullptr;
     QPushButton* generate_ = nullptr;
     QPushButton* cancel_ = nullptr;
     QProgressBar* progress_ = nullptr;

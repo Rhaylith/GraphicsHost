@@ -36,3 +36,10 @@ std::optional<std::string> readImageMetadata(const std::vector<uint8_t>& bytes);
 Image decodeImage(const std::vector<uint8_t>& bytes);
 
 }  // namespace gh::engine
+
+namespace gh::engine {
+
+// Scales to exactly width x height with bilinear filtering (3 or 4 channels); the same size returns a copy.
+Image resizeImage(const Image& source, uint32_t width, uint32_t height);
+
+}  // namespace gh::engine

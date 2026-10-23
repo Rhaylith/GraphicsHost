@@ -135,14 +135,6 @@ TEST_CASE("openai: without a model named, the loaded one is used", "[integration
     CHECK(test::bodyJson(c.Get("/v1/models"))["data"][0]["loaded"] == true);
 }
 
-TEST_CASE("openai: edits are not implemented yet", "[integration][api][openai]") {
-    GenApp g;
-    auto c = g.client();
-    const auto r = c.Post("/v1/images/edits", "{}", "application/json");
-    REQUIRE(r);
-    CHECK(r->status == 501);
-    CHECK(test::bodyJson(r)["error"]["code"] == "not_implemented");
-}
 
 TEST_CASE("openai: needs the generate permission when tokens are required", "[integration][api][openai][auth]") {
     GenApp g;

@@ -35,6 +35,7 @@ inline host::GenerateCall callFromBody(const nlohmann::json& body) {
     copy("batchCount", "batchCount");
     copy("clip_skip", "clipSkip");
     copy("clipSkip", "clipSkip");
+    copy("strength", "strength");
     copy("vae_tiling", "vaeTiling");
     copy("vaeTiling", "vaeTiling");
     copy("output_format", "format");

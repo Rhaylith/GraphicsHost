@@ -10,6 +10,7 @@
 #include <webp/mux.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <stdexcept>
 
@@ -393,6 +394,44 @@ Image decodeImage(const std::vector<uint8_t>& bytes) {
         case ImageFormat::Webp: return decodeWebp(bytes);
     }
     return image;
+}
+
+}  // namespace gh::engine
+
+namespace gh::engine {
+
+Image resizeImage(const Image& src, uint32_t width, uint32_t height) {
+    if (src.width == 0 || src.height == 0 || width == 0 || height == 0 || (src.channels != 3 && src.channels != 4) ||
+        src.data.size() < static_cast<size_t>(src.width) * src.height * src.channels) {
+        throw std::runtime_error("resizeImage: the picture is empty or inconsistent");
+    }
+    if (src.width == width && src.height == height) return src;
+    Image out;
+    out.width = width;
+    out.height = height;
+    out.channels = src.channels;
+    out.data.resize(static_cast<size_t>(width) * height * src.channels);
+    const double sx = static_cast<double>(src.width) / width;
+    const double sy = static_cast<double>(src.height) / height;
+    for (uint32_t y = 0; y < height; ++y) {
+        const double fy = std::max(0.0, (y + 0.5) * sy - 0.5);
+        const uint32_t y0 = std::min<uint32_t>(static_cast<uint32_t>(fy), src.height - 1);
+        const uint32_t y1 = std::min<uint32_t>(y0 + 1, src.height - 1);
+        const double wy = fy - y0;
+        for (uint32_t x = 0; x < width; ++x) {
+            const double fx = std::max(0.0, (x + 0.5) * sx - 0.5);
+            const uint32_t x0 = std::min<uint32_t>(static_cast<uint32_t>(fx), src.width - 1);
+            const uint32_t x1 = std::min<uint32_t>(x0 + 1, src.width - 1);
+            const double wx = fx - x0;
+            for (uint32_t c = 0; c < src.channels; ++c) {
+                auto at = [&](uint32_t xx, uint32_t yy) { return static_cast<double>(src.data[(static_cast<size_t>(yy) * src.width + xx) * src.channels + c]); };
+                const double top = at(x0, y0) * (1 - wx) + at(x1, y0) * wx;
+                const double bottom = at(x0, y1) * (1 - wx) + at(x1, y1) * wx;
+                out.data[(static_cast<size_t>(y) * width + x) * src.channels + c] = static_cast<uint8_t>(std::lround(top * (1 - wy) + bottom * wy));
+            }
+        }
+    }
+    return out;
 }
 
 }  // namespace gh::engine

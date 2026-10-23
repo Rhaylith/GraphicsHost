@@ -104,6 +104,7 @@ GH_API int32_t gh_runtime_get_info(gh_runtime_info* out) {
     info.engine_version = sd_version();
     info.engine_commit = sd_commit();
     info.system_info = sd_get_system_info();
+    info.features = GH_FEATURE_IMG2IMG;
     std::memcpy(out, &info, size < sizeof(info) ? size : sizeof(info));
     return GH_OK;
 }
@@ -211,6 +212,27 @@ GH_API int32_t gh_generate(gh_model* model, const gh_generate_params* params, gh
         gp.vae_tiling_params.enabled = params->vae_tiling != 0;
         gp.sample_params.sample_steps = params->steps > 0 ? params->steps : gp.sample_params.sample_steps;
         gp.sample_params.guidance.txt_cfg = params->cfg_scale;
+
+        // image to image (ABI fields appended in 5.2: only read when the caller's struct has them)
+        std::vector<uint8_t> initPixels;
+        if (has_field(params->struct_size, offsetof(gh_generate_params, strength), sizeof(params->strength)) && params->init_image &&
+            params->init_image->data && params->init_image->width > 0 && params->init_image->height > 0) {
+            const gh_image& in = *params->init_image;
+            if (in.channels != 3 && in.channels != 4) {
+                return fail(GH_ERR_INVALID_ARGUMENT, "gh_generate: init_image must have 3 or 4 channels");
+            }
+            if (static_cast<int32_t>(in.width) != params->width || static_cast<int32_t>(in.height) != params->height) {
+                return fail(GH_ERR_INVALID_ARGUMENT, "gh_generate: init_image must have the size of the result (width x height)");
+            }
+            // the engine wants RGB: drop an alpha channel
+            const size_t pixels = static_cast<size_t>(in.width) * in.height;
+            initPixels.resize(pixels * 3);
+            for (size_t i = 0; i < pixels; ++i) {
+                std::memcpy(&initPixels[i * 3], &in.data[i * in.channels], 3);
+            }
+            gp.init_image = sd_image_t{in.width, in.height, 3, initPixels.data()};
+            gp.strength = params->strength;
+        }
 
         sample_method_t method = sd_get_default_sample_method(model->ctx);
         if (params->sampler && *params->sampler) {
