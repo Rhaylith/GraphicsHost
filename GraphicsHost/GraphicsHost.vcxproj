@@ -30,6 +30,7 @@
     <QtModules>Core;Gui;Widgets</QtModules>
     <TargetName>GraphicsHost</TargetName>
   </PropertyGroup>
+  <Import Project="$(RepoRoot)props\Core.props" />
   <Import Project="$(RepoRoot)props\Qt.props" />
   <ItemGroup>
     <ClCompile Include="main.cpp" />

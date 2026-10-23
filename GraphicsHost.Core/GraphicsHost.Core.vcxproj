@@ -43,6 +43,8 @@
     <ClCompile Include="core\**\*.cpp" />
     <ClCompile Include="engine\**\*.cpp" />
     <ClCompile Include="cli\**\*.cpp" />
+    <ClCompile Include="host\**\*.cpp" />
+    <ClInclude Include="host\**\*.h" />
     <ClInclude Include="core\**\*.h" />
     <ClInclude Include="engine\**\*.h" />
     <ClInclude Include="cli\**\*.h" />

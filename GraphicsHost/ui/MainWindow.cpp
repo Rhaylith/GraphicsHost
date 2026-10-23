@@ -1,12 +1,15 @@
 #include "MainWindow.h"
 
+#include "host/AppHost.h"
+
 #include <QLabel>
 #include <QStatusBar>
 #include <QTabWidget>
 
 namespace gh::ui {
 
-MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), tabs_(new QTabWidget(this)) {
+MainWindow::MainWindow(gh::host::AppHost& host, QWidget* parent)
+    : QMainWindow(parent), host_(host), tabs_(new QTabWidget(this)) {
     setWindowTitle(tr("GraphicsHost"));
     resize(1100, 720);
     setCentralWidget(tabs_);
@@ -17,7 +20,16 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), tabs_(new QTabWid
     addPlaceholderTab(tr("Discover"), tr("Model discovery and downloads arrive in phase 4."));
     addPlaceholderTab(tr("Settings"), tr("Settings arrive in phase 4."));
 
-    statusBar()->showMessage(tr("Ready"));
+    statusBar()->showMessage(runtimeSummary());
+}
+
+QString MainWindow::runtimeSummary() const {
+    if (const auto* runtime = host_.selectedRuntime()) {
+        return tr("Runtime: %1 (backend setting: %2)")
+            .arg(QString::fromStdString(runtime->id), QString::fromStdString(host_.settings().backend));
+    }
+    return tr("No runtime available for backend setting '%1'")
+        .arg(QString::fromStdString(host_.settings().backend));
 }
 
 void MainWindow::addPlaceholderTab(const QString& title, const QString& text) {
