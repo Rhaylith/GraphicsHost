@@ -6,6 +6,7 @@
 #include <QApplication>
 #include <QCoreApplication>
 #include <QDir>
+#include <QEventLoop>
 #include <QStringList>
 #include <QTimer>
 #include <QTabWidget>
@@ -100,7 +101,9 @@ int runGui(int argc, char* argv[]) {
             QDir().mkpath(dir);
             for (int i = 0; i < window.tabs()->count(); ++i) {
                 window.tabs()->setCurrentIndex(i);
-                QCoreApplication::processEvents();
+                QEventLoop settle;   // let the tab load what it loads in the background
+                QTimer::singleShot(700, &settle, &QEventLoop::quit);
+                settle.exec();
                 const QString name = window.tabs()->tabText(i).remove(QLatin1Char('&')).replace(QLatin1Char(' '), QLatin1Char('-')).toLower();
                 window.grab().save(dir + QStringLiteral("/") + QString::number(i + 1) + QStringLiteral("-") + name + QStringLiteral(".png"));
             }

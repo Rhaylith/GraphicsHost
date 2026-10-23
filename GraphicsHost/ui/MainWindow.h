@@ -10,6 +10,7 @@ class QTabWidget;
 class QTimer;
 
 namespace gh::ui {
+class GalleryTab;
 class GenerateTab;
 }
 
@@ -64,6 +65,7 @@ private:
     QString serverError_;
     QTabWidget* tabs_ = nullptr;
     GenerateTab* generate_ = nullptr;
+    GalleryTab* gallery_ = nullptr;
     QSystemTrayIcon* tray_ = nullptr;
     QTimer* statusTimer_ = nullptr;
     QLabel* serverLabel_ = nullptr;

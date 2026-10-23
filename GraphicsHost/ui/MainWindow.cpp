@@ -1,6 +1,7 @@
 #include "MainWindow.h"
 
 #include "DiscoverTab.h"
+#include "GalleryTab.h"
 #include "GenerateTab.h"
 #include "ModelsTab.h"
 #include "LogsTab.h"
@@ -66,14 +67,15 @@ MainWindow::~MainWindow() {
 }
 
 void MainWindow::buildTabs() {
-    auto placeholder = [this](const QString& title, const QString& text) {
-        auto* label = new QLabel(text, tabs_);
-        label->setAlignment(Qt::AlignCenter);
-        tabs_->addTab(label, title);
-    };
     generate_ = new GenerateTab(host_, tabs_);
     tabs_->addTab(generate_, tr("Generate"));
-    placeholder(tr("Gallery"), tr("The gallery arrives in phase 5."));
+    gallery_ = new GalleryTab(host_, tabs_);
+    tabs_->addTab(gallery_, tr("Gallery"));
+    connect(generate_, &GenerateTab::imagesAdded, gallery_, &GalleryTab::reload);
+    connect(gallery_, &GalleryTab::reuseRequested, this, [this](const nlohmann::json& request, const QString& model) {
+        generate_->loadParameters(request, model);
+        tabs_->setCurrentWidget(generate_);
+    });
     auto* models = new ModelsTab(host_, tabs_);
     tabs_->addTab(models, tr("My Models"));
     auto* discover = new DiscoverTab(host_, tabs_);

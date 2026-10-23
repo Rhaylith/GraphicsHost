@@ -380,7 +380,8 @@ Goal: retire the biggest risk (§10) before any application code exists.
 
 ### Phase 5 — Depth: more of what an image host needs (L)
 
-- [ ] 5.1 Qt and browser **Gallery** tab: lazy thumbnails, search by prompt, reuse parameters, delete, export (M)
+- [x] 5.1 Qt and browser **Gallery** tab: lazy thumbnails, search by prompt, reuse parameters, delete, export (M)
+  - Qt: thumbnails load in pages of 60 off the UI thread, multi-select delete, "Reuse parameters" fills the Generate tab, save as / show in folder, export of the selection or of everything that matches the search into a folder. Browser: search, load more, detail dialog with reuse, download and delete (done in 4.10).
 - [ ] 5.2 img2img (`init_image`, `strength`) and `/v1/images/edits` (M)
 - [ ] 5.3 Inpainting with `mask_image`; mask drawing in the Qt UI (browser UI may follow later) (M)
 - [ ] 5.4 LoRA support: library scan, `loras[]` parameter, `<lora:name:w>` prompt syntax (M)
