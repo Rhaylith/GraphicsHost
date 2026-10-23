@@ -226,3 +226,15 @@ TEST_CASE("service: a plain repository file, with size and hash from the reposit
     for (const auto& n : gated.notes) note |= n.find("gated") != std::string::npos;
     CHECK(note);
 }
+
+TEST_CASE("service: the record keeps the repository path of a file in a sub-folder (needed by the update check)", "[unit][service]") {
+    Fixture f;
+    f.hub.sizes["other/plain/sub/dir/nested.safetensors"] = kCkptSize;
+    const auto plan = f.service->planRepoFile("other/plain", "sub/dir/nested.safetensors");
+    f.waitAll(f.service->start(plan));
+    CHECK(plan.items[0].destination.filename() == "nested.safetensors");   // flat in the library
+    const auto record = json::parse(gh::test::readText(sourceSidecarFor(plan.items[0].destination)));
+    CHECK(record["file"] == "sub/dir/nested.safetensors");                 // the name to look for in the repository
+    CHECK(record["localFile"] == "nested.safetensors");
+    CHECK(record["repo"] == "other/plain");
+}
