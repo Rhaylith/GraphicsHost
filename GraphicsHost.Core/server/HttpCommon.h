@@ -35,6 +35,7 @@ inline void sendEngineError(httplib::Response& res, const engine::EngineError& e
         case engine::EngineErrorCode::LoadFailed: sendError(res, 500, "server_error", e.what(), "model_load_failed"); break;
         case engine::EngineErrorCode::OutOfMemory: sendError(res, 507, "server_error", e.what(), "out_of_memory"); break;
         case engine::EngineErrorCode::Cancelled: sendError(res, 499, "cancelled", e.what(), "cancelled"); break;
+        case engine::EngineErrorCode::Blocked: sendError(res, 400, "invalid_request_error", e.what(), "content_policy_violation"); break;
         case engine::EngineErrorCode::Failed: sendError(res, 409, "server_error", e.what(), "busy"); break;
     }
 }

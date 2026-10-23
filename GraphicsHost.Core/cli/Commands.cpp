@@ -195,6 +195,10 @@ int runGen(host::AppHost& host, const GenInvocation& in, bool json, bool quiet, 
         err << "error: " << e.what() << "\n";
         return kUsage;
     }
+    if (const auto verdict = host.checkSafety(request); !verdict.allowed) {
+        err << "error: " << verdict.reason << "\n";
+        return kUsage;
+    }
     load.modelPath = modelPath.string();
     if (load.vaePath.empty() && !card.vae.empty()) {
         load.vaePath = (modelPath.parent_path() / card.vae).string();  // the VAE the library linked to this checkpoint

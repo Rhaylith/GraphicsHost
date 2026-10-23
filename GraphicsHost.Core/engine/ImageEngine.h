@@ -35,6 +35,7 @@ enum class EngineErrorCode {
     OutOfMemory,
     Cancelled,
     Failed,
+    Blocked,         // refused by the safety filter
 };
 
 class EngineError : public std::runtime_error {

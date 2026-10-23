@@ -184,6 +184,7 @@ int exitCodeFor(engine::EngineErrorCode code) {
         case engine::EngineErrorCode::NotFound: return kNotFound;
         case engine::EngineErrorCode::OutOfMemory: return kOutOfMemory;
         case engine::EngineErrorCode::Cancelled: return kCancelled;
+        case engine::EngineErrorCode::Blocked: return kUsage;   // the request was refused
         case engine::EngineErrorCode::LoadFailed:
         case engine::EngineErrorCode::Failed: return kFailure;
     }

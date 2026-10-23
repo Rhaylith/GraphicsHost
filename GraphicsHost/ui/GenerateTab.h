@@ -117,6 +117,7 @@ private:
     QComboBox* device_ = nullptr;
     QCheckBox* flash_ = nullptr;
     QCheckBox* offload_ = nullptr;
+    QCheckBox* safety_ = nullptr;
     QWidget* advancedRequest_ = nullptr;
     QWidget* advancedLoad_ = nullptr;
     QWidget* powerWidgets_ = nullptr;

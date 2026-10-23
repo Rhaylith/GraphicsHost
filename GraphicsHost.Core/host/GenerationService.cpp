@@ -190,6 +190,9 @@ GenerationService::Prepared GenerationService::prepare(const GenerateCall& call)
     } else if (call.maskImage) {
         throw EngineError(EngineErrorCode::InvalidRequest, "a mask needs a source image (init_image)");
     }
+    if (const auto verdict = host_.checkSafety(request); !verdict.allowed) {
+        throw EngineError(EngineErrorCode::Blocked, verdict.reason);
+    }
     load.modelPath = card.path.string();
     if (load.vaePath.empty() && !card.vae.empty()) load.vaePath = (card.path.parent_path() / card.vae).string();
     if (const auto errors = engine::validate(request); !errors.empty()) {

@@ -75,6 +75,18 @@ tags in the prompt (the tags are removed from the text; a tag wins over a list e
 file name without extension, or a unique prefix. Weights go from -5 to 5, at most 8 at a time. A LoRA made for the other
 model family (SD 1.x against SDXL) is refused. The gallery records the LoRAs of every image.
 
+## Safety filter
+
+Optional and off by default. Turn it on in Settings (`safety.enabled`) for every request, or ask for it per request with
+`"safety_filter": true`; a request cannot switch it off when the setting is on. A refused prompt answers 400
+`content_policy_violation` and never reaches the engine; the CLI refuses it with exit code 2.
+
+It is a **word list**, not an image classifier: it refuses prompts that contain a listed word or phrase (whole words, any
+case, punctuation ignored; the negative prompt is not checked). It is easy to get around and will refuse some harmless
+prompts. The list is `data\safety-terms.txt` next to the exe plus your own `safety-terms.txt` in the data folder (one
+term per line, `#` comments); edits count immediately. `ISafetyFilter::checkImage` is the hook for a picture classifier;
+the built-in filter lets every picture through.
+
 ## Native API (`/api/v1`)
 
 | Route | Permission | Notes |

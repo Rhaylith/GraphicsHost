@@ -239,3 +239,14 @@ HardwareMonitor& AppHost::monitor() {
 }
 
 }  // namespace gh::host
+
+namespace gh::host {
+
+engine::SafetyVerdict AppHost::checkSafety(const engine::GenerationRequest& request) const {
+    if (!settings_.safety.enabled && !request.safetyFilter) return {};   // off unless the host or the request turns it on
+    const engine::BlocklistFilter filter(engine::BlocklistFilter::readTerms(
+        {core::AppPaths::executableDir() / "data" / "safety-terms.txt", paths_.root() / "safety-terms.txt"}));
+    return filter.checkPrompt(request.prompt);
+}
+
+}  // namespace gh::host

@@ -7,6 +7,7 @@
 #include "engine/ImageEngine.h"
 #include "engine/ModelManager.h"
 #include "engine/RuntimeLoader.h"
+#include "engine/SafetyFilter.h"
 #include "gallery/GalleryStore.h"
 #include "host/GenerationService.h"
 #include "host/HardwareMonitor.h"
@@ -73,6 +74,9 @@ public:
     models::ModelLibrary& library();               // the checkpoints, VAEs and LoRAs in modelsDir()
     server::TokenStore& tokens();                  // API access tokens (<data folder>/tokens.json)
     HardwareMonitor& monitor();                    // CPU, RAM, GPU load and video memory readings
+    // Whether the safety filter applies to this request (settings.safety.enabled or the request asks for it) and, if so,
+    // what it says about the prompt. Reads the term files each time, so edits to them count at once.
+    engine::SafetyVerdict checkSafety(const engine::GenerationRequest& request) const;
     models::DownloadManager& downloads();          // model downloads (a few at a time)
     models::ModelService& modelService();          // catalog + downloads + library: "get this model"
     GenerationService& generation();               // JIT load + queue + gallery for the API and the UIs

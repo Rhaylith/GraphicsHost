@@ -390,7 +390,8 @@ Goal: retire the biggest risk (§10) before any application code exists.
   - ABI: `GH_FEATURE_LORA`, `gh_lora` + `loras` appended to the generate params. Names resolve against the library (file name, stem or unique prefix), family mismatches are refused, weights are per request. Verified on the real engine with a synthetic LoRA (it changes the picture, weight 0 does not, nothing stays applied). UIs: a LoRA field with a picker in Qt, a field with a datalist in the browser.
 - [x] 5.5 Presets import/export; hardware monitor graphs (GPU utilisation, VRAM) with Qt Charts (M)
   - `HardwareMonitor` (CPU and RAM from the system, GPU load and VRAM from the PDH counters "GPU Engine" / "GPU Adapter Memory"), `GET /api/v1/hardware/usage`, a Monitor tab with two charts (two minutes of history). Checked live on the RX 7900 XTX: VRAM rose from 1.4 to 4.8 GiB when a model loaded; GPU load readings were low during the short runs I sampled. Presets: save the current settings, import, export, delete from a menu in both UIs (the Qt and browser flows were exercised; Qt dialogs only by build).
-- [ ] 5.6 Optional safety filter: `ISafetyFilter`, first implementation, per-request override, off by default (M)
+- [x] 5.6 Optional safety filter: `ISafetyFilter`, first implementation, per-request override, off by default (M)
+  - `BlocklistFilter`: a prompt word list (shipped `datasafety-terms.txt` plus the user's own file), honest about being no image classifier; `checkImage` is the hook for one. Setting on = every request; the request can turn it on for itself but not off. New engine error `Blocked` (HTTP 400 `content_policy_violation`, CLI exit 2). Qt: a per-prompt checkbox in advanced mode; Settings has the global switch in both UIs.
 - [ ] 5.7 ESRGAN upscaler *(stretch)*; ControlNet *(stretch)*
 
 **Exit:** the standard parameter set from §5 is fully usable from the API and both UIs, except the stretch items.

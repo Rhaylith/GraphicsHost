@@ -278,6 +278,9 @@ void GenerateTab::buildUi() {
     load->addRow(QString(), vaeTiling_);
     load->addRow(QString(), flash_);
     load->addRow(QString(), offload_);
+    safety_ = new QCheckBox(tr("Safety filter for this prompt"), advancedLoad_);
+    safety_->setToolTip(tr("Refuses prompts with words from the block list. It is on for everything when the Settings tab turns it on."));
+    load->addRow(QString(), safety_);
     leftLayout->addWidget(advancedLoad_);
 
     showJson_ = new QPushButton(tr("Show request JSON…"), left);
@@ -439,6 +442,7 @@ gh::host::GenerateCall GenerateTab::currentCall() const {
     Json& l = call.loadOptions;
     if (advancedLoad_->isVisible()) {
         if (clipSkip_->value() >= 0) r["clipSkip"] = clipSkip_->value();
+        if (safety_->isChecked()) r["safetyFilter"] = true;
         if (vaeTiling_->checkState() != Qt::PartiallyChecked) r["vaeTiling"] = vaeTiling_->isChecked();
         if (!format_->currentData().toString().isEmpty()) r["format"] = s(format_->currentData().toString());
         if (!device_->currentData().toString().isEmpty()) l["device"] = s(device_->currentData().toString());
