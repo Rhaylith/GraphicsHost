@@ -410,7 +410,9 @@ Goal: retire the biggest risk (§10) before any application code exists.
   - `msbuild installerPackage.proj` stages and zips `builddistGraphicsHost-<version>-win-x64.zip` (88 MB: exe, vcpkg and Qt DLLs and plugins, runtimes, data, web, translations, the VC145 runtime app-local, NOTICE.txt with the licences, a short README). It is a portable package, **not an installer**: no WiX or MSIX tooling is installed here, so there is no MSI, no Start-menu entry and no signing. Checked by unzipping to another folder and running it with a bare PATH (Windows folders only): `--smoke-test`, `hardware`, a Vulkan generation and `serve` all worked.
 - [ ] 6.6 Auto-update (feed, signed package, rollback) *(stretch)*
 - [ ] 6.7 Hardware cross-check: RDNA GPU, an older GCN card if available, an APU; a CPU-only machine without AVX2; clean-VM install test *(AMD)* (M)
-- [ ] 6.8 Docs: README with feature table, per-feature docs as in LLMHost, API reference (S)
+  - Not done: only one machine is available. What was and was not run, and a checklist for new machines, are in `docs/hardware-checklist.md`.
+- [x] 6.8 Docs: README with feature table, API reference, hardware checklist, translation guide (S)
+  - README feature table, `docs/api.md` (every route, errors, auth, HTTPS/limits, safety, LoRA, image to image), `docs/hardware-checklist.md`, `GraphicsHost/translations/README.md`, `installer/NOTICE.txt`. LLMHost-style per-feature pages were not written; `docs/api.md` is one page.
 
 **Exit:** an installer installs on a clean Windows machine and passes the smoke checklist on CPU and AMD Vulkan.
 

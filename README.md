@@ -5,13 +5,28 @@ runs them in-process on **CPU or Vulkan (AMD GPUs)**, exposes one standard set o
 them through a Qt desktop window, a browser UI, a CLI and an HTTP API. Modelled on LLMHost; the engine is
 [stable-diffusion.cpp](https://github.com/leejet/stable-diffusion.cpp).
 
-Status: **Phases 2 to 5 are done except the stretch items (upscaler, ControlNet)**: images are generated from the Qt window, the
+Status: **Phases 2 to 6 are done except the stretch items (upscaler, ControlNet, auto-update), an MSI installer and testing on other hardware**: images are generated from the Qt window, the
 browser, the command line and the HTTP API (OpenAI-compatible and native) on CPU and on the AMD GPU (Vulkan), for
 SD 1.x and SDXL, with all samplers and schedulers, a job queue with cancellation, PNG/JPEG/WebP output with the
 parameters embedded, a gallery, presets, per-model defaults and a memory estimate, plus a model library, a verified catalog,
 Hugging Face search and resumable downloads, API tokens and a request log, image to image, inpainting, LoRA, a hardware monitor and an
 optional prompt safety filter. See [implementation-plan.md](implementation-plan.md) for the plan and what is ticked off, and
 [docs/api.md](docs/api.md) for the HTTP API.
+
+## What it does
+
+| Area | Features |
+|---|---|
+| Generation | SD 1.x and SDXL on CPU (AVX2 / plain) or Vulkan (AMD); samplers and schedulers; batches; seeds; image to image; inpainting with a painted mask; LoRA; PNG/JPEG/WebP with the parameters embedded |
+| Models | library of the models folder; curated catalog with a fit hint for this computer; Hugging Face search; resumable, checksummed downloads; update check; per-model defaults; presets (import/export) |
+| Interfaces | Qt window (Generate, Gallery, My Models, Discover, Settings, Monitor, Logs), browser UI, CLI, OpenAI-compatible and native HTTP API ([docs/api.md](docs/api.md)) |
+| Server | access tokens with permissions, HTTPS (own or generated certificate), address allow-list, rate limit, request log, `/metrics`, Windows service mode |
+| Comfort | first-run wizard, light/dark themes with an accent colour, tray icon and notifications, hardware monitor, translation scaffolding |
+| Safety | optional prompt word filter, off by default ([docs/api.md](docs/api.md#safety-filter)) |
+
+Packaging: `msbuild installer\Package.proj` makes `build\dist\GraphicsHost-<version>-win-x64.zip` (a portable package, not an
+installer; see [implementation-plan.md](implementation-plan.md) step 6.5). Hardware coverage and what is untested:
+[docs/hardware-checklist.md](docs/hardware-checklist.md).
 
 ## Build
 
@@ -145,7 +160,7 @@ on the CPU runtime, so no GPU is needed. `tools\measure-vram.ps1` measures GPU m
 | `runtime/` | the C ABI (`gh_runtime.h`) and the three runtime DLL projects |
 | `ggml/`, `stable-diffusion/` | MSBuild projects that build the engine from the submodule in `extern/` |
 | `props/` | shared MSBuild settings, including the Qt moc/deploy integration |
-| `docs/` | [adding an option](docs/adding-options.md), [Phase 0 results](docs/phase0-results.md), [environment notes](docs/environment-notes.md), [HTTP API](docs/api.md) |
+| `docs/` | [adding an option](docs/adding-options.md), [Phase 0 results](docs/phase0-results.md), [environment notes](docs/environment-notes.md), [HTTP API](docs/api.md), [hardware checklist](docs/hardware-checklist.md) |
 | `spike/` | Phase 0 spike program |
 
 ## Known environment issues
