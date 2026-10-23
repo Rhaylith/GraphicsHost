@@ -129,9 +129,7 @@ QString MainWindow::applyServerSettings() {
     server_->stop();
     const auto& settings = host_.settings();
     if (!settings.server.enabled) return {};
-    gh::server::ServerOptions options;
-    options.port = settings.server.port;
-    options.bindAddress = settings.server.lan ? "0.0.0.0" : "127.0.0.1";
+    gh::server::ServerOptions options = gh::server::serverOptionsFrom(host_);
     const std::string error = server_->start(options);
     if (!error.empty()) {
         gh::log::warn("API server not started: " + error);

@@ -4,6 +4,8 @@
 #include "core/Version.h"
 #include "server/HttpCommon.h"
 #include "server/RouteContext.h"
+#include "server/ClientLimits.h"
+#include "server/Tls.h"
 
 #include <atomic>
 #include <chrono>
@@ -25,6 +27,9 @@ struct ApiServer::Impl {
     std::atomic<bool> running{false};
     int port = 0;
     std::string bindAddress;
+    bool https = false;
+    IpAllowList allow;
+    std::unique_ptr<RateLimiter> limiter;
 
     Auth auth;
     RequestLog requests;
@@ -42,14 +47,32 @@ ApiServer::~ApiServer() {
 
 bool ApiServer::running() const { return impl_->running.load(); }
 int ApiServer::port() const { return impl_->port; }
-std::string ApiServer::url() const { return "http://127.0.0.1:" + std::to_string(impl_->port); }
+std::string ApiServer::url() const { return std::string(impl_->https ? "https://" : "http://") + "127.0.0.1:" + std::to_string(impl_->port); }
 
 std::string ApiServer::start(const ServerOptions& o) {
     if (impl_->running) return "the server is already running";
     if (!Auth::isLoopback(o.bindAddress) && !impl_->host.tokens().any()) {
         return "refusing to listen on " + o.bindAddress + ": other computers could use the server without a password. Create an access token first (graphicshost token create <name>)";
     }
-    impl_->server = std::make_unique<httplib::Server>();
+    try {
+        impl_->allow = IpAllowList(o.allowedAddresses);
+    } catch (const std::invalid_argument& e) {
+        return std::string("cannot use the address list: ") + e.what();
+    }
+    impl_->limiter = std::make_unique<RateLimiter>(o.rateLimitPerMinute);
+    impl_->https = o.https;
+    if (o.https) {
+        fs::path cert = o.tlsCertFile, key = o.tlsKeyFile;
+        if (cert.empty() && key.empty()) {
+            const std::string problem = ensureSelfSignedCertificate(o.tlsDir.empty() ? core::AppPaths::executableDir() / "tls" : o.tlsDir, cert, key);
+            if (!problem.empty()) return "cannot make a certificate for https: " + problem;
+        }
+        auto tls = std::make_unique<httplib::SSLServer>(cert.string().c_str(), key.string().c_str());
+        if (!tls->is_valid()) return "cannot use the https certificate " + cert.string() + " with the key " + key.string() + " (are they a matching PEM pair?)";
+        impl_->server = std::move(tls);
+    } else {
+        impl_->server = std::make_unique<httplib::Server>();
+    }
     httplib::Server& s = *impl_->server;
 
     // a bounded pool: the default would use as many threads as the machine has cores (192 here)
@@ -81,8 +104,18 @@ std::string ApiServer::start(const ServerOptions& o) {
     });
 
     // the request log: when a request starts, and what became of it
-    s.set_pre_routing_handler([](const httplib::Request&, httplib::Response&) {
+    s.set_pre_routing_handler([this](const httplib::Request& req, httplib::Response& res) {
         t_requestStart = std::chrono::steady_clock::now();
+        if (!impl_->allow.allows(req.remote_addr)) {
+            sendError(res, 403, "permission_error", "this address may not use the server", "ip_not_allowed");
+            return httplib::Server::HandlerResponse::Handled;
+        }
+        int retry = 0;
+        if (req.path != "/api/v1/health" && !impl_->limiter->allow(req.remote_addr + "|" + req.get_header_value("Authorization"), &retry)) {
+            res.set_header("Retry-After", std::to_string(retry));
+            sendError(res, 429, "rate_limit_error", "too many requests: try again in " + std::to_string(retry) + " seconds", "rate_limited");
+            return httplib::Server::HandlerResponse::Handled;
+        }
         return httplib::Server::HandlerResponse::Unhandled;
     });
     s.set_logger([this](const httplib::Request& req, const httplib::Response& res) {
@@ -141,6 +174,24 @@ void ApiServer::stop() {
         log::info("API server stopped");
     }
     impl_->running = false;
+}
+
+}  // namespace gh::server
+
+namespace gh::server {
+
+ServerOptions serverOptionsFrom(const host::AppHost& host) {
+    const auto& st = host.settings().server;
+    ServerOptions o;
+    o.port = st.port;
+    o.bindAddress = st.lan ? "0.0.0.0" : "127.0.0.1";
+    o.https = st.https;
+    o.tlsCertFile = st.tlsCertFile;
+    o.tlsKeyFile = st.tlsKeyFile;
+    o.tlsDir = host.paths().root() / "tls";
+    o.allowedAddresses = st.allowedAddresses;
+    o.rateLimitPerMinute = st.rateLimitPerMinute;
+    return o;
 }
 
 }  // namespace gh::server

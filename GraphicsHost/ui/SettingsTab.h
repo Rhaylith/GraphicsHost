@@ -54,6 +54,9 @@ private:
     QSpinBox* port_ = nullptr;
     QCheckBox* lan_ = nullptr;
     QCheckBox* requireToken_ = nullptr;
+    QCheckBox* https_ = nullptr;
+    QLineEdit* allowed_ = nullptr;
+    QSpinBox* rate_ = nullptr;
     QComboBox* logLevel_ = nullptr;
     QCheckBox* safety_ = nullptr;
     QLabel* message_ = nullptr;

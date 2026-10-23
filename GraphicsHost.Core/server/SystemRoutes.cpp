@@ -94,7 +94,9 @@ void registerSystemRoutes(httplib::Server& server, RouteContext& ctx) {
             const core::Settings after = core::settingsFromJson(merged);
             ctx.host.updateSettings(after);
             const bool restart = after.server.port != before.server.port || after.server.lan != before.server.lan ||
-                                 after.server.enabled != before.server.enabled;
+                                 after.server.enabled != before.server.enabled || after.server.https != before.server.https ||
+                                 after.server.allowedAddresses != before.server.allowedAddresses || after.server.rateLimitPerMinute != before.server.rateLimitPerMinute ||
+                                 after.server.tlsCertFile != before.server.tlsCertFile || after.server.tlsKeyFile != before.server.tlsKeyFile;
             sendJson(res, {{"settings", core::toJson(ctx.host.settings())}, {"restartRequired", restart}});
         } catch (const std::invalid_argument& e) {
             sendError(res, 400, "invalid_request_error", e.what(), "invalid_settings");

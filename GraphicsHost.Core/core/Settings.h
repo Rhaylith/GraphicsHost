@@ -18,6 +18,11 @@ struct ServerSettings {
     int port = 1234;
     bool lan = false;  // bind to all interfaces instead of localhost only
     bool requireToken = false;  // also local clients must send an access token (remote clients always must)
+    bool https = false;                // serve https (a self-signed certificate is made when no files are given)
+    std::string tlsCertFile;           // PEM certificate chain, with tlsKeyFile
+    std::string tlsKeyFile;
+    std::vector<std::string> allowedAddresses;   // "192.168.1.0/24", "10.0.0.5"; empty = anyone who may connect at all
+    int rateLimitPerMinute = 0;        // requests per client and minute, 0 = no limit
 };
 
 struct LoggingSettings {

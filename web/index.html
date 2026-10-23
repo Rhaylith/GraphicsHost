@@ -118,6 +118,9 @@
         <label class="check"><input id="s-lan" type="checkbox"> Let other computers connect (needs a token)</label>
         <label class="check"><input id="s-require" type="checkbox"> Require a token on this computer too</label>
         <label>Port <input id="s-port" type="number" min="1" max="65535"></label>
+        <label class="check"><input id="s-https" type="checkbox"> Use https (a self-signed certificate is made)</label>
+        <label>Allowed addresses <input id="s-allowed" type="text" placeholder="everyone, e.g. 192.168.1.0/24, 10.0.0.5"></label>
+        <label>Rate limit (requests a minute, 0 = none) <input id="s-rate" type="number" min="0" max="100000"></label>
         <h2>Other</h2>
         <label>Log level <select id="s-log"><option>trace</option><option>debug</option><option>info</option><option>warn</option><option>error</option></select></label>
         <label class="check"><input id="s-safety" type="checkbox"> Safety filter</label>

@@ -75,6 +75,7 @@
     <ClCompile Include="ImageToImageTests.cpp" />
     <ClCompile Include="LoraTests.cpp" />
     <ClCompile Include="SafetyTests.cpp" />
+    <ClCompile Include="TlsAndLimitsTests.cpp" />
     <ClCompile Include="ApiContractTests.cpp" />
     <ClCompile Include="UiSmokeTests.cpp" />
     <ClInclude Include="ApiTestUtil.h" />

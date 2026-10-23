@@ -32,9 +32,9 @@ void requestServeStop() {
 }
 
 int runServe(host::AppHost& host, int port, const std::string& bind, bool json, std::ostream& out, std::ostream& err) {
-    server::ServerOptions options;
-    options.port = port >= 0 ? port : host.settings().server.port;
-    options.bindAddress = bind.empty() ? (host.settings().server.lan ? "0.0.0.0" : "127.0.0.1") : bind;
+    server::ServerOptions options = server::serverOptionsFrom(host);
+    if (port >= 0) options.port = port;
+    if (!bind.empty()) options.bindAddress = bind;
 
     server::ApiServer api(host);
     const std::string problem = api.start(options);

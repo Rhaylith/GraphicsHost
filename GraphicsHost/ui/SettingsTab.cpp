@@ -115,6 +115,17 @@ SettingsTab::SettingsTab(gh::host::AppHost& host, QWidget* parent) : QWidget(par
     serverForm->addRow(tr("Port"), port_);
     serverForm->addRow(QString(), lan_);
     serverForm->addRow(QString(), requireToken_);
+    https_ = new QCheckBox(tr("Use https (a self-signed certificate is made for you)"), serverBox);
+    allowed_ = new QLineEdit(serverBox);
+    allowed_->setPlaceholderText(tr("everyone, e.g. 192.168.1.0/24, 10.0.0.5"));
+    allowed_->setToolTip(tr("Only these addresses may connect (this computer always may). Separate entries with commas."));
+    rate_ = new QSpinBox(serverBox);
+    rate_->setRange(0, 100000);
+    rate_->setSpecialValueText(tr("No limit"));
+    rate_->setSuffix(tr(" requests a minute"));
+    serverForm->addRow(QString(), https_);
+    serverForm->addRow(tr("Allowed addresses"), allowed_);
+    serverForm->addRow(tr("Rate limit"), rate_);
 
     tokens_ = new QTableWidget(0, 4, serverBox);
     tokens_->setHorizontalHeaderLabels({tr("Name"), tr("Permissions"), tr("Created"), tr("Last used")});
@@ -200,6 +211,11 @@ void SettingsTab::loadFromSettings() {
     port_->setValue(st.server.port);
     lan_->setChecked(st.server.lan);
     requireToken_->setChecked(st.server.requireToken);
+    https_->setChecked(st.server.https);
+    QStringList addresses;
+    for (const auto& a : st.server.allowedAddresses) addresses << q(a);
+    allowed_->setText(addresses.join(QStringLiteral(", ")));
+    rate_->setValue(st.server.rateLimitPerMinute);
     logLevel_->setCurrentIndex(std::max(0, logLevel_->findData(q(st.logging.level))));
     safety_->setChecked(st.safety.enabled);
 }
@@ -217,6 +233,10 @@ void SettingsTab::apply() {
     st.server.port = port_->value();
     st.server.lan = lan_->isChecked();
     st.server.requireToken = requireToken_->isChecked();
+    st.server.https = https_->isChecked();
+    st.server.allowedAddresses.clear();
+    for (const QString& part : allowed_->text().split(QLatin1Char(','), Qt::SkipEmptyParts)) st.server.allowedAddresses.push_back(s(part.trimmed()));
+    st.server.rateLimitPerMinute = rate_->value();
     st.logging.level = s(logLevel_->currentData().toString());
     st.safety.enabled = safety_->isChecked();
     if (st.server.enabled && st.server.lan && !host_.tokens().any()) {

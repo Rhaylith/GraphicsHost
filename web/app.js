@@ -468,6 +468,7 @@ async function loadSettingsTab() {
     const s = await api('/api/v1/settings');
     state.settings = s;
     $('s-backend').value = s.backend; $('s-threads').value = s.threads; $('s-modelsdir').value = s.modelsDir; $('s-mode').value = s.interfaceMode;
+    $('s-https').checked = s.server.https; $('s-allowed').value = (s.server.allowedAddresses || []).join(', '); $('s-rate').value = s.server.rateLimitPerMinute;
     $('s-lan').checked = s.server.lan; $('s-require').checked = s.server.requireToken; $('s-port').value = s.server.port;
     $('s-log').value = s.logging.level; $('s-safety').checked = s.safety.enabled;
   } catch (e) { fail($('s-status'), e); }
@@ -477,7 +478,7 @@ async function loadSettingsTab() {
 $('s-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const patch = { backend: $('s-backend').value, threads: parseInt($('s-threads').value || '0', 10), modelsDir: $('s-modelsdir').value.trim(), interfaceMode: $('s-mode').value,
-    server: { lan: $('s-lan').checked, requireToken: $('s-require').checked, port: parseInt($('s-port').value, 10) }, logging: { level: $('s-log').value }, safety: { enabled: $('s-safety').checked } };
+    server: { https: $('s-https').checked, allowedAddresses: $('s-allowed').value.split(',').map((x) => x.trim()).filter(Boolean), rateLimitPerMinute: parseInt($('s-rate').value || '0', 10), lan: $('s-lan').checked, requireToken: $('s-require').checked, port: parseInt($('s-port').value, 10) }, logging: { level: $('s-log').value }, safety: { enabled: $('s-safety').checked } };
   try {
     const r = await api('/api/v1/settings', { method: 'PUT', body: patch });
     state.settings = r.settings;

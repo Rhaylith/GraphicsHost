@@ -87,6 +87,18 @@ prompts. The list is `data\safety-terms.txt` next to the exe plus your own `safe
 term per line, `#` comments); edits count immediately. `ISafetyFilter::checkImage` is the hook for a picture classifier;
 the built-in filter lets every picture through.
 
+## HTTPS, address list and rate limit
+
+Settings (`server.*`, in Settings or `PUT /api/v1/settings`; the server picks them up when it is restarted):
+
+* `https`: serve `https://`. With no `tlsCertFile` / `tlsKeyFile` (PEM, give both or neither) a self-signed EC certificate for
+  `localhost`, `127.0.0.1` and `::1` is made in `<data folder>\tls` and renewed before it expires. Browsers and `curl` warn
+  about a self-signed certificate until you trust it or pass your own certificate.
+* `allowedAddresses`: `["192.168.1.0/24", "10.0.0.5"]`; anybody else gets 403 `ip_not_allowed`. This computer is always
+  allowed. Only IPv4 ranges and single IPv6 addresses are understood. Empty means everyone who may connect at all.
+* `rateLimitPerMinute`: requests per client (address and token) in a sliding minute; over the limit is 429
+  `rate_limited` with `Retry-After`. `/api/v1/health` is exempt. 0 means no limit.
+
 ## Native API (`/api/v1`)
 
 | Route | Permission | Notes |

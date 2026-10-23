@@ -1,6 +1,7 @@
 #include "core/Settings.h"
 
 #include "core/AtomicFile.h"
+#include "server/ClientLimits.h"
 
 #include <algorithm>
 #include <array>
@@ -38,7 +39,9 @@ Json toJson(const Settings& s) {
     json["firstRunDone"] = s.firstRunDone;
     json["theme"] = s.theme;
     json["accent"] = s.accent;
-    json["server"] = {{"enabled", s.server.enabled}, {"port", s.server.port}, {"lan", s.server.lan}, {"requireToken", s.server.requireToken}};
+    json["server"] = {{"enabled", s.server.enabled}, {"port", s.server.port}, {"lan", s.server.lan}, {"requireToken", s.server.requireToken},
+                      {"https", s.server.https}, {"tlsCertFile", s.server.tlsCertFile}, {"tlsKeyFile", s.server.tlsKeyFile},
+                      {"allowedAddresses", s.server.allowedAddresses}, {"rateLimitPerMinute", s.server.rateLimitPerMinute}};
     json["logging"] = {{"level", s.logging.level}};
     json["safety"] = {{"enabled", s.safety.enabled}};
     return json;
@@ -63,6 +66,11 @@ Settings settingsFromJson(const Json& json) {
         s.server.port = it->value("port", s.server.port);
         s.server.lan = it->value("lan", s.server.lan);
         s.server.requireToken = it->value("requireToken", s.server.requireToken);
+        s.server.https = it->value("https", s.server.https);
+        s.server.tlsCertFile = it->value("tlsCertFile", s.server.tlsCertFile);
+        s.server.tlsKeyFile = it->value("tlsKeyFile", s.server.tlsKeyFile);
+        s.server.rateLimitPerMinute = it->value("rateLimitPerMinute", s.server.rateLimitPerMinute);
+        if (const auto a = it->find("allowedAddresses"); a != it->end() && a->is_array()) s.server.allowedAddresses = a->get<std::vector<std::string>>();
     }
     if (const auto it = json.find("logging"); it != json.end() && it->is_object()) {
         s.logging.level = it->value("level", s.logging.level);
@@ -98,6 +106,15 @@ std::vector<FieldError> validate(const Settings& s) {
     }
     if (!s.accent.empty() && !validAccent(s.accent)) {
         errors.push_back({"accent", "must be empty or a colour like #2b6cb0"});
+    }
+    for (const auto& a : s.server.allowedAddresses) {
+        if (!server::IpAllowList::valid(a)) errors.push_back({"server.allowedAddresses", "not an address or range: " + a});
+    }
+    if (s.server.rateLimitPerMinute < 0 || s.server.rateLimitPerMinute > 100000) {
+        errors.push_back({"server.rateLimitPerMinute", "must be between 0 (no limit) and 100000"});
+    }
+    if (s.server.https && (s.server.tlsCertFile.empty() != s.server.tlsKeyFile.empty())) {
+        errors.push_back({"server.tlsCertFile", "give both a certificate and a key file, or neither (a certificate is made for you)"});
     }
     if (s.server.port < 1 || s.server.port > 65535) {
         errors.push_back({"server.port", "must be between 1 and 65535"});

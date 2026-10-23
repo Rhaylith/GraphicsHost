@@ -252,3 +252,47 @@ TEST_CASE("cli token: create, list, revoke", "[unit][cli][auth]") {
     auto [c5, o5, e5] = run({"--json", "token", "create", "default"});
     CHECK(json::parse(o5)["permissions"] == json::array({"generate", "read"}));
 }
+
+#include "server/ClientLimits.h"
+
+TEST_CASE("limits: the allow-list understands ranges, single addresses and loopback", "[unit][api][limits]") {
+    using gh::server::IpAllowList;
+    CHECK(IpAllowList().allows("203.0.113.9"));                                   // no list: no restriction
+    const IpAllowList list({"192.168.1.0/24", "10.1.2.3", "fe80::1"});
+    CHECK(list.restricted());
+    CHECK(list.allows("192.168.1.77"));
+    CHECK_FALSE(list.allows("192.168.2.1"));
+    CHECK(list.allows("10.1.2.3"));
+    CHECK_FALSE(list.allows("10.1.2.4"));
+    CHECK(list.allows("fe80::1"));
+    CHECK_FALSE(list.allows("fe80::2"));
+    CHECK(list.allows("::ffff:192.168.1.5"));                                       // IPv4 on a dual-stack socket
+    CHECK(list.allows("127.0.0.1"));                                                // this computer is always allowed
+    CHECK(list.allows("::1"));
+    CHECK(IpAllowList({"0.0.0.0/0"}).allows("8.8.8.8"));
+    CHECK_THROWS_AS(IpAllowList({"192.168.1.0/33"}), std::invalid_argument);
+    CHECK_THROWS_AS(IpAllowList({"example.com"}), std::invalid_argument);
+    CHECK_THROWS_AS(IpAllowList({"300.1.1.1"}), std::invalid_argument);
+    CHECK(IpAllowList::valid("10.0.0.0/8"));
+    CHECK_FALSE(IpAllowList::valid("10.0.0.0/"));
+}
+
+TEST_CASE("limits: the rate limiter counts a sliding minute per client", "[unit][api][limits]") {
+    using gh::server::RateLimiter;
+    RateLimiter off(0);
+    for (int i = 0; i < 1000; ++i) REQUIRE(off.allow("a"));
+
+    RateLimiter limiter(3);
+    const auto t0 = RateLimiter::Clock::now();
+    int retry = 0;
+    CHECK(limiter.allow("a", &retry, t0));
+    CHECK(limiter.allow("a", &retry, t0 + std::chrono::seconds(1)));
+    CHECK(limiter.allow("a", &retry, t0 + std::chrono::seconds(2)));
+    CHECK_FALSE(limiter.allow("a", &retry, t0 + std::chrono::seconds(3)));
+    CHECK(retry >= 57);
+    CHECK(retry <= 60);
+    CHECK(limiter.allow("b", &retry, t0 + std::chrono::seconds(3)));                 // another client has its own count
+    CHECK(limiter.allow("a", &retry, t0 + std::chrono::seconds(61)));                // the first two are a minute old, one request is left over
+    CHECK(limiter.allow("a", &retry, t0 + std::chrono::seconds(61)));
+    CHECK_FALSE(limiter.allow("a", &retry, t0 + std::chrono::seconds(61)));
+}
