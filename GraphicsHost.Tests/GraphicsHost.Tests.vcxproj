@@ -49,6 +49,8 @@
     <ClCompile Include="EngineTests.cpp" />
     <ClCompile Include="CliTests.cpp" />
     <ClCompile Include="GenerationRequestTests.cpp" />
+    <ClCompile Include="EngineGenerateTests.cpp" />
+    <ClInclude Include="ModelFixture.h" />
     <ClInclude Include="TestUtil.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -96,6 +96,11 @@ private:
     std::deque<Entry> entries_;
 };
 
+// Recent warnings/errors from the native engine, numbered so callers can ask for "the ones since my call".
+std::mutex g_nativeMutex;
+uint64_t g_nativeSequence = 0;
+std::deque<std::pair<uint64_t, std::string>> g_nativeErrors;
+
 std::mutex g_mutex;
 std::shared_ptr<spdlog::logger> g_logger;
 std::shared_ptr<RingSink> g_ring;
@@ -196,7 +201,30 @@ void nativeLog(int level, const char* text) {
         case 3: mapped = Level::Warn; break;
         default: mapped = Level::Error; break;
     }
+    if (level >= 3) {
+        std::lock_guard<std::mutex> lock(g_nativeMutex);
+        g_nativeErrors.push_back({++g_nativeSequence, message});
+        if (g_nativeErrors.size() > 64) {
+            g_nativeErrors.pop_front();
+        }
+    }
     write(mapped, "[engine] " + message);
+}
+
+uint64_t nativeMark() {
+    std::lock_guard<std::mutex> lock(g_nativeMutex);
+    return g_nativeSequence;
+}
+
+std::vector<std::string> nativeErrorsSince(uint64_t mark) {
+    std::lock_guard<std::mutex> lock(g_nativeMutex);
+    std::vector<std::string> out;
+    for (const auto& [sequence, message] : g_nativeErrors) {
+        if (sequence > mark) {
+            out.push_back(message);
+        }
+    }
+    return out;
 }
 
 }  // namespace gh::log
