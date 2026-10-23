@@ -206,3 +206,91 @@ TEST_CASE("engine: a negative prompt with cfgScale 1 produces a warning", "[mode
     REQUIRE(result.warnings.size() == 1);
     CHECK(result.warnings[0].find("negative prompt") != std::string::npos);
 }
+
+TEST_CASE("engine: every known sampler works on SD1.5", "[model][engine][samplers]") {
+    auto l = loadSd15OrSkip();
+    for (const auto& sampler : knownSamplers()) {
+        DYNAMIC_SECTION(sampler) {
+            auto r = tiny();
+            r.width = r.height = 128;
+            r.steps = 2;
+            r.sampler = sampler;
+            const auto result = l.model->generate(r, {}, {});
+            REQUIRE(result.images.size() == 1);
+            CHECK(result.images[0].data.size() == 128u * 128u * 3u);
+        }
+    }
+}
+
+TEST_CASE("engine: every known scheduler works on SD1.5", "[model][engine][samplers]") {
+    auto l = loadSd15OrSkip();
+    for (const auto& scheduler : knownSchedulers()) {
+        DYNAMIC_SECTION(scheduler) {
+            auto r = tiny();
+            r.width = r.height = 128;
+            r.steps = 2;
+            r.scheduler = scheduler;
+            const auto result = l.model->generate(r, {}, {});
+            REQUIRE(result.images.size() == 1);
+        }
+    }
+}
+
+TEST_CASE("engine: sampler and scheduler change the picture", "[model][engine][samplers]") {
+    auto l = loadSd15OrSkip();
+    auto a = tiny();
+    a.steps = 4;
+    a.sampler = "euler";
+    auto b = a;
+    b.sampler = "dpm++2m";
+    auto c = a;
+    c.scheduler = "karras";
+    const auto ra = l.model->generate(a, {}, {}).images[0].data;
+    CHECK(ra != l.model->generate(b, {}, {}).images[0].data);
+    CHECK(ra != l.model->generate(c, {}, {}).images[0].data);
+}
+
+TEST_CASE("engine: odd sizes and the vae tiling switch", "[model][engine]") {
+    auto l = loadSd15OrSkip();
+    auto r = tiny();
+    r.width = 320;
+    r.height = 192;
+    r.steps = 2;
+    auto result = l.model->generate(r, {}, {});
+    CHECK(result.images[0].width == 320);
+    CHECK(result.images[0].height == 192);
+    r.vaeTiling = true;
+    result = l.model->generate(r, {}, {});
+    CHECK(result.images[0].width == 320);
+}
+
+TEST_CASE("engine: SDXL generates at its own default family settings", "[model][engine][sdxl]") {
+    const auto sdxl = gh::test::findTestModel("sd_xl_base_1.0.safetensors");
+    if (!sdxl) {
+        SKIP("no SDXL checkpoint (models/sd_xl_base_1.0.safetensors)");
+    }
+    std::string problem;
+    auto runtime = gh::test::loadCpuRuntime(problem);
+    if (!runtime) {
+        WARN(problem);
+        SKIP("CPU runtime not available");
+    }
+    auto engine = makeRuntimeEngine(runtime);
+    LoadOptions options;
+    options.modelPath = sdxl->string();
+    options.device = "cpu";
+    auto model = engine->load(options);
+    CHECK(model->info().family.find("XL") != std::string::npos);
+    CHECK(model->info().defaults.width == 1024);
+
+    GenerationRequest r;
+    r.prompt = "a red apple on a table";
+    r.width = 512;  // smaller than the default to keep the test short
+    r.height = 512;
+    r.steps = 2;
+    r.seed = 3;
+    const auto result = model->generate(r, {}, {});
+    REQUIRE(result.images.size() == 1);
+    CHECK(result.images[0].width == 512);
+    CHECK(result.request.cfgScale == 7.0f);  // SDXL family default filled in
+}
