@@ -43,6 +43,8 @@
     <ClCompile Include="core\**\*.cpp" />
     <ClCompile Include="engine\**\*.cpp" />
     <ClCompile Include="cli\**\*.cpp" />
+    <ClCompile Include="net\**\*.cpp" />
+    <ClInclude Include="net\**\*.h" />
     <ClCompile Include="models\**\*.cpp" />
     <ClInclude Include="models\**\*.h" />
     <ClCompile Include="presets\**\*.cpp" />
