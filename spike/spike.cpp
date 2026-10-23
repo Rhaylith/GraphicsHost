@@ -7,6 +7,8 @@
 #include <stb_image_write.h>
 
 #include <stable-diffusion.h>
+#include <ggml.h>
+#include <ggml-backend.h>
 
 #include <chrono>
 #include <cstdio>
@@ -22,7 +24,8 @@ static double seconds_since(Clock::time_point t0) {
 }
 
 static void on_log(sd_log_level_t level, const char* text, void*) {
-    if (level >= SD_LOG_INFO) {
+    static const bool verbose = std::getenv("SPIKE_VERBOSE") != nullptr;
+    if (verbose || level >= SD_LOG_INFO) {
         std::fputs(text, stderr);
     }
 }
@@ -59,8 +62,18 @@ int main(int argc, char** argv) {
 
     sd_set_log_callback(on_log, nullptr);
     sd_set_progress_callback(on_progress, nullptr);
+    if (std::getenv("SPIKE_VERBOSE")) {
+        // backend registration and device probing happen before sd's own ggml log hook is installed
+        ggml_log_set([](ggml_log_level, const char* text, void*) { std::fputs(text, stderr); }, nullptr);
+    }
     std::fprintf(stderr, "stable-diffusion.cpp %s (%s)\n%s\n", sd_version(), sd_commit(), sd_get_system_info());
 
+    if (list && std::getenv("SPIKE_VERBOSE")) {
+        for (size_t i = 0; i < ggml_backend_reg_count(); ++i) {
+            ggml_backend_reg_t r = ggml_backend_reg_get(i);
+            std::fprintf(stderr, "backend reg %zu: %s (%zu devices)\n", i, ggml_backend_reg_name(r), ggml_backend_reg_dev_count(r));
+        }
+    }
     if (list) {
         size_t need = sd_list_devices(nullptr, 0);
         std::string buf(need + 1, '\0');

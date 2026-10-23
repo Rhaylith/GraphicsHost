@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Host tool that turns ggml's Vulkan compute shaders (.comp) into C++ arrays of SPIR-V.
+  Replaces the CMake ExternalProject "vulkan-shaders-gen"; always built Release, output in build\tools.
+  The GGML_VULKAN_*_GLSLC_SUPPORT defines mirror the glslc feature tests of ggml-vulkan/CMakeLists.txt;
+  all seven were supported by shaderc 2026.2 (see docs/phase0-results.md). Re-run tools\probe-glslc.ps1 if glslc changes.
+-->
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>18.0</VCProjectVersion>
+    <ProjectGuid>{7B3D1E0A-5C2F-4E7A-9A11-0F6E2D4C8A04}</ProjectGuid>
+    <RootNamespace>vulkanshadersgen</RootNamespace>
+    <Keyword>Win32Proj</Keyword>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <PropertyGroup>
+    <OutDir>$(RepoRoot)build\tools\</OutDir>
+    <IntDir>$(RepoRoot)build\obj\vulkan-shaders-gen\</IntDir>
+    <TargetName>vulkan-shaders-gen</TargetName>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <PreprocessorDefinitions>NDEBUG;_CRT_SECURE_NO_WARNINGS;GGML_VULKAN_COOPMAT_GLSLC_SUPPORT;GGML_VULKAN_COOPMAT2_GLSLC_SUPPORT;GGML_VULKAN_COOPMAT2_DECODE_VECTOR_GLSLC_SUPPORT;GGML_VULKAN_INTEGER_DOT_GLSLC_SUPPORT;GGML_VULKAN_BFLOAT16_GLSLC_SUPPORT;GGML_VULKAN_FLOAT_E2M1_GLSLC_SUPPORT;GGML_VULKAN_FLOAT_E4M3_GLSLC_SUPPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="$(Sdcpp)ggml\src\ggml-vulkan\vulkan-shaders\vulkan-shaders-gen.cpp" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>

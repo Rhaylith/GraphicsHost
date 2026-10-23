@@ -25,6 +25,19 @@
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <!-- Vulkan variant (msbuild /p:GgmlVulkan=true): links ggml-vulkan.lib (through the project reference) and the Vulkan loader. -->
+  <PropertyGroup Condition="'$(GgmlVulkan)'=='true'">
+    <TargetName>spike-vulkan</TargetName>
+    <!-- use the driver's own vulkan-1.dll from System32, not vcpkg's copy -->
+    <VcpkgApplocalDeps>false</VcpkgApplocalDeps>
+    <IntDir>$(RepoRoot)build\obj\spike-vulkan\$(Platform)\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(GgmlVulkan)'=='true'">
+    <Link>
+      <AdditionalLibraryDirectories>$(VcpkgInstalled)lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>vulkan-1.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
   <ItemDefinitionGroup>
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -32,7 +45,7 @@
       <LanguageStandard>stdcpp17</LanguageStandard>
       <ExceptionHandling>Sync</ExceptionHandling>
       <AdditionalOptions>/utf-8 /wd4996 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalIncludeDirectories>$(Sdcpp)include;$(Sdcpp)thirdparty;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(Sdcpp)include;$(Sdcpp)thirdparty;$(Sdcpp)ggml\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>

@@ -8,4 +8,19 @@
     <OutDir>$(RepoRoot)build\bin\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(RepoRoot)build\obj\$(MSBuildProjectName)\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
+
+  <!-- vcpkg (dynamic x64-windows triplet). Override with the VCPKG_INSTALLED environment variable. -->
+  <PropertyGroup>
+    <VcpkgInstalled Condition="'$(VcpkgInstalled)'=='' And '$(VCPKG_INSTALLED)'!=''">$(VCPKG_INSTALLED)\</VcpkgInstalled>
+    <VcpkgInstalled Condition="'$(VcpkgInstalled)'==''">D:\code\vcpkg\installed\x64-windows\</VcpkgInstalled>
+    <Glslc Condition="'$(Glslc)'==''">$(VcpkgInstalled)tools\shaderc\glslc.exe</Glslc>
+  </PropertyGroup>
+
+  <!--
+    GgmlVulkan=true builds the Vulkan variant (msbuild /p:GgmlVulkan=true): ggml gains the Vulkan backend
+    (output ggml-vulkan.lib) and the spike links it (output spike-vulkan.exe). The default is the CPU-only variant.
+  -->
+  <PropertyGroup>
+    <GgmlVulkan Condition="'$(GgmlVulkan)'==''">false</GgmlVulkan>
+  </PropertyGroup>
 </Project>

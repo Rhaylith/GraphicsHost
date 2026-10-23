@@ -32,7 +32,23 @@
   <PropertyGroup>
     <GgmlCpuVariant Condition="'$(GgmlCpuVariant)'==''">avx2</GgmlCpuVariant>
     <GgmlSrc>$(Sdcpp)ggml\</GgmlSrc>
+    <!-- same-named sources get unique object names in the UniqueObjectNames target below -->
+    <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);MSB8027</MSBuildWarningsAsMessages>
   </PropertyGroup>
+  <!-- Vulkan variant (msbuild /p:GgmlVulkan=true): separate library name and object folder, so both variants coexist. -->
+  <PropertyGroup Condition="'$(GgmlVulkan)'=='true'">
+    <TargetName>ggml-vulkan</TargetName>
+    <IntDir>$(RepoRoot)build\obj\ggml-vulkan\$(Platform)\$(Configuration)\</IntDir>
+    <VkSrc>$(GgmlSrc)src\ggml-vulkan\</VkSrc>
+    <VkGenDir>$(IntDir)vulkan\</VkGenDir>
+    <VkGenExe>$(RepoRoot)build\tools\vulkan-shaders-gen.exe</VkGenExe>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(GgmlVulkan)'=='true'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(VkGenDir);$(VcpkgInstalled)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>GGML_USE_VULKAN;GGML_VULKAN_COOPMAT_GLSLC_SUPPORT;GGML_VULKAN_COOPMAT2_GLSLC_SUPPORT;GGML_VULKAN_COOPMAT2_DECODE_VECTOR_GLSLC_SUPPORT;GGML_VULKAN_INTEGER_DOT_GLSLC_SUPPORT;GGML_VULKAN_BFLOAT16_GLSLC_SUPPORT;GGML_VULKAN_FLOAT_E2M1_GLSLC_SUPPORT;GGML_VULKAN_FLOAT_E4M3_GLSLC_SUPPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
   <ItemDefinitionGroup>
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -68,6 +84,12 @@
       <PreprocessorDefinitions>GGML_AVX2;GGML_FMA;GGML_F16C;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
+  <!-- /p:GgmlVulkanDebug=true prints the Vulkan backend's debug log (instance creation errors are otherwise swallowed). -->
+  <ItemDefinitionGroup Condition="'$(GgmlVulkan)'=='true' And '$(GgmlVulkanDebug)'=='true'">
+    <ClCompile>
+      <PreprocessorDefinitions>GGML_VULKAN_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
   <ItemGroup Label="ggml-base and backend registry">
     <ClCompile Include="$(GgmlSrc)src\ggml.c" />
     <ClCompile Include="$(GgmlSrc)src\ggml.cpp" />
@@ -100,12 +122,40 @@
     <ClCompile Include="$(GgmlSrc)src\ggml-cpu\arch\x86\quants.c" />
     <ClCompile Include="$(GgmlSrc)src\ggml-cpu\arch\x86\repack.cpp" />
   </ItemGroup>
+  <ItemGroup Label="Vulkan backend" Condition="'$(GgmlVulkan)'=='true'">
+    <ClCompile Include="$(VkSrc)ggml-vulkan.cpp" />
+    <ClCompile Include="$(VkSrc)ggml-vulkan-buffers.cpp" />
+    <ClCompile Include="$(VkSrc)ggml-vulkan-debug.cpp" />
+    <VkShader Include="$(VkSrc)vulkan-shaders\*.comp" />
+    <!-- one generated .cpp per shader; they are created by the GenerateVulkanShaders target before compiling -->
+    <ClCompile Include="@(VkShader->'$(VkGenDir)%(Filename)%(Extension).cpp')" />
+    <ProjectReference Include="vulkan-shaders-gen.vcxproj">
+      <Project>{7B3D1E0A-5C2F-4E7A-9A11-0F6E2D4C8A04}</Project>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+      <SetConfiguration>Configuration=Release</SetConfiguration>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <!--
+    Shader generation (what CMake does with ExternalProject + add_custom_command):
+    1. vulkan-shaders-gen called without a source argument writes ggml-vulkan-shaders.hpp;
+    2. for every .comp it compiles all variants with glslc and writes <name>.comp.cpp.
+    Step 2 is incremental: only shaders newer than their output are regenerated.
+  -->
+  <Target Name="GenerateVulkanShadersHeader" BeforeTargets="ClCompile" Condition="'$(GgmlVulkan)'=='true'"
+          Inputs="$(VkGenExe)" Outputs="$(VkGenDir)ggml-vulkan-shaders.hpp">
+    <MakeDir Directories="$(VkGenDir)" />
+    <Exec Command="&quot;$(VkGenExe)&quot; --output-dir &quot;$(VkGenDir)vulkan-shaders.spv&quot; --target-hpp &quot;$(VkGenDir)ggml-vulkan-shaders.hpp&quot;" />
+  </Target>
+  <Target Name="GenerateVulkanShaders" BeforeTargets="ClCompile" DependsOnTargets="GenerateVulkanShadersHeader" Condition="'$(GgmlVulkan)'=='true'"
+          Inputs="@(VkShader);$(VkGenExe)" Outputs="@(VkShader->'$(VkGenDir)%(Filename)%(Extension).cpp')">
+    <Exec Command="&quot;$(VkGenExe)&quot; --glslc &quot;$(Glslc)&quot; --source &quot;%(VkShader.FullPath)&quot; --output-dir &quot;$(VkGenDir)vulkan-shaders.spv&quot; --target-hpp &quot;$(VkGenDir)ggml-vulkan-shaders.hpp&quot; --target-cpp &quot;$(VkGenDir)%(VkShader.Filename)%(VkShader.Extension).cpp&quot;" />
+  </Target>
   <!-- Different folders hold same-named sources (quants.c, repack.cpp, ggml.c vs ggml.cpp): make every object name unique. -->
   <Target Name="UniqueObjectNames" BeforeTargets="SelectClCompile">
     <ItemGroup>
       <ClCompile>
-        <ObjectFileName>$(IntDir)$([System.String]::Copy('%(FullPath)').Replace('$(GgmlSrc)src\','').Replace('\','_')).obj</ObjectFileName>
+        <ObjectFileName>$(IntDir)$([System.String]::Copy('%(FullPath)').Replace('$(GgmlSrc)src\','').Replace('$(IntDir)','').Replace(':','').Replace('\','_')).obj</ObjectFileName>
       </ClCompile>
     </ItemGroup>
   </Target>
