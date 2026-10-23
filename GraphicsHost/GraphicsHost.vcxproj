@@ -35,6 +35,8 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="ui\MainWindow.cpp" />
+    <ClCompile Include="ui\UiUtil.cpp" />
+    <ClInclude Include="ui\UiUtil.h" />
     <ClInclude Include="ui\MainWindow.h" />
     <QtMoc Include="ui\MainWindow.h" />
   </ItemGroup>

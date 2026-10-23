@@ -363,7 +363,8 @@ Goal: retire the biggest risk (§10) before any application code exists.
 - [x] 4.4 Native `/api/v1`: generate + job poll/stream/cancel, models load/unload, downloads, discover, gallery, outputs (L)
   - Routes: status, hardware, settings (PUT = admin, partial merge), logs, models (+load/unload/get), defaults, presets, catalog, hub/search, hub/files, downloads (+pause/resume/cancel), updates, generate, jobs (+cancel, SSE events), gallery (+image, thumbnail), `/outputs/...` (images only, never the index). Permissions: read / generate / manage / admin.
 - [x] 4.5 Request log, `/api/v1/requests` (admin, no query strings kept), `/metrics` (Prometheus text) (S)
-- [ ] 4.6 Qt shell: main window, tabs, tray icon, single instance, window-state memory, services → view-model wiring (M)
+- [x] 4.6 Qt shell: main window, tabs, tray icon (closing keeps the API server running), single instance (named mutex + broadcast message), window-state memory (window.ini), the API server started from the settings, status bar (M)
+  - `tools/ui-shots.ps1` saves a picture of every tab (offscreen) for checking layouts. Single instance and the tray are not exercised by an automated check (they need a real desktop).
 - [ ] 4.7 Qt **Generate** tab: prompt boxes, parameter panel with interface-mode gating, model/device picker, live progress and preview, results, context menus (L)
 - [ ] 4.8 Qt **My Models** and **Discover** tabs, download queue (L)
 - [ ] 4.9 Qt **Settings** tab (server, tokens, runtime/backend, GPU device, models folder) and **Logs** tab (M)
