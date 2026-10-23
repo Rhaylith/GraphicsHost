@@ -298,7 +298,7 @@ machine; steps marked *(stretch)* can slip past v1 without breaking it.
 Goal: retire the biggest risk (§10) before any application code exists.
 
 - [x] 0.1 Install the toolchain: VS2026 C++ workload, Vulkan SDK (or vcpkg `shaderc`), Git; bootstrap the existing `D:\code\vcpkg` (S)
-- [ ] 0.2 Add `extern/stable-diffusion.cpp` (+ `ggml`) as a pinned submodule; record the commit (S)
+- [x] 0.2 Add `extern/stable-diffusion.cpp` (+ `ggml`) as a pinned submodule; record the commit (S) — pinned `fd21ecf` (master-995), ggml `c1f80e5`
 - [ ] 0.3 `ggml.vcxproj`: static library, ggml core + CPU backend, builds clean with `/W3` (M)
 - [ ] 0.4 `stable-diffusion.vcxproj`: static library on top of `ggml.vcxproj` (S)
 - [ ] 0.5 Console spike project: load an SD1.5 model, generate a 512×512 image on **CPU**, save PNG (S)
