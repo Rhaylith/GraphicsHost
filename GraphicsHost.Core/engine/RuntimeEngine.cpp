@@ -94,6 +94,18 @@ public:
         if (request.maskImage && (static_cast<int>(request.maskImage->width) != request.width || static_cast<int>(request.maskImage->height) != request.height)) {
             throw EngineError(EngineErrorCode::InvalidRequest, "the mask must have the size of the result");
         }
+        if (!request.loras.empty() && (runtime_->features() & GH_FEATURE_LORA) == 0) {
+            throw EngineError(EngineErrorCode::InvalidRequest, "this runtime build does not support LoRAs: update the runtime DLLs");
+        }
+        std::vector<gh_lora> loraViews;
+        for (const auto& l : request.loras) {
+            if (l.path.empty()) throw EngineError(EngineErrorCode::InvalidRequest, "the LoRA " + l.name + " has not been resolved to a file");
+            loraViews.push_back(gh_lora{l.path.c_str(), l.weight});
+        }
+        if (!loraViews.empty()) {
+            params.loras = loraViews.data();
+            params.lora_count = static_cast<int32_t>(loraViews.size());
+        }
         gh_image maskView{};
         gh_image initView{};
         if (request.initImage) {

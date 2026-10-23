@@ -15,7 +15,9 @@ class QComboBox;
 class QDoubleSpinBox;
 class QGroupBox;
 class QLabel;
+class QLineEdit;
 class QListWidget;
+class QToolButton;
 class QPlainTextEdit;
 class QProgressBar;
 class QPushButton;
@@ -95,6 +97,8 @@ private:
     QComboBox* preset_ = nullptr;
     QPlainTextEdit* prompt_ = nullptr;
     QPlainTextEdit* negative_ = nullptr;
+    QLineEdit* loras_ = nullptr;
+    QToolButton* loraPick_ = nullptr;
     QSpinBox* width_ = nullptr;
     QSpinBox* height_ = nullptr;
     QSpinBox* steps_ = nullptr;

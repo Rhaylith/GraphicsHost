@@ -386,7 +386,8 @@ Goal: retire the biggest risk (§10) before any application code exists.
   - Runtime ABI: `gh_runtime_info.features` (`GH_FEATURE_IMG2IMG`) and `init_image` + `strength` appended to `gh_generate_params`, read only when the caller's struct has them. Verified on the real model (CPU test: lower strength stays closer to the source, same inputs give the same picture, progress counts steps*strength+1) and through the browser UI on the GPU. Qt: source image row with strength, "Use as source image" from results and the gallery.
 - [x] 5.3 Inpainting with `mask_image`; mask drawing in the Qt UI (browser UI may follow later) (M)
   - ABI: `GH_FEATURE_INPAINT` and `mask_image` (white = repaint). Verified on the real model (CPU test: the kept half stays close to the source, the repainted half does not). Qt: "Edit mask…" painter (brush, erase, invert, clear); it is also rendered by the screenshot/`[ui]` check. Browser: not yet.
-- [ ] 5.4 LoRA support: library scan, `loras[]` parameter, `<lora:name:w>` prompt syntax (M)
+- [x] 5.4 LoRA support: library scan, `loras[]` parameter, `<lora:name:w>` prompt syntax (M)
+  - ABI: `GH_FEATURE_LORA`, `gh_lora` + `loras` appended to the generate params. Names resolve against the library (file name, stem or unique prefix), family mismatches are refused, weights are per request. Verified on the real engine with a synthetic LoRA (it changes the picture, weight 0 does not, nothing stays applied). UIs: a LoRA field with a picker in Qt, a field with a datalist in the browser.
 - [ ] 5.5 Presets import/export; hardware monitor graphs (GPU utilisation, VRAM) with Qt Charts (M)
 - [ ] 5.6 Optional safety filter: `ISafetyFilter`, first implementation, per-request override, off by default (M)
 - [ ] 5.7 ESRGAN upscaler *(stretch)*; ControlNet *(stretch)*

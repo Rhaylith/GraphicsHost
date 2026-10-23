@@ -19,6 +19,14 @@ struct Image {
     std::vector<uint8_t> data;   // width * height * channels bytes, row by row
 };
 
+// A LoRA to apply: name as the library knows it (or a file name), strength; path is filled in by the host before the
+// engine sees the request and is not part of the JSON form.
+struct LoraRef {
+    std::string name;
+    float weight = 1.0f;
+    std::string path;
+};
+
 // The standard parameter set, independent of model family and of the API it arrived through (see implementation plan,
 // section 5). A field a family does not support is ignored and reported in GenerationResult::warnings.
 // "Unset" values (0, -1, empty string) mean: use the model's default; resolve() fills them in.
@@ -43,6 +51,7 @@ struct GenerationRequest {
     std::shared_ptr<const Image> initImage;
     float strength = 0.75f;      // with initImage: how much of it is replaced, (0..1]; 1 ignores the picture
     std::shared_ptr<const Image> maskImage;   // with initImage: white = repaint, black = keep (inpainting); same size as the result
+    std::vector<LoraRef> loras;               // also written in the prompt as <lora:name:0.8>
 };
 
 // How a model is put in memory. Changing it needs a reload. Mirrors gh_load_params in runtime/gh_runtime.h.

@@ -67,6 +67,14 @@ Add a source picture to a generation and it becomes image to image: the result s
   image is refused. The Qt UI has a mask painter ("Edit mask…"); the browser UI does not yet.
 * A runtime DLL built before this feature answers 400 (`invalid_parameters`): update the DLLs in `runtimes\`.
 
+## LoRA
+
+Put LoRA files (`.safetensors`) in the models folder; they show up in `GET /api/v1/models` with `"kind": "lora"`. Use them
+with a `loras` list (`"detail:0.8"`, `{"name": "detail", "weight": 0.8}` or just `"detail"`) or with `<lora:detail:0.8>`
+tags in the prompt (the tags are removed from the text; a tag wins over a list entry of the same name). Names match the
+file name without extension, or a unique prefix. Weights go from -5 to 5, at most 8 at a time. A LoRA made for the other
+model family (SD 1.x against SDXL) is refused. The gallery records the LoRAs of every image.
+
 ## Native API (`/api/v1`)
 
 | Route | Permission | Notes |

@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <regex>
 
 namespace gh::host {
 
@@ -23,6 +24,32 @@ std::string errorList(const char* what, const std::vector<core::FieldError>& err
     return message;
 }
 
+
+// "<lora:name:0.8>" tags in a prompt: removed from the text, returned as references (a missing weight is 1).
+std::vector<engine::LoraRef> takeLoraTags(std::string& prompt) {
+    static const std::regex tag(R"(<\s*(?:lora|lyco)\s*:\s*([^:>]+?)\s*(?::\s*(-?[0-9]*\.?[0-9]+))?\s*>)", std::regex::icase);
+    std::vector<engine::LoraRef> found;
+    std::string rest;
+    auto begin = std::sregex_iterator(prompt.begin(), prompt.end(), tag);
+    size_t last = 0;
+    for (auto it = begin; it != std::sregex_iterator(); ++it) {
+        engine::LoraRef ref;
+        ref.name = (*it)[1].str();
+        if ((*it)[2].matched) ref.weight = std::stof((*it)[2].str());
+        found.push_back(std::move(ref));
+        rest += prompt.substr(last, static_cast<size_t>(it->position()) - last);
+        last = static_cast<size_t>(it->position() + it->length());
+    }
+    if (!found.empty()) {
+        rest += prompt.substr(last);
+        // tidy the gaps the tags leave behind
+        rest = std::regex_replace(rest, std::regex(R"(\s{2,})"), " ");
+        const auto first = rest.find_first_not_of(" ,");
+        const auto end = rest.find_last_not_of(" ,");
+        prompt = first == std::string::npos ? std::string() : rest.substr(first, end - first + 1);
+    }
+    return found;
+}
 }  // namespace
 
 GenerationService::GenerationService(AppHost& host) : host_(host) {
@@ -98,6 +125,37 @@ GenerationService::Prepared GenerationService::prepare(const GenerateCall& call)
         load = presets::layerLoadOptions(loadLayers);
     } catch (const std::exception& e) {
         throw EngineError(EngineErrorCode::InvalidRequest, e.what());
+    }
+    // LoRAs: the request's list plus the tags in the prompt (a tag wins over a list entry of the same name), each
+    // resolved to a file of the library and checked against the model's family
+    {
+        for (auto& tagged : takeLoraTags(request.prompt)) {
+            auto same = std::find_if(request.loras.begin(), request.loras.end(), [&](const engine::LoraRef& l) { return l.name == tagged.name; });
+            if (same != request.loras.end()) *same = tagged;
+            else request.loras.push_back(tagged);
+        }
+        if (!request.loras.empty()) {
+            const auto available = host_.library().ofKind(models::Kind::Lora);
+            for (auto& ref : request.loras) {
+                std::string lower = ref.name;
+                std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                const models::ModelCard* match = nullptr;
+                std::vector<const models::ModelCard*> prefixed;
+                for (const auto& c : available) {
+                    auto low = [](std::string s) { std::transform(s.begin(), s.end(), s.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); }); return s; };
+                    if (low(c.file) == lower || low(c.name) == lower) { match = &c; break; }
+                    if (low(c.name).rfind(lower, 0) == 0) prefixed.push_back(&c);
+                }
+                if (!match && prefixed.size() == 1) match = prefixed.front();
+                if (!match && prefixed.size() > 1) throw EngineError(EngineErrorCode::InvalidRequest, "the LoRA name '" + ref.name + "' matches several files: use a longer name");
+                if (!match) throw EngineError(EngineErrorCode::NotFound, "no LoRA named '" + ref.name + "' in the models folder (see GET /api/v1/models)");
+                if (!match->familyName.empty() && !card.familyName.empty() && match->familyName != card.familyName) {
+                    throw EngineError(EngineErrorCode::InvalidRequest, "the LoRA " + match->file + " is for " + match->familyName + ", this model is " + card.familyName);
+                }
+                ref.name = match->name;
+                ref.path = match->path.string();
+            }
+        }
     }
     if (call.initImage) {
         // the result has the size of the picture unless the request says otherwise; the picture is scaled to the result

@@ -48,6 +48,7 @@ typedef enum gh_status {
 /* What a runtime can do beyond plain text-to-image (gh_runtime_info.features). */
 #define GH_FEATURE_IMG2IMG 0x1u   /* gh_generate_params.init_image + strength */
 #define GH_FEATURE_INPAINT 0x2u   /* gh_generate_params.mask_image (with init_image) */
+#define GH_FEATURE_LORA 0x4u      /* gh_generate_params.loras */
 
 typedef struct gh_model gh_model;
 
@@ -75,6 +76,11 @@ typedef struct gh_load_params {
     int32_t vae_on_cpu;         /* run the VAE on the CPU */
 } gh_load_params;
 
+typedef struct gh_lora {
+    const char* path;           /* .safetensors LoRA file */
+    float multiplier;           /* strength, usually 0.2 to 1.2; negative values subtract the style */
+} gh_lora;
+
 typedef struct gh_generate_params {
     uint32_t struct_size;
     const char* prompt;
@@ -94,6 +100,9 @@ typedef struct gh_generate_params {
     float strength;             /* 0..1: how much of init_image is replaced (1 = ignore it); used with init_image */
     /* appended in step 5.3: needs GH_FEATURE_INPAINT */
     const struct gh_image* mask_image; /* with init_image: white (255) = repaint, black (0) = keep; RGB or RGBA, same size as the result; NULL = no mask */
+    /* appended in step 5.4: needs GH_FEATURE_LORA */
+    const gh_lora* loras;       /* applied for this generation only; NULL = none */
+    int32_t lora_count;
 } gh_generate_params;
 
 typedef struct gh_image {

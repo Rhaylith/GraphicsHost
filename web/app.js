@@ -127,6 +127,7 @@ async function loadGenerate() {
     const [models, presets] = await Promise.all([api('/api/v1/models'), api('/api/v1/presets')]);
     const keep = $('g-model').value;
     const checkpoints = models.models.filter((m) => m.kind === 'checkpoint' && m.supported);
+    $('g-lora-list').replaceChildren(...models.models.filter((m) => m.kind === 'lora').map((m) => h('option', { value: m.name + ':0.8' }, m.family)));
     $('g-model').replaceChildren(...(checkpoints.length ? checkpoints.map((m) => h('option', { value: m.file }, `${m.file}  (${m.family})`))
       : [h('option', { value: '' }, 'No models yet: see My Models or Discover')]));
     if (checkpoints.some((m) => m.file === keep)) $('g-model').value = keep;
@@ -150,6 +151,8 @@ async function readForm() {
   const body = { model: $('g-model').value, prompt: $('g-prompt').value.trim() };
   if ($('g-preset').value) body.preset = $('g-preset').value;
   if ($('g-negative').value.trim()) body.negativePrompt = $('g-negative').value.trim();
+  const loras = $('g-loras').value.split(',').map((x) => x.trim()).filter(Boolean);
+  if (loras.length) body.loras = loras;
   const num = (id, key, int = true) => { const v = $(id).value; if (v !== '') body[key] = int ? parseInt(v, 10) : parseFloat(v); };
   num('g-width', 'width'); num('g-height', 'height'); num('g-seed', 'seed');
   if (parseInt($('g-count').value, 10) > 1) body.batchCount = parseInt($('g-count').value, 10);
@@ -170,6 +173,7 @@ function fillForm(request, model) {
   if (model) $('g-model').value = model;
   $('g-prompt').value = request.prompt || '';
   $('g-negative').value = request.negativePrompt || '';
+  $('g-loras').value = (request.loras || []).map((l) => (typeof l === 'string' ? l : l.name + ':' + l.weight)).join(', ');
   for (const [id, key] of [['g-width', 'width'], ['g-height', 'height'], ['g-seed', 'seed'], ['g-steps', 'steps'], ['g-cfg', 'cfgScale']]) $(id).value = request[key] ?? '';
   $('g-count').value = request.batchCount || 1;
   $('g-sampler').value = request.sampler || '';

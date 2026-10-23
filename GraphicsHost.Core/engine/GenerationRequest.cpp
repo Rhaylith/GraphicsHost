@@ -110,6 +110,13 @@ std::vector<core::FieldError> validate(const GenerationRequest& r) {
     if (r.clipSkip < -1 || r.clipSkip > 12) {
         errors.push_back({"clipSkip", "must be -1 (model default) or between 0 and 12"});
     }
+    if (r.loras.size() > 8) {
+        errors.push_back({"loras", "at most 8 LoRAs at a time"});
+    }
+    for (const auto& l : r.loras) {
+        if (l.name.empty() && l.path.empty()) errors.push_back({"loras", "a LoRA needs a name"});
+        if (!(l.weight >= -5.0f && l.weight <= 5.0f)) errors.push_back({"loras", "the weight of " + l.name + " must be between -5 and 5"});
+    }
     if (r.maskImage && !r.initImage) {
         errors.push_back({"mask", "needs a source image"});
     }
@@ -139,6 +146,12 @@ std::vector<core::FieldError> validate(const LoadOptions& o) {
     return errors;
 }
 
+Json loraList(const std::vector<LoraRef>& loras) {
+    Json list = Json::array();
+    for (const auto& l : loras) list.push_back({{"name", l.name}, {"weight", l.weight}});
+    return list;
+}
+
 Json toJson(const GenerationRequest& r) {
     return {{"prompt", r.prompt},
             {"negativePrompt", r.negativePrompt},
@@ -157,7 +170,38 @@ Json toJson(const GenerationRequest& r) {
             {"safetyFilter", r.safetyFilter},
             {"strength", r.strength},
             {"hasInitImage", r.initImage != nullptr},
-            {"hasMask", r.maskImage != nullptr}};
+            {"hasMask", r.maskImage != nullptr},
+            {"loras", loraList(r.loras)}};
+}
+
+// "loras": [{"name": "detail", "weight": 0.8}, "style:0.6", "plain"]  (a bare name has weight 1)
+std::vector<LoraRef> lorasFromJson(const Json& list) {
+    if (!list.is_array()) {
+        throw std::runtime_error("loras must be a list");
+    }
+    std::vector<LoraRef> out;
+    for (const auto& item : list) {
+        LoraRef ref;
+        if (item.is_string()) {
+            const std::string text = item.get<std::string>();
+            const auto colon = text.rfind(':');
+            ref.name = colon == std::string::npos ? text : text.substr(0, colon);
+            if (colon != std::string::npos) {
+                try {
+                    ref.weight = std::stof(text.substr(colon + 1));
+                } catch (const std::exception&) {
+                    throw std::runtime_error("the LoRA weight in '" + text + "' is not a number");
+                }
+            }
+        } else if (item.is_object()) {
+            takeIf(item, "name", ref.name);
+            takeIf(item, "weight", ref.weight);
+        } else {
+            throw std::runtime_error("each LoRA is a name, 'name:weight' or {\"name\", \"weight\"}");
+        }
+        out.push_back(std::move(ref));
+    }
+    return out;
 }
 
 GenerationRequest applyRequestJson(GenerationRequest r, const Json& json) {
@@ -180,6 +224,7 @@ GenerationRequest applyRequestJson(GenerationRequest r, const Json& json) {
     takeIf(json, "embedMetadata", r.embedMetadata);
     takeIf(json, "safetyFilter", r.safetyFilter);
     takeIf(json, "strength", r.strength);
+    if (const auto it = json.find("loras"); it != json.end() && !it->is_null()) r.loras = lorasFromJson(*it);
     return r;
 }
 

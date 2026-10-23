@@ -21,6 +21,8 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QListWidget>
+#include <QToolButton>
+#include <QLineEdit>
 #include <QMenu>
 #include <QMessageBox>
 #include <QPlainTextEdit>
@@ -108,6 +110,34 @@ void GenerateTab::buildUi() {
     negative_->setMaximumHeight(60);
     leftLayout->addWidget(prompt_, 3);
     leftLayout->addWidget(negative_, 1);
+
+    auto* loraRow = new QHBoxLayout();
+    loras_ = new QLineEdit(left);
+    loras_->setPlaceholderText(tr("LoRAs: name:0.8, other  (or <lora:name:0.8> in the prompt)"));
+    loraPick_ = new QToolButton(left);
+    loraPick_->setText(tr("Add ▾"));
+    loraPick_->setPopupMode(QToolButton::InstantPopup);
+    loraRow->addWidget(loras_, 1);
+    loraRow->addWidget(loraPick_);
+    leftLayout->addLayout(loraRow);
+    auto* loraMenu = new QMenu(loraPick_);
+    loraPick_->setMenu(loraMenu);
+    connect(loraMenu, &QMenu::aboutToShow, this, [this, loraMenu] {
+        loraMenu->clear();
+        const std::string family = [&] {
+            const auto r = host_.library().resolve(s(model_->currentData().toString()));
+            return r.card ? r.card->familyName : std::string();
+        }();
+        for (const auto& card : host_.library().ofKind(gh::models::Kind::Lora)) {
+            if (!family.empty() && !card.familyName.empty() && card.familyName != family) continue;   // not for this model
+            loraMenu->addAction(q(card.name), this, [this, name = q(card.name)] {
+                const QString now = loras_->text().trimmed();
+                const QString entry = QString(name) + QStringLiteral(":0.8");
+                loras_->setText(now.isEmpty() ? entry : QString(now + QStringLiteral(", ") + entry));
+            });
+        }
+        if (loraMenu->isEmpty()) loraMenu->addAction(tr("No LoRAs for this model in the models folder"))->setEnabled(false);
+    });
 
     auto* basics = new QFormLayout();
     auto* sizeRow = new QHBoxLayout();
@@ -352,6 +382,11 @@ gh::host::GenerateCall GenerateTab::currentCall() const {
     Json& r = call.request;
     r["prompt"] = s(prompt_->toPlainText().trimmed());
     if (!negative_->toPlainText().trimmed().isEmpty()) r["negativePrompt"] = s(negative_->toPlainText().trimmed());
+    if (!loras_->text().trimmed().isEmpty()) {
+        Json list = Json::array();
+        for (const QString& part : loras_->text().split(QLatin1Char(','), Qt::SkipEmptyParts)) list.push_back(s(part.trimmed()));
+        r["loras"] = list;
+    }
     if (width_->value() > 0) r["width"] = width_->value();
     if (height_->value() > 0) r["height"] = height_->value();
     if (count_->value() > 1) r["batchCount"] = count_->value();
@@ -406,6 +441,14 @@ void GenerateTab::loadParameters(const Json& request, const QString& model) {
     };
     prompt_->setPlainText(q(request.value("prompt", std::string())));
     negative_->setPlainText(q(request.value("negativePrompt", std::string())));
+    QStringList loraParts;
+    if (request.contains("loras") && request["loras"].is_array()) {
+        for (const auto& l : request["loras"]) {
+            if (l.is_object()) loraParts << QStringLiteral("%1:%2").arg(q(l.value("name", std::string()))).arg(l.value("weight", 1.0), 0, 'g', 3);
+            else if (l.is_string()) loraParts << q(l.get<std::string>());
+        }
+    }
+    loras_->setText(loraParts.join(QStringLiteral(", ")));
     number("width", [&](const Json& v) { width_->setValue(v.get<int>()); });
     number("height", [&](const Json& v) { height_->setValue(v.get<int>()); });
     number("steps", [&](const Json& v) { steps_->setValue(v.get<int>()); });

@@ -1,9 +1,11 @@
 #include "ModelFixture.h"
+#include "TestUtil.h"
 
 #include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cmath>
+#include <fstream>
 #include <set>
 
 using namespace gh::engine;
@@ -408,4 +410,44 @@ TEST_CASE("engine: inpainting repaints only the white part of the mask", "[model
     } catch (const EngineError& e) {
         CHECK(e.code() == EngineErrorCode::InvalidRequest);
     }
+}
+
+TEST_CASE("engine: a LoRA changes the picture, and a strength of zero does not", "[model][engine][lora]") {
+    auto l = loadSd15OrSkip();
+    // a synthetic LoRA on the first attention layer of the first down block, with big values so the change is plain
+    gh::test::TempDir dir;
+    const std::string base = "lora_unet_down_blocks_0_attentions_0_transformer_blocks_0_attn1_to_q";
+    const auto path = dir.path() / "synthetic.safetensors";
+    {
+        // header + data by hand: two float16 tensors and an alpha
+        nlohmann::json header = nlohmann::json::object();
+        const uint64_t downBytes = 4 * 320 * 2, upBytes = 320 * 4 * 2;
+        header[base + ".lora_down.weight"] = {{"dtype", "F16"}, {"shape", {4, 320}}, {"data_offsets", {0, downBytes}}};
+        header[base + ".lora_up.weight"] = {{"dtype", "F16"}, {"shape", {320, 4}}, {"data_offsets", {downBytes, downBytes + upBytes}}};
+        const std::string text = header.dump();
+        std::vector<uint8_t> data((downBytes + upBytes), 0);
+        for (size_t i = 0; i + 1 < data.size(); i += 2) {   // half precision 0.5 (0x3800); the "down" matrix alternates its sign so that rank 4 does not cancel out
+            const bool negative = i < downBytes && (i / 2) % 2 == 1;
+            data[i] = 0x00;
+            data[i + 1] = negative ? 0xB8 : 0x38;
+        }
+        std::ofstream out(path, std::ios::binary);
+        const uint64_t length = text.size();
+        out.write(reinterpret_cast<const char*>(&length), 8);
+        out.write(text.data(), static_cast<std::streamsize>(text.size()));
+        out.write(reinterpret_cast<const char*>(data.data()), static_cast<std::streamsize>(data.size()));
+    }
+
+    auto generate = [&](std::vector<LoraRef> loras) {
+        GenerationRequest r = tiny();
+        r.steps = 4;
+        r.loras = std::move(loras);
+        return l.model->generate(r, {}, {}).images.at(0);
+    };
+    const Image plain = generate({});
+    const Image styled = generate({{"synthetic", 1.0f, path.string()}});
+    const Image zero = generate({{"synthetic", 0.0f, path.string()}});
+    CHECK(meanDifference(plain, styled) > 0.5);       // the LoRA did something
+    CHECK(meanDifference(plain, zero) < 0.01);        // weight zero is no LoRA
+    CHECK(meanDifference(plain, generate({})) == 0.0);   // and it was not left applied
 }
