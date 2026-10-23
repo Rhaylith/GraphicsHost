@@ -37,13 +37,39 @@ Result runCli(const fs::path& home, std::vector<std::string> args) {
     return r;
 }
 
-// A checkpoint-looking file of a given size (sparse: no real data is written).
-void fakeCheckpoint(const fs::path& file, uint64_t size) {
+// A checkpoint-looking file of a given size, with a valid safetensors header (so the library can read and classify it)
+// and a huge ballast tensor that makes up the rest. The file is sparse: no real data is written.
+// sdxl: the tensor names of an SDXL checkpoint instead of an SD 1.x one.
+void fakeCheckpoint(const fs::path& file, uint64_t size, bool sdxl = false) {
+    constexpr uint64_t kHeaderSpace = 2048;
+    REQUIRE(size >= 8 + kHeaderSpace + 64);
     fs::create_directories(file.parent_path());
+    nlohmann::json header = nlohmann::json::object();
+    uint64_t offset = 0;
+    auto small = [&](const std::string& name) {
+        header[name] = {{"dtype", "F16"}, {"shape", {1}}, {"data_offsets", {offset, offset + 2}}};
+        offset += 2;
+    };
+    small("model.diffusion_model.input_blocks.0.0.weight");
+    small("cond_stage_model.transformer.text_model.embeddings.token_embedding.weight");
+    if (sdxl) {
+        small("conditioner.embedders.1.model.transformer.resblocks.0.attn.in_proj_weight");
+        small("model.diffusion_model.label_emb.0.0.weight");
+    }
+    const uint64_t ballast = (size - 8 - kHeaderSpace - offset) / 2 * 2;
+    header["model.diffusion_model.ballast"] = {{"dtype", "F16"}, {"shape", {static_cast<int64_t>(ballast / 2)}}, {"data_offsets", {offset, offset + ballast}}};
+    std::string text = header.dump();
+    REQUIRE(text.size() <= kHeaderSpace);
+    text.resize(kHeaderSpace, ' ');  // safetensors allows trailing spaces: the header length stays constant
+
     HANDLE h = CreateFileW(file.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     REQUIRE(h != INVALID_HANDLE_VALUE);
     DWORD returned = 0;
     DeviceIoControl(h, FSCTL_SET_SPARSE, nullptr, 0, nullptr, 0, &returned, nullptr);  // so a huge size costs no disk space
+    const uint64_t length = kHeaderSpace;
+    DWORD written = 0;
+    WriteFile(h, &length, 8, &written, nullptr);
+    WriteFile(h, text.data(), static_cast<DWORD>(text.size()), &written, nullptr);
     LARGE_INTEGER end;
     end.QuadPart = static_cast<LONGLONG>(size);
     REQUIRE(SetFilePointerEx(h, end, nullptr, FILE_BEGIN));
@@ -58,7 +84,7 @@ constexpr uint64_t kSdxlSize = 6938078334ull;
 
 TEST_CASE("cli gen: input problems are reported with the right exit code before anything loads", "[unit][cli][gen]") {
     gh::test::TempDir home;
-    fakeCheckpoint(home.path() / "models" / "tiny.safetensors", 1000);
+    fakeCheckpoint(home.path() / "models" / "tiny.safetensors", 100000);
 
     auto r = runCli(home.path(), {"gen", "a cat"});
     CHECK(r.code == gh::cli::kUsage);
@@ -83,7 +109,7 @@ TEST_CASE("cli gen: input problems are reported with the right exit code before 
 TEST_CASE("cli ls: lists checkpoints and finds them by name or unique prefix", "[unit][cli][gen]") {
     gh::test::TempDir home;
     fakeCheckpoint(home.path() / "models" / "sd15.safetensors", kSd15Size);
-    fakeCheckpoint(home.path() / "models" / "sub" / "sdxl-base.safetensors", kSdxlSize);
+    fakeCheckpoint(home.path() / "models" / "sub" / "sdxl-base.safetensors", kSdxlSize, true);
     gh::test::writeText(home.path() / "models" / "notes.txt", "not a checkpoint");
 
     const auto ls = runCli(home.path(), {"--json", "ls"});
@@ -109,7 +135,7 @@ TEST_CASE("cli ls: lists checkpoints and finds them by name or unique prefix", "
 
 TEST_CASE("cli ls: a custom models folder", "[unit][cli][gen]") {
     gh::test::TempDir home, elsewhere;
-    fakeCheckpoint(elsewhere.path() / "m.safetensors", 1000);
+    fakeCheckpoint(elsewhere.path() / "m.safetensors", 100000);
     REQUIRE(runCli(home.path(), {"config", "set", "modelsDir", elsewhere.path().string()}).code == gh::cli::kOk);
     const auto ls = runCli(home.path(), {"--json", "ls"});
     CHECK(ls.asJson()["models"].size() == 1);
@@ -117,7 +143,7 @@ TEST_CASE("cli ls: a custom models folder", "[unit][cli][gen]") {
 
 TEST_CASE("cli gen --dry-run: layers, size defaults and the memory estimate", "[unit][cli][gen]") {
     gh::test::TempDir home;
-    fakeCheckpoint(home.path() / "models" / "sdxl.safetensors", kSdxlSize);
+    fakeCheckpoint(home.path() / "models" / "sdxl.safetensors", kSdxlSize, true);
 
     auto plan = [&](std::vector<std::string> extra) {
         std::vector<std::string> args = {"--json", "gen", "a lighthouse", "-m", "sdxl", "--dry-run"};

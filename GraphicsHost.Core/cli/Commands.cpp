@@ -7,6 +7,7 @@
 #include "engine/FitEstimator.h"
 #include "engine/ImageCodec.h"
 #include "engine/LoadAdvice.h"
+#include "models/ModelLibrary.h"
 #include "presets/PresetStore.h"
 
 #include <windows.h>
@@ -31,58 +32,20 @@ std::string humanSize(uint64_t bytes) {
     return s.str();
 }
 
-bool isCheckpoint(const fs::path& p) {
-    const std::string ext = p.extension().string();
-    return ext == ".safetensors" || ext == ".ckpt" || ext == ".gguf" || ext == ".sft";
-}
-
-std::vector<fs::path> checkpointsIn(const fs::path& dir) {
-    std::vector<fs::path> found;
-    std::error_code ec;
-    for (fs::recursive_directory_iterator it(dir, fs::directory_options::skip_permission_denied, ec), end; !ec && it != end; it.increment(ec)) {
-        if (it->is_regular_file(ec) && isCheckpoint(it->path())) {
-            found.push_back(it->path());
-        }
-    }
-    std::sort(found.begin(), found.end());
-    return found;
-}
-
 // A path, or a name (with or without extension, or a unique prefix) in the models folder.
-bool resolveModel(host::AppHost& host, const std::string& arg, fs::path& resolved, std::string& problem, int& code) {
+bool resolveModel(host::AppHost& host, const std::string& arg, models::ModelCard& card, std::string& problem, int& code) {
     if (arg.empty()) {
         problem = "give the model with --model <file or name> (see: graphicshost ls)";
         code = kUsage;
         return false;
     }
-    std::error_code ec;
-    if (fs::is_regular_file(arg, ec)) {
-        resolved = fs::absolute(arg, ec);
+    const auto r = host.library().resolve(arg);
+    if (r.status == models::ModelLibrary::Resolution::Status::Found) {
+        card = *r.card;
         return true;
     }
-    const auto all = checkpointsIn(host.modelsDir());
-    std::vector<fs::path> matches;
-    for (const auto& p : all) {
-        if (p.filename() == arg || p.stem() == arg) {
-            matches.clear();
-            matches.push_back(p);
-            break;
-        }
-        if (p.filename().string().rfind(arg, 0) == 0) {
-            matches.push_back(p);
-        }
-    }
-    if (matches.size() == 1) {
-        resolved = matches[0];
-        return true;
-    }
-    if (matches.empty()) {
-        problem = "model not found: " + arg + " (looked in " + host.modelsDir().string() + ")";
-        code = kNotFound;
-    } else {
-        problem = "'" + arg + "' matches " + std::to_string(matches.size()) + " models; be more specific";
-        code = kUsage;
-    }
+    problem = r.problem;
+    code = r.status == models::ModelLibrary::Resolution::Status::Ambiguous ? kUsage : kNotFound;
     return false;
 }
 
@@ -154,17 +117,12 @@ bool coerceJsonValue(const Json& sample, const std::string& text, Json& out, std
 
 int runLs(host::AppHost& host, bool json, std::ostream& out, std::ostream&) {
     const fs::path dir = host.modelsDir();
+    const auto cards = host.library().scan();
     Json models = Json::array();
-    for (const auto& p : checkpointsIn(dir)) {
-        std::error_code ec;
-        const uint64_t size = fs::file_size(p, ec);
-        const std::string family = engine::guessFamilyFromFileSize(size);
-        models.push_back({{"name", p.stem().string()},
-                          {"file", p.filename().string()},
-                          {"path", p.string()},
-                          {"sizeBytes", size},
-                          {"family", family},
-                          {"hasDefaults", host.modelDefaults().get(p.filename().string()).has_value()}});
+    for (const auto& c : cards) {
+        Json entry = models::toJson(c);
+        entry["hasDefaults"] = host.modelDefaults().get(c.file).has_value();
+        models.push_back(std::move(entry));
     }
     if (json) {
         out << Json{{"modelsDir", dir.string()}, {"models", models}}.dump(2) << "\n";
@@ -172,12 +130,15 @@ int runLs(host::AppHost& host, bool json, std::ostream& out, std::ostream&) {
     }
     out << "Models in " << dir.string() << "\n";
     if (models.empty()) {
-        out << "  none (put .safetensors, .ckpt or .gguf files there, or set modelsDir with: graphicshost config set modelsDir <folder>)\n";
+        out << "  none (put .safetensors, .ckpt or .gguf files there, download some with: graphicshost get, or set modelsDir with: graphicshost config set modelsDir <folder>)\n";
     }
     for (const auto& m : models) {
-        out << "  " << std::left << std::setw(36) << m["file"].get<std::string>() << std::right << std::setw(12)
-            << humanSize(m["sizeBytes"].get<uint64_t>()) << "  " << m["family"].get<std::string>()
-            << (m["hasDefaults"].get<bool>() ? "  (has defaults)" : "") << "\n";
+        std::string family = m["kind"].get<std::string>() == "checkpoint" ? m["family"].get<std::string>() : m["kind"].get<std::string>();
+        if (!m["supported"].get<bool>()) family += " (not supported)";
+        out << "  " << std::left << std::setw(40) << m["file"].get<std::string>() << std::right << std::setw(12)
+            << humanSize(m["sizeBytes"].get<uint64_t>()) << "  " << family
+            << (m["hasDefaults"].get<bool>() ? "  (has defaults)" : "")
+            << (!m["vae"].get<std::string>().empty() ? "  + VAE " + m["vae"].get<std::string>() : std::string()) << "\n";
     }
     return kOk;
 }
@@ -186,14 +147,23 @@ int runLs(host::AppHost& host, bool json, std::ostream& out, std::ostream&) {
 
 int runGen(host::AppHost& host, const GenInvocation& in, bool json, bool quiet, std::ostream& out, std::ostream& err) {
     // 1. the model
-    fs::path modelPath;
+    models::ModelCard card;
     std::string problem;
     int code = kOk;
-    if (!resolveModel(host, in.model, modelPath, problem, code)) {
+    if (!resolveModel(host, in.model, card, problem, code)) {
         err << "error: " << problem << "\n";
         return code;
     }
-    const std::string modelFile = modelPath.filename().string();
+    if (card.kind != models::Kind::Checkpoint) {
+        err << "error: " << card.file << " is a " << models::toString(card.kind) << ", not a checkpoint that can generate images\n";
+        return kUsage;
+    }
+    if (!card.supported) {
+        err << "error: " << card.file << ": " << (card.note.empty() ? "not supported in this version" : card.note) << "\n";
+        return kUsage;
+    }
+    const fs::path modelPath = card.path;
+    const std::string modelFile = card.file;
 
     // 2. the layers: model defaults < preset < what was given on the command line
     std::vector<Json> requestLayers, loadLayers;
@@ -226,6 +196,9 @@ int runGen(host::AppHost& host, const GenInvocation& in, bool json, bool quiet, 
         return kUsage;
     }
     load.modelPath = modelPath.string();
+    if (load.vaePath.empty() && !card.vae.empty()) {
+        load.vaePath = (modelPath.parent_path() / card.vae).string();  // the VAE the library linked to this checkpoint
+    }
 
     if (const auto errors = engine::validate(request); !errors.empty()) {
         err << "error: invalid parameters:\n" << errorList(errors);
@@ -245,14 +218,14 @@ int runGen(host::AppHost& host, const GenInvocation& in, bool json, bool quiet, 
     }
     std::error_code ec;
     const uint64_t fileSize = fs::file_size(modelPath, ec);
-    const std::string guessedFamily = engine::guessFamilyFromFileSize(fileSize);
-    const engine::FamilyDefaults sizes = engine::familyDefaults(guessedFamily);
+    const std::string guessedFamily = card.familyName;  // from the file header, not from the size
+    const engine::FamilyDefaults sizes = card.defaults;
     const engine::GenerationRequest sized = engine::resolve(request, sizes);
 
     engine::FitReport fit;
     if (!in.noFitCheck) {
         engine::FitInput fi;
-        fi.weightsBytes = engine::estimateWeightsBytes(fileSize, guessedFamily);
+        fi.weightsBytes = card.weightsBytes > 0 ? card.weightsBytes : engine::estimateWeightsBytes(fileSize, guessedFamily);
         fi.family = guessedFamily;
         fi.width = sized.width;
         fi.height = sized.height;

@@ -8,6 +8,7 @@
 #include "engine/ModelManager.h"
 #include "engine/RuntimeLoader.h"
 #include "gallery/GalleryStore.h"
+#include "models/ModelLibrary.h"
 #include "presets/PresetStore.h"
 
 #include <memory>
@@ -61,6 +62,7 @@ public:
     gallery::GalleryStore& gallery();     // <data folder>/outputs
     presets::PresetStore& presets();      // <data folder>/presets
     presets::ModelDefaultsStore& modelDefaults();  // <data folder>/model-defaults.json
+    models::ModelLibrary& library();               // the checkpoints, VAEs and LoRAs in modelsDir()
 
 private:
     core::AppPaths paths_;
@@ -77,6 +79,7 @@ private:
     std::unique_ptr<gallery::GalleryStore> gallery_;
     presets::PresetStore presets_;
     presets::ModelDefaultsStore modelDefaults_;
+    models::ModelLibrary library_;
     std::unique_ptr<engine::ModelManager> models_;
 };
 

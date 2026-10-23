@@ -16,6 +16,7 @@ AppHost::AppHost(std::optional<std::filesystem::path> home)
     settings_ = std::move(loaded.settings);
     settingsWarning_ = std::move(loaded.warning);
 
+    library_.setFolders({modelsDir()});
     log::init(paths_.logsDir(), settings_.logging.level);
     log::info("GraphicsHost starting, data folder " + paths_.root().string());
     if (loaded.migrated) {
@@ -60,6 +61,7 @@ const engine::RuntimeCandidate* AppHost::selectedRuntime() const {
 void AppHost::updateSettings(core::Settings settings) {
     store_.save(settings);  // validates first
     settings_ = std::move(settings);
+    library_.setFolders({modelsDir()});
     log::setLevel(settings_.logging.level);
     log::info("settings saved");
 }
@@ -129,6 +131,14 @@ presets::PresetStore& AppHost::presets() {
 
 presets::ModelDefaultsStore& AppHost::modelDefaults() {
     return modelDefaults_;
+}
+
+}  // namespace gh::host
+
+namespace gh::host {
+
+models::ModelLibrary& AppHost::library() {
+    return library_;
 }
 
 }  // namespace gh::host

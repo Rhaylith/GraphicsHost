@@ -59,6 +59,8 @@
     <ClCompile Include="PresetTests.cpp" />
     <ClCompile Include="CliGenTests.cpp" />
     <ClCompile Include="ModelCardTests.cpp" />
+    <ClCompile Include="ModelLibraryTests.cpp" />
+    <ClInclude Include="SafetensorsFixture.h" />
     <ClInclude Include="ModelFixture.h" />
     <ClInclude Include="TestUtil.h" />
   </ItemGroup>
