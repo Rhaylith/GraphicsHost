@@ -17,6 +17,7 @@ struct ServerSettings {
     bool enabled = true;
     int port = 1234;
     bool lan = false;  // bind to all interfaces instead of localhost only
+    bool requireToken = false;  // also local clients must send an access token (remote clients always must)
 };
 
 struct LoggingSettings {

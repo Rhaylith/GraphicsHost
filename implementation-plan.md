@@ -357,7 +357,7 @@ Goal: retire the biggest risk (§10) before any application code exists.
 ### Phase 4 — API and both UIs (XL)
 
 - [x] 4.1 HTTP server (`cpp-httplib`): routing, JSON errors, SSE helper, body-size caps before parsing (M) — `server/ApiServer` (own thread, bounded worker pool, exclusive port bind: found that Windows lets two programs share a port with SO_REUSEADDR, so "port in use" never fired; a fresh httplib server per start), JSON errors in one OpenAI-style shape for 404/413/500, request size cap, `GET /api/v1/health`, static web folder at `/`, `HttpCommon.h` with `sendError/sendJson/readJsonObject` and an SSE helper (exercised by the job events in 4.4); 6 test cases. The 413 check moves to the first POST route (4.3)
-- [ ] 4.2 Auth: API tokens (hashed, permissions), localhost-only default, `--lan` flag (M)
+- [x] 4.2 Auth: API tokens (hashed, permissions), localhost-only default, `--lan` flag (M) — `server/TokenStore` (SHA-256 only, shown once, 256-bit secrets, constant-time compare, lastUsed throttled), `server/Auth` (decision table: token judged by its permissions; no token = this computer only and only while `server.requireToken` is off; LAN listening refused until a token exists), routes `whoami`/`tokens`, CLI `token create|list|revoke`, `x-api-key` accepted too; 9 test cases
 - [ ] 4.3 OpenAI endpoints: `/v1/images/generations`, `/v1/images/edits` (stub until img2img), `/v1/models` (M)
 - [ ] 4.4 Native `/api/v1`: generate + job poll/stream/cancel, models load/unload, downloads, discover, gallery, outputs (L)
 - [ ] 4.5 Request log, `/api/requests`, `/metrics` (S)

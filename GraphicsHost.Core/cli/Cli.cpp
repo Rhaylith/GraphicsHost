@@ -350,6 +350,13 @@ int run(int argc, char** argv, std::ostream& out, std::ostream& err, std::option
     auto* logoutCmd = app.add_subcommand("logout", "remove the stored Hugging Face token");
     auto* whoamiCmd = app.add_subcommand("whoami", "the Hugging Face user of the stored token");
 
+    auto* tokenCmd = app.add_subcommand("token", "API access tokens for the HTTP server");
+    std::string tokenAction = "list", tokenPerms;
+    std::vector<std::string> tokenArgs;
+    tokenCmd->add_option("action", tokenAction, "create | list | revoke")->capture_default_str();
+    tokenCmd->add_option("args", tokenArgs, "create: the name; revoke: the id or name");
+    tokenCmd->add_option("--perm", tokenPerms, "create: read,generate,manage,admin (default read,generate)");
+
     try {
         app.parse(argc, argv);
     } catch (const CLI::ParseError& e) {
@@ -382,6 +389,7 @@ int run(int argc, char** argv, std::ostream& out, std::ostream& err, std::option
             return cmdConfig(host, configAction, configArgs, json, out, err);
         }
         if (logoutCmd->parsed()) return runLogout(json, out, err);
+        if (tokenCmd->parsed()) return runToken(host, tokenAction, tokenArgs, tokenPerms, json, out, err);
         if (catalogCmd->parsed()) return runCatalog(host, catalogText, catalogFamily, catalogKind, json, out, err);
         if (searchCmd->parsed()) return runSearch(host, searchText, searchLimit, json, out, err);
         if (infoCmd->parsed()) return runInfo(host, infoRepo, json, out, err);

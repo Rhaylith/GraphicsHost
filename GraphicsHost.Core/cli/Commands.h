@@ -62,4 +62,9 @@ int runLogin(host::AppHost& host, const std::string& token, bool json, std::ostr
 int runLogout(bool json, std::ostream& out, std::ostream& err);
 int runWhoami(host::AppHost& host, bool json, std::ostream& out, std::ostream& err);
 
+
+// token create NAME [--perm ...] | list | revoke ID_OR_NAME  (API access tokens)
+int runToken(host::AppHost& host, const std::string& action, const std::vector<std::string>& args,
+             const std::string& permissions, bool json, std::ostream& out, std::ostream& err);
+
 }  // namespace gh::cli

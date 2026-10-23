@@ -13,6 +13,7 @@
 #include "models/ModelLibrary.h"
 #include "models/ModelService.h"
 #include "presets/PresetStore.h"
+#include "server/TokenStore.h"
 
 #include <memory>
 #include <mutex>
@@ -66,6 +67,7 @@ public:
     presets::PresetStore& presets();      // <data folder>/presets
     presets::ModelDefaultsStore& modelDefaults();  // <data folder>/model-defaults.json
     models::ModelLibrary& library();               // the checkpoints, VAEs and LoRAs in modelsDir()
+    server::TokenStore& tokens();                  // API access tokens (<data folder>	okens.json)
     models::DownloadManager& downloads();          // model downloads (a few at a time)
     models::ModelService& modelService();          // catalog + downloads + library: "get this model"
     const models::Catalog& catalog();              // datatalog.json next to the exe, overridden by <data folder>talog.json
@@ -86,6 +88,7 @@ private:
     presets::PresetStore presets_;
     presets::ModelDefaultsStore modelDefaults_;
     models::ModelLibrary library_;
+    server::TokenStore tokens_;
     std::unique_ptr<engine::ModelManager> models_;
     std::unique_ptr<models::DownloadManager> downloads_;
     std::unique_ptr<models::Catalog> catalog_;

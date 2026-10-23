@@ -3,6 +3,7 @@
 #include "core/Log.h"
 #include "core/Version.h"
 #include "server/HttpCommon.h"
+#include "server/RouteContext.h"
 
 #include <atomic>
 #include <thread>
@@ -20,7 +21,11 @@ struct ApiServer::Impl {
     int port = 0;
     std::string bindAddress;
 
-    explicit Impl(host::AppHost& h) : host(h) {}
+    Auth auth;
+    RouteContext ctx;
+
+    explicit Impl(host::AppHost& h)
+        : host(h), auth(h.tokens(), [&h] { return h.settings().server.requireToken; }), ctx{h, auth} {}
 };
 
 ApiServer::ApiServer(host::AppHost& host) : impl_(std::make_unique<Impl>(host)) {}
@@ -35,6 +40,9 @@ std::string ApiServer::url() const { return "http://127.0.0.1:" + std::to_string
 
 std::string ApiServer::start(const ServerOptions& o) {
     if (impl_->running) return "the server is already running";
+    if (!Auth::isLoopback(o.bindAddress) && !impl_->host.tokens().any()) {
+        return "refusing to listen on " + o.bindAddress + ": other computers could use the server without a password. Create an access token first (graphicshost token create <name>)";
+    }
     impl_->server = std::make_unique<httplib::Server>();
     httplib::Server& s = *impl_->server;
 
@@ -69,6 +77,8 @@ std::string ApiServer::start(const ServerOptions& o) {
     s.Get("/api/v1/health", [](const httplib::Request&, httplib::Response& res) {
         sendJson(res, {{"status", "ok"}, {"name", kAppName}, {"version", kAppVersion}});
     });
+
+    registerTokenRoutes(s, impl_->ctx);
 
     // the browser UI
     fs::path web = o.webRoot.empty() ? core::AppPaths::executableDir() / "web" : o.webRoot;

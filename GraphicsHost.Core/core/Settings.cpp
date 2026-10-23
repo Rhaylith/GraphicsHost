@@ -30,7 +30,7 @@ Json toJson(const Settings& s) {
     json["threads"] = s.threads;
     json["modelsDir"] = s.modelsDir;
     json["interfaceMode"] = s.interfaceMode;
-    json["server"] = {{"enabled", s.server.enabled}, {"port", s.server.port}, {"lan", s.server.lan}};
+    json["server"] = {{"enabled", s.server.enabled}, {"port", s.server.port}, {"lan", s.server.lan}, {"requireToken", s.server.requireToken}};
     json["logging"] = {{"level", s.logging.level}};
     json["safety"] = {{"enabled", s.safety.enabled}};
     return json;
@@ -51,6 +51,7 @@ Settings settingsFromJson(const Json& json) {
         s.server.enabled = it->value("enabled", s.server.enabled);
         s.server.port = it->value("port", s.server.port);
         s.server.lan = it->value("lan", s.server.lan);
+        s.server.requireToken = it->value("requireToken", s.server.requireToken);
     }
     if (const auto it = json.find("logging"); it != json.end() && it->is_object()) {
         s.logging.level = it->value("level", s.logging.level);

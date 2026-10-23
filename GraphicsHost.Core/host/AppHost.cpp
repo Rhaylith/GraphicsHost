@@ -10,7 +10,8 @@ AppHost::AppHost(std::optional<std::filesystem::path> home)
     : paths_(home ? core::AppPaths(*home) : core::AppPaths::fromEnvironment()),
       store_(paths_),
       presets_(paths_.presetsDir()),
-      modelDefaults_(paths_.root() / "model-defaults.json") {
+      modelDefaults_(paths_.root() / "model-defaults.json"),
+      tokens_(paths_.root() / "tokens.json") {
     paths_.ensureDirectories();
     core::LoadResult loaded = store_.load();
     settings_ = std::move(loaded.settings);
@@ -180,6 +181,14 @@ models::ModelService& AppHost::modelService() {
         modelService_ = std::make_unique<models::ModelService>(cat, library_, dl, modelDefaults_, std::move(config));
     }
     return *modelService_;
+}
+
+}  // namespace gh::host
+
+namespace gh::host {
+
+server::TokenStore& AppHost::tokens() {
+    return tokens_;
 }
 
 }  // namespace gh::host
