@@ -8,6 +8,7 @@
 #include "engine/ModelManager.h"
 #include "engine/RuntimeLoader.h"
 #include "gallery/GalleryStore.h"
+#include "host/GenerationService.h"
 #include "models/Catalog.h"
 #include "models/DownloadManager.h"
 #include "models/ModelLibrary.h"
@@ -63,14 +64,17 @@ public:
 
     // Services; created on first use except the stores, which are cheap.
     engine::ModelManager& models();      // one loaded model, the job queue
+    // Replaces the inference engine (tests plug in a fake one). Call before models() is first used.
+    void overrideEngine(std::shared_ptr<engine::IImageEngine> engine);
     gallery::GalleryStore& gallery();     // <data folder>/outputs
     presets::PresetStore& presets();      // <data folder>/presets
     presets::ModelDefaultsStore& modelDefaults();  // <data folder>/model-defaults.json
     models::ModelLibrary& library();               // the checkpoints, VAEs and LoRAs in modelsDir()
-    server::TokenStore& tokens();                  // API access tokens (<data folder>	okens.json)
+    server::TokenStore& tokens();                  // API access tokens (<data folder>/tokens.json)
     models::DownloadManager& downloads();          // model downloads (a few at a time)
     models::ModelService& modelService();          // catalog + downloads + library: "get this model"
-    const models::Catalog& catalog();              // datatalog.json next to the exe, overridden by <data folder>talog.json
+    GenerationService& generation();               // JIT load + queue + gallery for the API and the UIs
+    const models::Catalog& catalog();              // data/catalog.json next to the exe, overridden by <data folder>/catalog.json
 
 private:
     core::AppPaths paths_;
@@ -93,6 +97,8 @@ private:
     std::unique_ptr<models::DownloadManager> downloads_;
     std::unique_ptr<models::Catalog> catalog_;
     std::unique_ptr<models::ModelService> modelService_;
+    std::mutex generationMutex_;
+    std::unique_ptr<GenerationService> generation_;
 };
 
 }  // namespace gh::host

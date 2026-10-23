@@ -3,6 +3,8 @@
 // Helpers shared by the route files. Including this pulls in the whole of cpp-httplib, so only .cpp files of the
 // server include it; the rest of the application sees ApiServer.h only.
 
+#include "engine/ImageEngine.h"
+
 #include <httplib.h>
 
 #include <nlohmann/json.hpp>
@@ -23,6 +25,18 @@ inline void sendError(httplib::Response& res, int status, const std::string& typ
 inline void sendJson(httplib::Response& res, const nlohmann::json& body, int status = 200) {
     res.status = status;
     res.set_content(body.dump(), "application/json");
+}
+
+// The HTTP face of an engine failure.
+inline void sendEngineError(httplib::Response& res, const engine::EngineError& e) {
+    switch (e.code()) {
+        case engine::EngineErrorCode::InvalidRequest: sendError(res, 400, "invalid_request_error", e.what(), "invalid_parameters"); break;
+        case engine::EngineErrorCode::NotFound: sendError(res, 404, "not_found", e.what(), "model_not_found"); break;
+        case engine::EngineErrorCode::LoadFailed: sendError(res, 500, "server_error", e.what(), "model_load_failed"); break;
+        case engine::EngineErrorCode::OutOfMemory: sendError(res, 507, "server_error", e.what(), "out_of_memory"); break;
+        case engine::EngineErrorCode::Cancelled: sendError(res, 499, "cancelled", e.what(), "cancelled"); break;
+        case engine::EngineErrorCode::Failed: sendError(res, 409, "server_error", e.what(), "busy"); break;
+    }
 }
 
 // The body parsed as a JSON object; on failure sends a 400 and returns false.

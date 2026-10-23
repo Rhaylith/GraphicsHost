@@ -48,6 +48,7 @@ AppHost::AppHost(std::optional<std::filesystem::path> home)
 }
 
 AppHost::~AppHost() {
+    generation_.reset();  // stops observing the queue
     models_.reset();  // cancels running jobs, then frees the model
     engine_.reset();
     modelService_.reset();
@@ -189,6 +190,27 @@ namespace gh::host {
 
 server::TokenStore& AppHost::tokens() {
     return tokens_;
+}
+
+}  // namespace gh::host
+
+namespace gh::host {
+
+void AppHost::overrideEngine(std::shared_ptr<engine::IImageEngine> engine) {
+    std::lock_guard<std::mutex> lock(serviceMutex_);
+    engine_ = std::move(engine);
+    engineError_.clear();
+}
+
+}  // namespace gh::host
+
+namespace gh::host {
+
+GenerationService& AppHost::generation() {
+    models();  // GenerationService observes the queue; create that first (it takes serviceMutex_ itself)
+    std::lock_guard<std::mutex> lock(generationMutex_);
+    if (!generation_) generation_ = std::make_unique<GenerationService>(*this);
+    return *generation_;
 }
 
 }  // namespace gh::host

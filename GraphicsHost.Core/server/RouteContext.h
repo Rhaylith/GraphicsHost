@@ -25,5 +25,6 @@ bool authorize(RouteContext& ctx, const httplib::Request& req, httplib::Response
                std::string* principal = nullptr);
 
 void registerTokenRoutes(httplib::Server& server, RouteContext& ctx);
+void registerOpenAiRoutes(httplib::Server& server, RouteContext& ctx);
 
 }  // namespace gh::server
