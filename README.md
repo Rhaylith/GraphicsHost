@@ -5,11 +5,13 @@ runs them in-process on **CPU or Vulkan (AMD GPUs)**, exposes one standard set o
 them through a Qt desktop window, a browser UI, a CLI and an HTTP API. Modelled on LLMHost; the engine is
 [stable-diffusion.cpp](https://github.com/leejet/stable-diffusion.cpp).
 
-Status: **Phases 2 (engine) and 3 (models) are done**: images are generated from the command line on CPU and on the AMD GPU (Vulkan), for
+Status: **Phases 2 (engine), 3 (models) and 4 (server and UIs) are done**: images are generated from the Qt window, the
+browser, the command line and the HTTP API (OpenAI-compatible and native) on CPU and on the AMD GPU (Vulkan), for
 SD 1.x and SDXL, with all samplers and schedulers, a job queue with cancellation, PNG/JPEG/WebP output with the
 parameters embedded, a gallery, presets, per-model defaults and a memory estimate, plus a model library, a verified catalog,
-Hugging Face search and resumable downloads. The Qt window is still empty; the HTTP API and both UIs (phase 4) are next. See
-[implementation-plan.md](implementation-plan.md) for the plan and what is ticked off.
+Hugging Face search and resumable downloads, API tokens and a request log. Image-to-image, inpainting, LoRA and the safety
+filter belong to phase 5. See [implementation-plan.md](implementation-plan.md) for the plan and what is ticked off, and
+[docs/api.md](docs/api.md) for the HTTP API.
 
 ## Build
 
@@ -101,13 +103,30 @@ user-installed runtimes, `presets\`, `outputs\`, `models\`.
 Exit codes: 0 ok, 1 failure, 2 usage, 3 not found, 4 not authorised, 5 server unreachable, 6 out of memory, 7 cancelled,
 8 conflict.
 
+The server and the UIs:
+
+```
+GraphicsHost.exe                               # the window; it also runs the API server (settings server.enabled / server.port)
+GraphicsHost.exe serve [--port 1234]           # the same server without a window, until Ctrl+C
+GraphicsHost.exe token create "my phone" --perm read,generate   # an access token (shown once)
+curl http://127.0.0.1:1234/v1/images/generations -H "Content-Type: application/json" -d "{\"model\":\"v1-5\",\"prompt\":\"a lighthouse\"}"
+```
+
+Open `http://127.0.0.1:1234/` for the browser UI (the `web` folder next to the exe). Closing the window leaves GraphicsHost
+in the tray while the server runs; Quit is in the tray menu. Without a token the server answers only programs on this
+computer; letting other computers connect (`server.lan`) is refused until a token exists. The OpenAI-style routes and
+the native `/api/v1` routes are listed in [docs/api.md](docs/api.md).
+
 ## Test
 
 ```
 build\bin\x64\Release\GraphicsHost.Tests.exe "[unit]"          # pure logic, settings, CLI, queue, gallery, codecs
 build\bin\x64\Release\GraphicsHost.Tests.exe "[integration]"   # needs a built runtime DLL next to the exe
 build\bin\x64\Release\GraphicsHost.Tests.exe "[model]"         # real generation; needs checkpoints in models\ (see below)
-build\bin\x64\Release\GraphicsHost.Tests.exe                   # everything: 135 test cases, about 2 minutes
+build\bin\x64\Release\GraphicsHost.Tests.exe "[api]"           # the HTTP API against a fake engine (OpenAI, native, auth, metrics, contract)
+build\bin\x64\Release\GraphicsHost.Tests.exe "[ui]"            # starts GraphicsHost.exe offscreen and checks that every tab renders
+build\bin\x64\Release\GraphicsHost.Tests.exe "~[model]~[network]"   # everything that needs neither a checkpoint nor the internet (about 230 cases)
+build\bin\x64\Release\GraphicsHost.Tests.exe                   # everything, including the real-model and network tests
 ```
 
 The `[model]` tests look for `models\v1-5-pruned-emaonly.safetensors` (SD 1.5) and `models\sd_xl_base_1.0.safetensors`
@@ -119,17 +138,18 @@ on the CPU runtime, so no GPU is needed. `tools\measure-vram.ps1` measures GPU m
 
 | Folder | What |
 |---|---|
-| `GraphicsHost/` | the application: `main.cpp`, Qt UI (`ui/`) |
-| `GraphicsHost.Core/` | everything that is not UI: `core/` settings, logging, paths; `engine/` hardware, runtime loader, `ImageEngine`, `JobQueue`, `ModelManager`, image codecs, fit estimator; `gallery/`; `presets/`; `host/` the composition root `AppHost`; `cli/` |
+| `GraphicsHost/` | the application: `main.cpp`, Qt UI (`ui/`: Generate, My Models, Discover, Settings, Logs tabs) |
+| `web/` | the browser UI (plain HTML/JS/CSS, copied next to the exe) |
+| `GraphicsHost.Core/` | everything that is not UI: `core/` settings, logging, paths; `engine/` hardware, runtime loader, `ImageEngine`, `JobQueue`, `ModelManager`, image codecs, fit estimator; `gallery/`; `presets/`; `host/` the composition root `AppHost` and `GenerationService`; `models/` library, catalog, downloads; `server/` the HTTP server, auth, routes; `cli/` |
 | `GraphicsHost.Tests/` | Catch2 tests |
 | `runtime/` | the C ABI (`gh_runtime.h`) and the three runtime DLL projects |
 | `ggml/`, `stable-diffusion/` | MSBuild projects that build the engine from the submodule in `extern/` |
 | `props/` | shared MSBuild settings, including the Qt moc/deploy integration |
-| `docs/` | [adding an option](docs/adding-options.md), [Phase 0 results](docs/phase0-results.md), [environment notes](docs/environment-notes.md) |
+| `docs/` | [adding an option](docs/adding-options.md), [Phase 0 results](docs/phase0-results.md), [environment notes](docs/environment-notes.md), [HTTP API](docs/api.md) |
 | `spike/` | Phase 0 spike program |
 
 ## Known environment issues
 
 * Windows Application Control can refuse to load freshly built unsigned binaries; see
   [docs/environment-notes.md](docs/environment-notes.md).
-* GPU runs are untested until the development machine's AMD driver is repaired (Phase 0 results).
+* The offscreen UI checks (`tools/ui-shots.ps1`, the `[ui]` test) need no display; the tray icon and the single-instance behaviour need a real desktop and are not covered by automated checks.

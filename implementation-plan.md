@@ -373,7 +373,8 @@ Goal: retire the biggest risk (§10) before any application code exists.
   - Applying settings restarts the server and re-reads the interface mode; a changed backend now drops the loaded model and engine (`AppHost::updateSettings`). `graphicshost serve [--port N] [--bind ADDR]` runs the same server headless. The token dialogs and the Hugging Face login in the UI were not driven by an automated check (they would touch the real credential store).
 - [x] 4.10 Browser UI: static files in `web\` (copied next to the exe) served at `/`, with Generate, Gallery, My Models, Discover, Settings and Logs against `/api/v1` (L)
   - Plain JavaScript, no build step; server text only goes into the page with `textContent`. With a token configured, images are fetched with the Authorization header and shown from blobs. Checked in the built-in browser against `graphicshost serve`: generated a 256x256 image, gallery, models, catalog, settings and logs all loaded without console errors. The files are copied, not embedded in the exe, so the `web` folder must stay next to it.
-- [ ] 4.11 API contract tests (server on an ephemeral port) and UI smoke checks (M)
+- [x] 4.11 API contract tests (server on an ephemeral port) and UI smoke checks (M)
+  - `[contract]`: every documented route exists and every failure has the one JSON error shape (`docs/api.md`). `[ui]`: starts the real `GraphicsHost.exe` offscreen, every tab must render. With the OpenAI and native suites that is 30 `[api]` cases against a fake engine.
 
 **Exit:** the same generation can be started from the Qt window, the browser UI, an OpenAI client and the CLI; models can be discovered and downloaded from either UI.
 
