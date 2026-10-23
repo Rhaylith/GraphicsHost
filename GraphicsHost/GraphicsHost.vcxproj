@@ -27,7 +27,7 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <Import Project="$(GhProps)" />
   <PropertyGroup>
-    <QtModules>Core;Gui;Widgets</QtModules>
+    <QtModules>Core;Gui;Widgets;Charts</QtModules>
     <TargetName>GraphicsHost</TargetName>
   </PropertyGroup>
   <Import Project="$(RepoRoot)props\Core.props" />
@@ -36,6 +36,9 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="ui\MainWindow.cpp" />
     <ClCompile Include="ui\UiUtil.cpp" />
+    <ClCompile Include="ui\MonitorTab.cpp" />
+    <ClInclude Include="ui\MonitorTab.h" />
+    <QtMoc Include="ui\MonitorTab.h" />
     <ClCompile Include="ui\MaskEditor.cpp" />
     <ClInclude Include="ui\MaskEditor.h" />
     <ClCompile Include="ui\GalleryTab.cpp" />

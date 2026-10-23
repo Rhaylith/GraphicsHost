@@ -388,7 +388,8 @@ Goal: retire the biggest risk (§10) before any application code exists.
   - ABI: `GH_FEATURE_INPAINT` and `mask_image` (white = repaint). Verified on the real model (CPU test: the kept half stays close to the source, the repainted half does not). Qt: "Edit mask…" painter (brush, erase, invert, clear); it is also rendered by the screenshot/`[ui]` check. Browser: not yet.
 - [x] 5.4 LoRA support: library scan, `loras[]` parameter, `<lora:name:w>` prompt syntax (M)
   - ABI: `GH_FEATURE_LORA`, `gh_lora` + `loras` appended to the generate params. Names resolve against the library (file name, stem or unique prefix), family mismatches are refused, weights are per request. Verified on the real engine with a synthetic LoRA (it changes the picture, weight 0 does not, nothing stays applied). UIs: a LoRA field with a picker in Qt, a field with a datalist in the browser.
-- [ ] 5.5 Presets import/export; hardware monitor graphs (GPU utilisation, VRAM) with Qt Charts (M)
+- [x] 5.5 Presets import/export; hardware monitor graphs (GPU utilisation, VRAM) with Qt Charts (M)
+  - `HardwareMonitor` (CPU and RAM from the system, GPU load and VRAM from the PDH counters "GPU Engine" / "GPU Adapter Memory"), `GET /api/v1/hardware/usage`, a Monitor tab with two charts (two minutes of history). Checked live on the RX 7900 XTX: VRAM rose from 1.4 to 4.8 GiB when a model loaded; GPU load readings were low during the short runs I sampled. Presets: save the current settings, import, export, delete from a menu in both UIs (the Qt and browser flows were exercised; Qt dialogs only by build).
 - [ ] 5.6 Optional safety filter: `ISafetyFilter`, first implementation, per-request override, off by default (M)
 - [ ] 5.7 ESRGAN upscaler *(stretch)*; ControlNet *(stretch)*
 

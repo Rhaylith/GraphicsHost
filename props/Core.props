@@ -18,7 +18,7 @@
       <PreprocessorDefinitions>SPDLOG_SHARED_LIB;SPDLOG_COMPILED_LIB;SPDLOG_FMT_EXTERNAL;FMT_SHARED;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>spdlog$(VcpkgDebugSuffix).lib;fmt$(VcpkgDebugSuffix).lib;libpng16$(VcpkgDebugSuffix).lib;jpeg.lib;libwebp.lib;libwebpmux.lib;libsharpyuv.lib;sqlite3.lib;libcurl$(CurlSuffix).lib;ws2_32.lib;advapi32.lib;shell32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>spdlog$(VcpkgDebugSuffix).lib;fmt$(VcpkgDebugSuffix).lib;libpng16$(VcpkgDebugSuffix).lib;jpeg.lib;libwebp.lib;libwebpmux.lib;libsharpyuv.lib;sqlite3.lib;libcurl$(CurlSuffix).lib;ws2_32.lib;pdh.lib;advapi32.lib;shell32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>

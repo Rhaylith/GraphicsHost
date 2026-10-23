@@ -103,7 +103,7 @@ int runGui(int argc, char* argv[]) {
             for (int i = 0; i < window.tabs()->count(); ++i) {
                 window.tabs()->setCurrentIndex(i);
                 QEventLoop settle;   // let the tab load what it loads in the background
-                QTimer::singleShot(700, &settle, &QEventLoop::quit);
+                QTimer::singleShot(window.tabs()->tabText(i) == QLatin1String("Monitor") ? 3500 : 700, &settle, &QEventLoop::quit);   // the monitor needs a few readings
                 settle.exec();
                 const QString name = window.tabs()->tabText(i).remove(QLatin1Char('&')).replace(QLatin1Char(' '), QLatin1Char('-')).toLower();
                 window.grab().save(dir + QStringLiteral("/") + QString::number(i + 1) + QStringLiteral("-") + name + QStringLiteral(".png"));

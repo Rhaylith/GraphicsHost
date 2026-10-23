@@ -15,7 +15,7 @@ TEST_CASE("api contract: every documented route exists and speaks JSON errors", 
     struct Route { const char* method; const char* path; };
     const Route routes[] = {
         {"GET", "/api/v1/health"},          {"GET", "/api/v1/whoami"},           {"GET", "/api/v1/status"},
-        {"GET", "/api/v1/hardware"},        {"GET", "/api/v1/parameters"},       {"GET", "/api/v1/settings"},
+        {"GET", "/api/v1/hardware"},        {"GET", "/api/v1/hardware/usage"}, {"GET", "/api/v1/parameters"},       {"GET", "/api/v1/settings"},
         {"PUT", "/api/v1/settings"},        {"GET", "/api/v1/logs"},             {"GET", "/api/v1/requests"},
         {"GET", "/metrics"},                {"GET", "/api/v1/tokens"},           {"POST", "/api/v1/tokens"},
         {"DELETE", "/api/v1/tokens/nope"},  {"GET", "/v1/models"},               {"POST", "/v1/images/generations"},

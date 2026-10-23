@@ -231,3 +231,11 @@ GenerationService& AppHost::generation() {
 }
 
 }  // namespace gh::host
+
+namespace gh::host {
+
+HardwareMonitor& AppHost::monitor() {
+    return monitor_;
+}
+
+}  // namespace gh::host

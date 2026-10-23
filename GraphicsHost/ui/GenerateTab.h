@@ -86,6 +86,10 @@ private:
     void resultMenu(const QPoint& where);
     void updateAutoLabels();
     void showRequestJson();
+    void savePreset();
+    void importPreset();
+    void exportPreset();
+    void deletePreset();
 
     gh::host::AppHost& host_;
     std::shared_ptr<gh::engine::Job> job_;

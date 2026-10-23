@@ -9,6 +9,7 @@
 #include "engine/RuntimeLoader.h"
 #include "gallery/GalleryStore.h"
 #include "host/GenerationService.h"
+#include "host/HardwareMonitor.h"
 #include "models/Catalog.h"
 #include "models/DownloadManager.h"
 #include "models/ModelLibrary.h"
@@ -71,6 +72,7 @@ public:
     presets::ModelDefaultsStore& modelDefaults();  // <data folder>/model-defaults.json
     models::ModelLibrary& library();               // the checkpoints, VAEs and LoRAs in modelsDir()
     server::TokenStore& tokens();                  // API access tokens (<data folder>/tokens.json)
+    HardwareMonitor& monitor();                    // CPU, RAM, GPU load and video memory readings
     models::DownloadManager& downloads();          // model downloads (a few at a time)
     models::ModelService& modelService();          // catalog + downloads + library: "get this model"
     GenerationService& generation();               // JIT load + queue + gallery for the API and the UIs
@@ -99,6 +101,7 @@ private:
     std::unique_ptr<models::ModelService> modelService_;
     std::mutex generationMutex_;
     std::unique_ptr<GenerationService> generation_;
+    HardwareMonitor monitor_;
 };
 
 }  // namespace gh::host

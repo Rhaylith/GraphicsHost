@@ -19,6 +19,7 @@
 #include <QFormLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
+#include <QInputDialog>
 #include <QLabel>
 #include <QListWidget>
 #include <QToolButton>
@@ -99,7 +100,21 @@ void GenerateTab::buildUi() {
     model_->setMinimumContentsLength(24);
     preset_ = new QComboBox(left);
     form->addRow(tr("Model"), model_);
-    form->addRow(tr("Preset"), preset_);
+    // (the preset row is built below, with its menu)
+    auto* presetRow = new QHBoxLayout();
+    auto* presetMenuButton = new QToolButton(left);
+    presetMenuButton->setText(tr("▾"));
+    presetMenuButton->setToolTip(tr("Save, import, export or delete presets"));
+    presetMenuButton->setPopupMode(QToolButton::InstantPopup);
+    auto* presetMenu = new QMenu(presetMenuButton);
+    presetMenuButton->setMenu(presetMenu);
+    presetMenu->addAction(tr("Save these settings as a preset…"), this, [this] { savePreset(); });
+    presetMenu->addAction(tr("Import preset file…"), this, [this] { importPreset(); });
+    presetMenu->addAction(tr("Export selected preset…"), this, [this] { exportPreset(); });
+    presetMenu->addAction(tr("Delete selected preset"), this, [this] { deletePreset(); });
+    presetRow->addWidget(preset_, 1);
+    presetRow->addWidget(presetMenuButton);
+    form->addRow(tr("Preset"), presetRow);
     leftLayout->addLayout(form);
 
     prompt_ = new QPlainTextEdit(left);
@@ -657,6 +672,72 @@ void GenerateTab::setSourceImage(const QImage& image) {
         return;
     }
     sourceView_->setPixmap(QPixmap::fromImage(image.scaled(sourceView_->size() - QSize(4, 4), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
+}
+
+}  // namespace gh::ui
+
+namespace gh::ui {
+
+// A preset holds the sampling parameters and load options, not what the picture is about: no prompt, seed or model.
+void GenerateTab::savePreset() {
+    bool ok = false;
+    const QString name = QInputDialog::getText(this, tr("Save preset"), tr("Name of the preset (letters, digits, space, - _ .):"), QLineEdit::Normal, QString(), &ok).trimmed();
+    if (!ok || name.isEmpty()) return;
+    if (!gh::presets::validPresetName(s(name))) {
+        status_->setText(tr("\"%1\" is not a usable preset name.").arg(name));
+        return;
+    }
+    const auto call = currentCall();
+    gh::presets::Preset preset;
+    preset.name = s(name);
+    preset.request = call.request;
+    for (const char* key : {"prompt", "seed", "batchCount", "strength", "loras"}) preset.request.erase(key);
+    preset.load = call.loadOptions;
+    try {
+        host_.presets().save(preset);
+        refreshLists();
+        preset_->setCurrentIndex(std::max(0, preset_->findData(name)));
+        status_->setText(tr("Preset \"%1\" saved.").arg(name));
+    } catch (const std::exception& e) {
+        status_->setText(tr("Could not save the preset: %1").arg(q(e.what())));
+    }
+}
+
+void GenerateTab::importPreset() {
+    const QString file = QFileDialog::getOpenFileName(this, tr("Import preset"), QString(), tr("Preset files (*.json)"));
+    if (file.isEmpty()) return;
+    try {
+        const std::string name = host_.presets().importFile(std::filesystem::path(file.toStdWString()));
+        refreshLists();
+        preset_->setCurrentIndex(std::max(0, preset_->findData(q(name))));
+        status_->setText(tr("Preset \"%1\" imported.").arg(q(name)));
+    } catch (const std::exception& e) {
+        status_->setText(tr("Could not import the preset: %1").arg(q(e.what())));
+    }
+}
+
+void GenerateTab::exportPreset() {
+    const QString name = preset_->currentData().toString();
+    if (name.isEmpty()) {
+        status_->setText(tr("Select a preset to export first."));
+        return;
+    }
+    const QString file = QFileDialog::getSaveFileName(this, tr("Export preset"), name + QStringLiteral(".json"), tr("Preset files (*.json)"));
+    if (file.isEmpty()) return;
+    try {
+        host_.presets().exportFile(s(name), std::filesystem::path(file.toStdWString()));
+        status_->setText(tr("Preset \"%1\" exported.").arg(name));
+    } catch (const std::exception& e) {
+        status_->setText(tr("Could not export the preset: %1").arg(q(e.what())));
+    }
+}
+
+void GenerateTab::deletePreset() {
+    const QString name = preset_->currentData().toString();
+    if (name.isEmpty()) return;
+    if (QMessageBox::question(this, tr("Delete preset"), tr("Delete the preset \"%1\"?").arg(name)) != QMessageBox::Yes) return;
+    host_.presets().remove(s(name));
+    refreshLists();
 }
 
 }  // namespace gh::ui

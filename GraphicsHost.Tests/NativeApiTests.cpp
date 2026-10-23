@@ -316,3 +316,18 @@ TEST_CASE("native: the request log and /metrics", "[integration][api][native][me
     CHECK(c.Get("/api/v1/requests", asReader)->status == 403);
     CHECK(c.Get("/metrics", asReader)->status == 200);
 }
+
+TEST_CASE("native: hardware usage is a reading of this computer", "[integration][api][native][monitor]") {
+    GenApp g;
+    auto c = g.client();
+    c.Get("/api/v1/hardware/usage");   // the first reading has no CPU delta yet
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    const json u = test::bodyJson(c.Get("/api/v1/hardware/usage"));
+    CHECK(u["cpuPercent"].get<double>() >= 0.0);
+    CHECK(u["cpuPercent"].get<double>() <= 100.0);
+    CHECK(u["ramTotalBytes"].get<uint64_t>() > 0);
+    CHECK(u["ramUsedBytes"].get<uint64_t>() <= u["ramTotalBytes"].get<uint64_t>());
+    // the GPU numbers come from performance counters that not every machine has: null, or sensible
+    if (!u["gpuPercent"].is_null()) { CHECK(u["gpuPercent"].get<double>() >= 0.0); CHECK(u["gpuPercent"].get<double>() <= 100.0); }
+    if (!u["vramUsedBytes"].is_null()) CHECK(u["vramUsedBytes"].get<uint64_t>() < (uint64_t{1} << 40));
+}

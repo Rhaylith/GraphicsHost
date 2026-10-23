@@ -242,6 +242,49 @@ $('g-cancel').addEventListener('click', async () => {
 
 loaders.generate = loadGenerate;
 
+// ---- presets: save, export, import, delete ---------------------------------------------------------------------
+$('p-save').addEventListener('click', async () => {
+  const name = (prompt('Name of the preset (letters, digits, space, - _ .):') || '').trim();
+  if (!name) return;
+  try {
+    const form = await readForm();
+    const request = { ...form };
+    for (const key of ['model', 'preset', 'prompt', 'seed', 'batchCount', 'strength', 'loras', 'init_image', 'init_image_gallery_id']) delete request[key];
+    await api('/api/v1/presets/' + encodeURIComponent(name), { method: 'PUT', body: { request } });
+    await loadGenerate();
+    $('g-preset').value = name;
+    say($('g-status'), `Preset "${name}" saved.`);
+  } catch (e) { say($('g-status'), e.message, 'error'); }
+});
+$('p-export').addEventListener('click', async () => {
+  const name = $('g-preset').value;
+  if (!name) return say($('g-status'), 'Select a preset to export first.', 'error');
+  try {
+    const preset = await api('/api/v1/presets/' + encodeURIComponent(name));
+    const a = h('a', { href: URL.createObjectURL(new Blob([JSON.stringify(preset, null, 2)], { type: 'application/json' })), download: name + '.json' });
+    a.click(); URL.revokeObjectURL(a.href);
+  } catch (e) { say($('g-status'), e.message, 'error'); }
+});
+$('p-import').addEventListener('click', () => $('p-file').click());
+$('p-file').addEventListener('change', async () => {
+  const file = $('p-file').files[0];
+  if (!file) return;
+  try {
+    const doc = JSON.parse(await file.text());
+    const name = (doc.name || file.name.replace(/\.json$/i, '')).trim();
+    await api('/api/v1/presets/' + encodeURIComponent(name), { method: 'PUT', body: { description: doc.description || '', request: doc.request || {}, load: doc.load || {} } });
+    await loadGenerate();
+    $('g-preset').value = name;
+    say($('g-status'), `Preset "${name}" imported.`);
+  } catch (e) { say($('g-status'), 'Could not import the preset: ' + e.message, 'error'); }
+  $('p-file').value = '';
+});
+$('p-delete').addEventListener('click', async () => {
+  const name = $('g-preset').value;
+  if (!name || !confirm(`Delete the preset "${name}"?`)) return;
+  try { await api('/api/v1/presets/' + encodeURIComponent(name), { method: 'DELETE' }); await loadGenerate(); } catch (e) { say($('g-status'), e.message, 'error'); }
+});
+
 // ---- image to image: the source picture -----------------------------------------------------------------------
 function setSourceNote() {
   const file = $('g-source').files[0];

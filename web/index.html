@@ -26,7 +26,10 @@
       <div class="split">
         <form id="gen-form" class="panel params" autocomplete="off">
           <label>Model <select id="g-model"></select></label>
-          <label>Preset <select id="g-preset"></select></label>
+          <label>Preset <select id="g-preset"></select>
+            <span class="row" style="margin-top:4px"><button type="button" class="small" id="p-save">Save these settings…</button><button type="button" class="small" id="p-export">Export</button><button type="button" class="small" id="p-import">Import…</button><button type="button" class="small danger" id="p-delete">Delete</button></span>
+            <input id="p-file" type="file" accept=".json,application/json" hidden>
+          </label>
           <label>Prompt <textarea id="g-prompt" rows="4" placeholder="Describe the image…"></textarea></label>
           <label>Negative prompt <textarea id="g-negative" rows="2" placeholder="What to keep out"></textarea></label>
           <label>LoRAs <input id="g-loras" type="text" list="g-lora-list" placeholder="name:0.8, other  (or &lt;lora:name:0.8&gt; in the prompt)"><datalist id="g-lora-list"></datalist></label>

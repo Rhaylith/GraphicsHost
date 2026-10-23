@@ -79,7 +79,7 @@ model family (SD 1.x against SDXL) is refused. The gallery records the LoRAs of 
 
 | Route | Permission | Notes |
 |---|---|---|
-| `GET status`, `GET hardware`, `GET parameters` | read | state, CPU/GPU/runtimes, the names and limits a request may use |
+| `GET status`, `GET hardware`, `GET hardware/usage`, `GET parameters` | read | state, CPU/GPU/runtimes, a live reading of CPU, RAM, GPU load and video memory (GPU numbers are `null` without Windows performance counters), the names and limits a request may use |
 | `GET settings`, `PUT settings` | read, admin | `PUT` takes a partial document; `restartRequired` is set for port/LAN changes |
 | `GET logs?limit=&level=` | read | newest last |
 | `GET requests?limit=`, `GET /metrics` | admin, read | request log (no query strings kept); Prometheus text |

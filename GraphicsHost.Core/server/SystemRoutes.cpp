@@ -56,6 +56,17 @@ void registerSystemRoutes(httplib::Server& server, RouteContext& ctx) {
                        {"memory", {{"totalBytes", memory.totalBytes}, {"freeBytes", memory.freeBytes}}}});
     });
 
+    // How busy the computer is right now (poll about once a second; CPU load is measured between two polls).
+    server.Get("/api/v1/hardware/usage", [&ctx](const httplib::Request& req, httplib::Response& res) {
+        if (!authorize(ctx, req, res, "read")) return;
+        const host::HardwareUsage u = ctx.host.monitor().sample();
+        sendJson(res, {{"cpuPercent", u.cpuPercent},
+                       {"ramUsedBytes", u.ramUsedBytes},
+                       {"ramTotalBytes", u.ramTotalBytes},
+                       {"gpuPercent", u.gpuPercent ? Json(*u.gpuPercent) : Json(nullptr)},
+                       {"vramUsedBytes", u.vramUsedBytes ? Json(*u.vramUsedBytes) : Json(nullptr)}});
+    });
+
     // What a client may put into a generation request: the names it can choose from and the limits.
     server.Get("/api/v1/parameters", [&ctx](const httplib::Request& req, httplib::Response& res) {
         if (!authorize(ctx, req, res, "read")) return;

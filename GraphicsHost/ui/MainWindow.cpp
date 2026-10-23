@@ -5,6 +5,7 @@
 #include "GenerateTab.h"
 #include "ModelsTab.h"
 #include "LogsTab.h"
+#include "MonitorTab.h"
 #include "SettingsTab.h"
 #include "UiUtil.h"
 #include "core/Log.h"
@@ -95,6 +96,7 @@ void MainWindow::buildTabs() {
         generate_->refreshLists();
         refreshStatus();
     });
+    tabs_->addTab(new MonitorTab(host_, tabs_), tr("Monitor"));
     tabs_->addTab(new LogsTab(host_, tabs_), tr("Logs"));
 }
 
