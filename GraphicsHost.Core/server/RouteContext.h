@@ -26,5 +26,9 @@ bool authorize(RouteContext& ctx, const httplib::Request& req, httplib::Response
 
 void registerTokenRoutes(httplib::Server& server, RouteContext& ctx);
 void registerOpenAiRoutes(httplib::Server& server, RouteContext& ctx);
+void registerJobRoutes(httplib::Server& server, RouteContext& ctx);
+void registerGalleryRoutes(httplib::Server& server, RouteContext& ctx);
+void registerModelRoutes(httplib::Server& server, RouteContext& ctx);
+void registerSystemRoutes(httplib::Server& server, RouteContext& ctx);
 
 }  // namespace gh::server

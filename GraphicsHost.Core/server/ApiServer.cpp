@@ -80,6 +80,10 @@ std::string ApiServer::start(const ServerOptions& o) {
 
     registerTokenRoutes(s, impl_->ctx);
     registerOpenAiRoutes(s, impl_->ctx);
+    registerJobRoutes(s, impl_->ctx);
+    registerGalleryRoutes(s, impl_->ctx);
+    registerModelRoutes(s, impl_->ctx);
+    registerSystemRoutes(s, impl_->ctx);
 
     // the browser UI
     fs::path web = o.webRoot.empty() ? core::AppPaths::executableDir() / "web" : o.webRoot;

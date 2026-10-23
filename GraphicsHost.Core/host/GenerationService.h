@@ -50,6 +50,9 @@ public:
     // model, nothing loaded), OutOfMemory (does not fit), Failed (busy with another model), LoadFailed.
     Submission submit(const GenerateCall& call);
 
+    // Resolves, checks and loads the model like submit() does, without generating (result.job stays empty).
+    Submission loadModel(const GenerateCall& call);
+
     // The gallery entries of a job once it has succeeded; empty before that or when it was not stored.
     std::vector<gallery::GalleryEntry> entries(uint64_t jobId) const;
 
@@ -60,6 +63,13 @@ public:
 
 private:
     void onJob(const engine::Job& job);
+
+    struct Prepared {
+        Submission submission;
+        engine::GenerationRequest request;
+        engine::LoadOptions load;
+    };
+    Prepared prepare(const GenerateCall& call);
 
     AppHost& host_;
     mutable std::mutex mutex_;

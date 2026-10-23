@@ -360,7 +360,8 @@ Goal: retire the biggest risk (§10) before any application code exists.
 - [x] 4.2 Auth: API tokens (hashed, permissions), localhost-only default, `--lan` flag (M) — `server/TokenStore` (SHA-256 only, shown once, 256-bit secrets, constant-time compare, lastUsed throttled), `server/Auth` (decision table: token judged by its permissions; no token = this computer only and only while `server.requireToken` is off; LAN listening refused until a token exists), routes `whoami`/`tokens`, CLI `token create|list|revoke`, `x-api-key` accepted too; 9 test cases
 - [x] 4.3 OpenAI endpoints: `/v1/images/generations`, `/v1/images/edits` (501 until 5.2), `/v1/models` (M)
   - `GenerationService` (JIT load, defaults < preset < request layering, fit check, gallery storage) is shared by every front end; `AppHost::overrideEngine` lets tests plug in a fake engine. Hanging up cancels the job. Default `response_format` is `b64_json`; `store:false` skips the gallery.
-- [ ] 4.4 Native `/api/v1`: generate + job poll/stream/cancel, models load/unload, downloads, discover, gallery, outputs (L)
+- [x] 4.4 Native `/api/v1`: generate + job poll/stream/cancel, models load/unload, downloads, discover, gallery, outputs (L)
+  - Routes: status, hardware, settings (PUT = admin, partial merge), logs, models (+load/unload/get), defaults, presets, catalog, hub/search, hub/files, downloads (+pause/resume/cancel), updates, generate, jobs (+cancel, SSE events), gallery (+image, thumbnail), `/outputs/...` (images only, never the index). Permissions: read / generate / manage / admin.
 - [ ] 4.5 Request log, `/api/requests`, `/metrics` (S)
 - [ ] 4.6 Qt shell: main window, tabs, tray icon, single instance, window-state memory, services → view-model wiring (M)
 - [ ] 4.7 Qt **Generate** tab: prompt boxes, parameter panel with interface-mode gating, model/device picker, live progress and preview, results, context menus (L)

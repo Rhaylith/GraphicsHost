@@ -41,8 +41,9 @@ GenerationCounters GenerationService::counters() const {
     return counters_;
 }
 
-Submission GenerationService::submit(const GenerateCall& call) {
-    Submission result;
+GenerationService::Prepared GenerationService::prepare(const GenerateCall& call) {
+    Prepared prep;
+    Submission& result = prep.submission;
     engine::ModelManager& manager = host_.models();
 
     // 1. which model
@@ -139,10 +140,26 @@ Submission GenerationService::submit(const GenerateCall& call) {
             result.notes.push_back(fit.summary);
         }
     }
+    prep.request = request;
+    prep.load = load;
+    return prep;
+}
 
-    // 4. load (just in time) and queue
-    manager.load(load);
-    result.job = manager.submit(request);
+Submission GenerationService::loadModel(const GenerateCall& call) {
+    GenerateCall withPrompt = call;   // only the load options matter; the request must still validate
+    if (!withPrompt.request.contains("prompt")) withPrompt.request["prompt"] = "load";
+    Prepared prep = prepare(withPrompt);
+    host_.models().load(prep.load);
+    return prep.submission;
+}
+
+Submission GenerationService::submit(const GenerateCall& call) {
+    Prepared prep = prepare(call);
+    Submission& result = prep.submission;
+    engine::ModelManager& manager = host_.models();
+    // load just in time, then queue
+    manager.load(prep.load);
+    result.job = manager.submit(prep.request);
     {
         std::lock_guard<std::mutex> lock(mutex_);
         wantsGallery_[result.job->id()] = call.addToGallery;
