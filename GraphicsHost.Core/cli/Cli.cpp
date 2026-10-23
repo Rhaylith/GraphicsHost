@@ -322,6 +322,11 @@ int run(int argc, char** argv, std::ostream& out, std::ostream& err, std::option
     auto* logoutCmd = app.add_subcommand("logout", "remove the stored Hugging Face token");
     auto* whoamiCmd = app.add_subcommand("whoami", "the Hugging Face user of the stored token");
 
+    auto* serveCmd = app.add_subcommand("serve", "run the HTTP server (API and browser UI) in this console, without a window");
+    int servePort = -1;
+    std::string serveBind;
+    serveCmd->add_option("--port", servePort, "port (default: the server.port setting; 0 = any free port)");
+    serveCmd->add_option("--bind", serveBind, "address to listen on (default 127.0.0.1, or 0.0.0.0 with the lan setting)");
     auto* tokenCmd = app.add_subcommand("token", "API access tokens for the HTTP server");
     std::string tokenAction = "list", tokenPerms;
     std::vector<std::string> tokenArgs;
@@ -361,6 +366,7 @@ int run(int argc, char** argv, std::ostream& out, std::ostream& err, std::option
             return cmdConfig(host, configAction, configArgs, json, out, err);
         }
         if (logoutCmd->parsed()) return runLogout(json, out, err);
+        if (serveCmd->parsed()) return runServe(host, servePort, serveBind, json, out, err);
         if (tokenCmd->parsed()) return runToken(host, tokenAction, tokenArgs, tokenPerms, json, out, err);
         if (catalogCmd->parsed()) return runCatalog(host, catalogText, catalogFamily, catalogKind, json, out, err);
         if (searchCmd->parsed()) return runSearch(host, searchText, searchLimit, json, out, err);

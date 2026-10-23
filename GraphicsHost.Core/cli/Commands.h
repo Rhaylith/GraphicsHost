@@ -63,6 +63,11 @@ int runLogout(bool json, std::ostream& out, std::ostream& err);
 int runWhoami(host::AppHost& host, bool json, std::ostream& out, std::ostream& err);
 
 
+// serve [--port N] [--bind ADDRESS]: runs the HTTP server in this console until Ctrl+C (headless; no window)
+int runServe(host::AppHost& host, int port, const std::string& bind, bool json, std::ostream& out, std::ostream& err);
+// Ends a running `serve` (what Ctrl+C does); for tests and for the process to call on shutdown.
+void requestServeStop();
+
 // token create NAME [--perm ...] | list | revoke ID_OR_NAME  (API access tokens)
 int runToken(host::AppHost& host, const std::string& action, const std::vector<std::string>& args,
              const std::string& permissions, bool json, std::ostream& out, std::ostream& err);

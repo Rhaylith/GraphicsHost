@@ -369,7 +369,8 @@ Goal: retire the biggest risk (§10) before any application code exists.
   - Auto fields show the model default ("Auto (512)"); the load checkboxes are tri-state (partly filled = the model default). Loading runs off the UI thread. Checked with `tools/ui-shots.ps1`-style runs: `--screenshot-dir <dir> --generate-prompt <text>` generates a small image first (needs a model in the data folder).
 - [x] 4.8 Qt **My Models** and **Discover** tabs, download queue (L)
   - My Models: table of the folder (watcher + rescan), load/unload (off the UI thread), defaults editor, delete, open folder. Discover: catalog with fit hints, Hugging Face search + file list, a confirmation with the plan before anything downloads, a download queue with pause/resume/cancel. The Hugging Face client is built in one place now (`makeConfiguredHub`). Load and download clicks were not driven by an automated UI test; the services behind them are covered by the API and model-service tests.
-- [ ] 4.9 Qt **Settings** tab (server, tokens, runtime/backend, GPU device, models folder) and **Logs** tab (M)
+- [x] 4.9 Qt **Settings** tab (server, tokens, runtime/backend, GPU device, models folder, Hugging Face token) and **Logs** tab; CLI `serve` verb (M)
+  - Applying settings restarts the server and re-reads the interface mode; a changed backend now drops the loaded model and engine (`AppHost::updateSettings`). `graphicshost serve [--port N] [--bind ADDR]` runs the same server headless. The token dialogs and the Hugging Face login in the UI were not driven by an automated check (they would touch the real credential store).
 - [ ] 4.10 Browser UI: embedded static files served at `/`, with Generate, Gallery, My Models, Discover and Settings against `/api/v1` (L)
 - [ ] 4.11 API contract tests (server on an ephemeral port) and UI smoke checks (M)
 

@@ -64,10 +64,27 @@ const engine::RuntimeCandidate* AppHost::selectedRuntime() const {
 
 void AppHost::updateSettings(core::Settings settings) {
     store_.save(settings);  // validates first
+    const engine::RuntimeCandidate* before = selectedRuntime();
+    const std::string runtimeBefore = before ? before->id : std::string();
     settings_ = std::move(settings);
     library_.setFolders({modelsDir()});
     log::setLevel(settings_.logging.level);
     log::info("settings saved");
+
+    // another runtime (backend setting) needs another engine: drop the loaded one; it is created again on next use
+    const engine::RuntimeCandidate* after = selectedRuntime();
+    if ((after ? after->id : std::string()) != runtimeBefore) {
+        std::lock_guard<std::mutex> lock(serviceMutex_);
+        if (models_ && models_->queue().active() == 0) {
+            models_->unload();
+            engine_.reset();
+            log::info("runtime changed to " + (after ? after->id : std::string("(none)")) + ": the loaded model was unloaded");
+        } else if (models_) {
+            log::warn("the runtime setting changed while a generation is queued: it applies after a restart");
+        } else {
+            engine_.reset();
+        }
+    }
 }
 
 std::unique_ptr<engine::Runtime> AppHost::loadSelectedRuntime(std::string& error) const {

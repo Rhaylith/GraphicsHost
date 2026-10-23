@@ -3,6 +3,8 @@
 #include "DiscoverTab.h"
 #include "GenerateTab.h"
 #include "ModelsTab.h"
+#include "LogsTab.h"
+#include "SettingsTab.h"
 #include "UiUtil.h"
 #include "core/Log.h"
 #include "host/AppHost.h"
@@ -79,8 +81,15 @@ void MainWindow::buildTabs() {
     connect(models, &ModelsTab::modelsChanged, generate_, &GenerateTab::refreshLists);
     connect(discover, &DiscoverTab::modelsChanged, generate_, &GenerateTab::refreshLists);
     connect(discover, &DiscoverTab::modelsChanged, models, &ModelsTab::refresh);
-    placeholder(tr("Settings"), tr("Settings arrive in step 4.9."));
-    placeholder(tr("Logs"), tr("The log arrives in step 4.9."));
+    auto* settings = new SettingsTab(host_, tabs_);
+    tabs_->addTab(settings, tr("Settings"));
+    connect(settings, &SettingsTab::applied, this, [this] {
+        serverError_ = applyServerSettings();
+        generate_->applyInterfaceMode();
+        generate_->refreshLists();
+        refreshStatus();
+    });
+    tabs_->addTab(new LogsTab(host_, tabs_), tr("Logs"));
 }
 
 void MainWindow::buildTray() {

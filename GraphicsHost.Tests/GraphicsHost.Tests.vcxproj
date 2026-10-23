@@ -71,6 +71,7 @@
     <ClCompile Include="AuthTests.cpp" />
     <ClCompile Include="OpenAiApiTests.cpp" />
     <ClCompile Include="NativeApiTests.cpp" />
+    <ClCompile Include="CliServeTests.cpp" />
     <ClInclude Include="ApiTestUtil.h" />
     <ClInclude Include="TestHttpServer.h" />
     <ClInclude Include="SafetensorsFixture.h" />
