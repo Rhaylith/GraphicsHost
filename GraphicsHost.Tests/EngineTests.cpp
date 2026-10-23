@@ -5,6 +5,8 @@
 #include "engine/GpuDevices.h"
 #include "engine/RuntimeLoader.h"
 
+#include <windows.h>
+
 #include <catch2/catch_test_macros.hpp>
 
 using namespace gh::engine;
@@ -67,6 +69,8 @@ std::vector<RuntimeCandidate> allThree(const CpuFeatures& cpu, const GpuProbe& g
 TEST_CASE("cpu detection reports something sensible", "[unit][engine]") {
     const CpuFeatures c = detectCpuFeatures();
     CHECK(c.logicalCores > 0);
+    // counts every processor group, not just the 64 threads of the current one
+    CHECK(c.logicalCores == static_cast<int>(GetActiveProcessorCount(ALL_PROCESSOR_GROUPS)));
     CHECK_FALSE(c.vendor.empty());
     if (c.avx2) {
         CHECK(c.avx);  // AVX2 implies AVX

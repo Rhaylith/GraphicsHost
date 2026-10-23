@@ -55,3 +55,16 @@ build\bin\x64\Release\GraphicsHost.exe --json hardware          # CLI path of th
 build\bin\x64\Release\GraphicsHost.exe runtime info             # app loads the selected runtime
 build\bin\x64\Release\GraphicsHost.exe --smoke-test             # opens the Qt window and exits (QT_QPA_PLATFORM=offscreen is fine)
 ```
+
+### Update 2026-10-23: blocks resolved, GPU works
+
+After the build output was allowed or signed (done by the machine's owner), the owed verification ran:
+
+* `GraphicsHost.Tests.exe` (all tags): 39 test cases, 167 assertions, all pass; the `[integration]` cases load a real runtime DLL.
+* `GraphicsHost.exe hardware`, `--json hardware`, `runtime info`: work; `--smoke-test` exits 0 (offscreen and Windows platform).
+* The RX 7900 XTX now initialises in Vulkan: `ggml_vulkan: 0 = AMD Radeon RX 7900 XTX (AMD proprietary driver) ... matrix cores: KHR_coopmat`.
+  `backend = auto` therefore selects the Vulkan runtime. The Phase 0 GPU timings (SD1.5, SDXL) can now be measured.
+* Found and fixed by this run: `hardware` showed 64 logical cores on the 192-thread CPU (`GetSystemInfo` counts one
+  processor group only); it now uses `GetActiveProcessorCount(ALL_PROCESSOR_GROUPS)`, with a test.
+
+If a future build is blocked again, the notes above still apply: do not work around the policy, ask the machine's owner.

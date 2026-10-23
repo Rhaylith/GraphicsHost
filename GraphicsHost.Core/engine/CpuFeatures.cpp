@@ -25,9 +25,13 @@ bool bit(int value, int index) {
 
 CpuFeatures detectCpuFeatures() {
     CpuFeatures f;
-    SYSTEM_INFO info{};
-    GetSystemInfo(&info);
-    f.logicalCores = static_cast<int>(info.dwNumberOfProcessors);
+    // GetSystemInfo only counts the current processor group (at most 64 threads); big CPUs have several groups.
+    f.logicalCores = static_cast<int>(GetActiveProcessorCount(ALL_PROCESSOR_GROUPS));
+    if (f.logicalCores <= 0) {
+        SYSTEM_INFO info{};
+        GetSystemInfo(&info);
+        f.logicalCores = static_cast<int>(info.dwNumberOfProcessors);
+    }
 
     const auto leaf0 = cpuid(0);
     const int maxLeaf = leaf0[0];

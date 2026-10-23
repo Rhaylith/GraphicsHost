@@ -43,3 +43,5 @@ before step 0.7 can measure Vulkan.
 Memory/VRAM figures for the GPU runs are still missing for the same reason.
 
 Phase 0 closed as CPU-verified (user decision): GPU measurements are skipped for now. Open item: run `spike-vulkan` on a working RX 7900 XTX and fill in the table above.
+
+**Update 2026-10-23:** the RX 7900 XTX now initialises in Vulkan (`runtime info` lists `Vulkan0 AMD Radeon RX 7900 XTX`), so the GPU rows above can be measured with `spike-vulkan.exe`; not done yet.
