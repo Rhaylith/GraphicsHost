@@ -1,5 +1,6 @@
 #include "cli/Cli.h"
 
+#include "cli/Commands.h"
 #include "core/Version.h"
 #include "host/AppHost.h"
 
@@ -141,32 +142,6 @@ Json::json_pointer pointerFor(const std::string& dotted) {
     return Json::json_pointer(p);
 }
 
-bool coerce(const Json& current, const std::string& text, Json& out, std::string& problem) {
-    try {
-        if (current.is_boolean()) {
-            if (text == "true" || text == "1" || text == "on" || text == "yes") out = true;
-            else if (text == "false" || text == "0" || text == "off" || text == "no") out = false;
-            else {
-                problem = "expected true or false";
-                return false;
-            }
-        } else if (current.is_number_integer()) {
-            size_t used = 0;
-            const int value = std::stoi(text, &used);
-            if (used != text.size()) {
-                problem = "expected a whole number";
-                return false;
-            }
-            out = value;
-        } else {
-            out = text;
-        }
-        return true;
-    } catch (const std::exception&) {
-        problem = "expected a whole number";
-        return false;
-    }
-}
 
 int cmdConfig(host::AppHost& host, const std::string& action, const std::vector<std::string>& args, bool json,
               std::ostream& out, std::ostream& err) {
@@ -204,7 +179,7 @@ int cmdConfig(host::AppHost& host, const std::string& action, const std::vector<
         }
         Json value;
         std::string problem;
-        if (!coerce(document[pointer], args[1], value, problem)) {
+        if (!coerceJsonValue(document[pointer], args[1], value, problem)) {
             err << "error: " << args[0] << ": " << problem << "\n";
             return kUsage;
         }
@@ -284,6 +259,67 @@ int run(int argc, char** argv, std::ostream& out, std::ostream& err, std::option
     config->add_option("args", configArgs, "for set: <key> <value>");
     app.add_subcommand("gui", "open the desktop window");
 
+    bool quiet = false;
+    app.add_flag("-q,--quiet", quiet, "no progress or notes on stderr");
+
+    // gen: only the options the user actually gives become part of the request, so presets and model defaults can fill the rest
+    auto* gen = app.add_subcommand("gen", "generate images from a prompt");
+    GenInvocation inv;
+    std::string size, sampler, scheduler, negative, format, device, vae;
+    int steps = 0, batch = 1, clipSkip = -1, threads = 0;
+    int64_t seed = -1;
+    double cfg = 0;
+    bool vaeTiling = false, noMetadata = false, offload = false, flashAttn = false, clipOnCpu = false, vaeOnCpu = false;
+    gen->add_option("prompt", inv.prompt, "what to draw")->required();
+    gen->add_option("-m,--model", inv.model, "checkpoint file, or a name in the models folder (see: ls)");
+    gen->add_option("--preset", inv.preset, "named parameter set (see: preset list)");
+    auto* oSize = gen->add_option("--size", size, "WIDTHxHEIGHT, multiples of 8");
+    auto* oSteps = gen->add_option("-s,--steps", steps, "sampling steps");
+    auto* oCfg = gen->add_option("--cfg", cfg, "guidance scale");
+    auto* oSeed = gen->add_option("--seed", seed, "-1 = random (the real seed is always reported)");
+    auto* oNeg = gen->add_option("-n,--negative", negative, "negative prompt");
+    auto* oBatch = gen->add_option("-b,--batch", batch, "number of images");
+    auto* oSampler = gen->add_option("--sampler", sampler, "euler_a, dpm++2m, ...");
+    auto* oScheduler = gen->add_option("--scheduler", scheduler, "karras, discrete, ...");
+    auto* oClip = gen->add_option("--clip-skip", clipSkip, "CLIP layers to skip");
+    auto* oFormat = gen->add_option("--format", format, "png | jpeg | webp");
+    auto* fTiling = gen->add_flag("--vae-tiling", vaeTiling, "decode in tiles: slower, uses much less memory");
+    auto* fNoMeta = gen->add_flag("--no-metadata", noMetadata, "do not write the parameters into the image file");
+    auto* oDevice = gen->add_option("--device", device, "auto | cpu | vulkan0");
+    auto* oThreads = gen->add_option("--threads", threads, "CPU threads, 0 = automatic");
+    auto* oVae = gen->add_option("--vae", vae, "separate VAE file");
+    auto* fOffload = gen->add_flag("--offload", offload, "keep the weights in RAM (low GPU memory)");
+    auto* fFlash = gen->add_flag("--flash-attn", flashAttn, "flash attention (much faster for SD 1.x above 512)");
+    auto* fClipCpu = gen->add_flag("--clip-on-cpu", clipOnCpu, "run the text encoder on the CPU");
+    auto* fVaeCpu = gen->add_flag("--vae-on-cpu", vaeOnCpu, "run the VAE on the CPU");
+    gen->add_option("-o,--out", inv.outPath, "write the image(s) here: a file (one image) or a folder");
+    gen->add_option("--quality", inv.quality, "JPEG / lossy WebP quality 1-100")->capture_default_str();
+    gen->add_flag("--dry-run", inv.dryRun, "show the resolved parameters and the memory estimate, do not generate");
+    gen->add_flag("--no-gallery", inv.noGallery, "do not add the images to the gallery");
+    gen->add_flag("--no-fit-check", inv.noFitCheck, "skip the memory estimate and its automatic adjustments");
+
+    auto* ls = app.add_subcommand("ls", "list the checkpoints in the models folder");
+
+    auto* preset = app.add_subcommand("preset", "named parameter sets");
+    std::string presetAction = "list";
+    std::vector<std::string> presetArgs;
+    preset->add_option("action", presetAction, "list | show | set | delete | import | export")->capture_default_str();
+    preset->add_option("args", presetArgs, "arguments of the action");
+
+    auto* defaults = app.add_subcommand("defaults", "default parameters per checkpoint file");
+    std::string defaultsAction = "list";
+    std::vector<std::string> defaultsArgs;
+    defaults->add_option("action", defaultsAction, "list | show | set | clear")->capture_default_str();
+    defaults->add_option("args", defaultsArgs, "arguments of the action");
+
+    auto* galleryCmd = app.add_subcommand("gallery", "the images generated so far");
+    std::string galleryAction = "list";
+    std::vector<std::string> galleryArgs;
+    int galleryLimit = 20;
+    galleryCmd->add_option("action", galleryAction, "list | show | rm | rescan")->capture_default_str();
+    galleryCmd->add_option("args", galleryArgs, "list: text to search for; show, rm: the image id");
+    galleryCmd->add_option("--limit", galleryLimit, "list: how many")->capture_default_str();
+
     try {
         app.parse(argc, argv);
     } catch (const CLI::ParseError& e) {
@@ -314,6 +350,51 @@ int run(int argc, char** argv, std::ostream& out, std::ostream& err, std::option
         }
         if (config->parsed()) {
             return cmdConfig(host, configAction, configArgs, json, out, err);
+        }
+        if (ls->parsed()) {
+            return runLs(host, json, out, err);
+        }
+        if (preset->parsed()) {
+            return runPreset(host, presetAction, presetArgs, json, out, err);
+        }
+        if (defaults->parsed()) {
+            return runDefaults(host, defaultsAction, defaultsArgs, json, out, err);
+        }
+        if (galleryCmd->parsed()) {
+            return runGallery(host, galleryAction, galleryArgs, galleryLimit, json, out, err);
+        }
+        if (gen->parsed()) {
+            auto given = [](CLI::Option* o) { return o->count() > 0; };
+            if (given(oSize)) {
+                int w = 0, h = 0;
+                char x = 0;
+                std::istringstream parts(size);
+                if (!(parts >> w >> x >> h) || (x != 'x' && x != 'X')) {
+                    err << "error: --size must look like 512x768\n";
+                    return kUsage;
+                }
+                inv.request["width"] = w;
+                inv.request["height"] = h;
+            }
+            if (given(oSteps)) inv.request["steps"] = steps;
+            if (given(oCfg)) inv.request["cfgScale"] = cfg;
+            if (given(oSeed)) inv.request["seed"] = seed;
+            if (given(oNeg)) inv.request["negativePrompt"] = negative;
+            if (given(oBatch)) inv.request["batchCount"] = batch;
+            if (given(oSampler)) inv.request["sampler"] = sampler;
+            if (given(oScheduler)) inv.request["scheduler"] = scheduler;
+            if (given(oClip)) inv.request["clipSkip"] = clipSkip;
+            if (given(oFormat)) inv.request["format"] = format;
+            if (given(fTiling)) inv.request["vaeTiling"] = true;
+            if (given(fNoMeta)) inv.request["embedMetadata"] = false;
+            if (given(oDevice)) inv.load["device"] = device;
+            if (given(oThreads)) inv.load["threads"] = threads;
+            if (given(oVae)) inv.load["vaePath"] = vae;
+            if (given(fOffload)) inv.load["offloadParamsToCpu"] = true;
+            if (given(fFlash)) inv.load["flashAttention"] = true;
+            if (given(fClipCpu)) inv.load["clipOnCpu"] = true;
+            if (given(fVaeCpu)) inv.load["vaeOnCpu"] = true;
+            return runGen(host, inv, json, quiet, out, err);
         }
     } catch (const std::exception& e) {
         err << "error: " << e.what() << "\n";

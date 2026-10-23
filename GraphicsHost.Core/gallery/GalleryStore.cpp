@@ -138,7 +138,7 @@ void GalleryStore::exec(const char* sql) const {
 }
 
 fs::path GalleryStore::absolutePath(const GalleryEntry& entry) const {
-    return pathFromRelative(root_, entry.path);
+    return pathFromRelative(root_, entry.path).make_preferred();
 }
 
 GalleryEntry GalleryStore::fromRow(void* statement) const {

@@ -52,6 +52,9 @@ void on_progress(int step, int steps, float seconds, void*) {
     }
 }
 
+// The engine prints its own progress bar to stderr when no callback is set; this keeps it quiet between calls.
+void ignore_progress(int, int, float, void*) {}
+
 void on_log(sd_log_level_t level, const char* text, void*) {
     gh_log_fn fn = nullptr;
     void* user = nullptr;
@@ -154,6 +157,7 @@ GH_API gh_model* gh_load(const gh_load_params* params) {
         }
         cp.flash_attn = params->flash_attention != 0;
 
+        sd_set_progress_callback(ignore_progress, nullptr);
         sd_ctx_t* ctx = new_sd_ctx(&cp);
         if (!ctx) {
             fail(GH_ERR_LOAD_FAILED, std::string("failed to load model: ") + params->model_path);
@@ -237,7 +241,7 @@ GH_API int32_t gh_generate(gh_model* model, const gh_generate_params* params, gh
             g_progress = progress;
             g_progress_user = user;
         }
-        sd_set_progress_callback(progress ? on_progress : nullptr, nullptr);
+        sd_set_progress_callback(progress ? on_progress : ignore_progress, nullptr);
         sd_cancel_generation(model->ctx, SD_CANCEL_RESET);
 
         const auto t0 = std::chrono::steady_clock::now();

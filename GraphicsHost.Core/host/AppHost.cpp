@@ -7,7 +7,10 @@
 namespace gh::host {
 
 AppHost::AppHost(std::optional<std::filesystem::path> home)
-    : paths_(home ? core::AppPaths(*home) : core::AppPaths::fromEnvironment()), store_(paths_) {
+    : paths_(home ? core::AppPaths(*home) : core::AppPaths::fromEnvironment()),
+      store_(paths_),
+      presets_(paths_.presetsDir()),
+      modelDefaults_(paths_.root() / "model-defaults.json") {
     paths_.ensureDirectories();
     core::LoadResult loaded = store_.load();
     settings_ = std::move(loaded.settings);
@@ -43,6 +46,9 @@ AppHost::AppHost(std::optional<std::filesystem::path> home)
 }
 
 AppHost::~AppHost() {
+    models_.reset();  // cancels running jobs, then frees the model
+    engine_.reset();
+    gallery_.reset();
     log::info("GraphicsHost stopping");
     log::shutdown();
 }
@@ -73,6 +79,56 @@ std::unique_ptr<engine::Runtime> AppHost::loadSelectedRuntime(std::string& error
         log::error(error);
     }
     return runtime;
+}
+
+}  // namespace gh::host
+
+namespace gh::host {
+
+std::filesystem::path AppHost::modelsDir() const {
+    return settings_.modelsDir.empty() ? paths_.defaultModelsDir() : std::filesystem::path(settings_.modelsDir);
+}
+
+std::shared_ptr<engine::IImageEngine> AppHost::engine(std::string* error) {
+    std::lock_guard<std::mutex> lock(serviceMutex_);
+    if (!engine_) {
+        std::string problem;
+        std::shared_ptr<engine::Runtime> runtime = loadSelectedRuntime(problem);
+        if (!runtime) {
+            engineError_ = problem;
+        } else {
+            engine_ = engine::makeRuntimeEngine(std::move(runtime));
+            engineError_.clear();
+        }
+    }
+    if (!engine_ && error) {
+        *error = engineError_;
+    }
+    return engine_;
+}
+
+engine::ModelManager& AppHost::models() {
+    std::lock_guard<std::mutex> lock(serviceMutex_);
+    if (!models_) {
+        models_ = std::make_unique<engine::ModelManager>([this] { return engine(); });
+    }
+    return *models_;
+}
+
+gallery::GalleryStore& AppHost::gallery() {
+    std::lock_guard<std::mutex> lock(serviceMutex_);
+    if (!gallery_) {
+        gallery_ = std::make_unique<gallery::GalleryStore>(paths_.outputsDir());
+    }
+    return *gallery_;
+}
+
+presets::PresetStore& AppHost::presets() {
+    return presets_;
+}
+
+presets::ModelDefaultsStore& AppHost::modelDefaults() {
+    return modelDefaults_;
 }
 
 }  // namespace gh::host

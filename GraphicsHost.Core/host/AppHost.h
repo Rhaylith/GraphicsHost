@@ -4,9 +4,14 @@
 #include "core/Settings.h"
 #include "engine/CpuFeatures.h"
 #include "engine/GpuDevices.h"
+#include "engine/ImageEngine.h"
+#include "engine/ModelManager.h"
 #include "engine/RuntimeLoader.h"
+#include "gallery/GalleryStore.h"
+#include "presets/PresetStore.h"
 
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <vector>
@@ -44,6 +49,19 @@ public:
     // on failure.
     std::unique_ptr<engine::Runtime> loadSelectedRuntime(std::string& error) const;
 
+    // The folder checkpoints are looked for in: settings.modelsDir, or <data folder>/models.
+    std::filesystem::path modelsDir() const;
+
+    // The inference engine over the selected runtime, loaded on first use and then kept. nullptr (and a message in error)
+    // when no runtime fits or it cannot be loaded.
+    std::shared_ptr<engine::IImageEngine> engine(std::string* error = nullptr);
+
+    // Services; created on first use except the stores, which are cheap.
+    engine::ModelManager& models();      // one loaded model, the job queue
+    gallery::GalleryStore& gallery();     // <data folder>/outputs
+    presets::PresetStore& presets();      // <data folder>/presets
+    presets::ModelDefaultsStore& modelDefaults();  // <data folder>/model-defaults.json
+
 private:
     core::AppPaths paths_;
     core::SettingsStore store_;
@@ -52,6 +70,14 @@ private:
     engine::CpuFeatures cpu_;
     engine::GpuProbe gpu_;
     std::vector<engine::RuntimeCandidate> runtimes_;
+
+    std::mutex serviceMutex_;
+    std::shared_ptr<engine::IImageEngine> engine_;
+    std::string engineError_;
+    std::unique_ptr<gallery::GalleryStore> gallery_;
+    presets::PresetStore presets_;
+    presets::ModelDefaultsStore modelDefaults_;
+    std::unique_ptr<engine::ModelManager> models_;
 };
 
 }  // namespace gh::host
