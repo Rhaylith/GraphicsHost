@@ -71,3 +71,32 @@ TEST_CASE("cli serve: a port that is taken is reported", "[integration][cli][ser
     CHECK(cli::run(static_cast<int>(argv.size()), argv.data(), out, err, home.path()) == 1);
     CHECK(err.str().find("is another program using the port") != std::string::npos);
 }
+
+namespace {
+int runWith(const test::TempDir& home, std::vector<std::string> args, std::string& out, std::string& err) {
+    args.insert(args.begin(), "graphicshost");
+    std::vector<char*> argv;
+    for (auto& a : args) argv.push_back(a.data());
+    std::ostringstream o, e;
+    const int code = cli::run(static_cast<int>(argv.size()), argv.data(), o, e, home.path());
+    out = o.str();
+    err = e.str();
+    return code;
+}
+}  // namespace
+
+TEST_CASE("cli service: status can be asked by anyone, and --service needs Windows to start it", "[unit][cli][serve]") {
+    test::TempDir home;
+    std::string out, err;
+    REQUIRE(runWith(home, {"--json", "service", "status"}, out, err) == 0);   // installed or not, it answers
+    const auto status = nlohmann::json::parse(out);
+    REQUIRE(status.contains("installed"));
+    if (status["installed"].get<bool>()) CHECK(status.contains("state"));
+
+    // started from a console, not by the service manager: refused at once, nothing is served
+    CHECK(runWith(home, {"serve", "--service"}, out, err) == 1);
+    CHECK(err.find("service") != std::string::npos);
+
+    CHECK(runWith(home, {"service", "bogus"}, out, err) == 2);
+    CHECK(err.find("usage") != std::string::npos);
+}

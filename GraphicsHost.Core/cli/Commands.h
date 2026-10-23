@@ -64,7 +64,9 @@ int runWhoami(host::AppHost& host, bool json, std::ostream& out, std::ostream& e
 
 
 // serve [--port N] [--bind ADDRESS]: runs the HTTP server in this console until Ctrl+C (headless; no window)
-int runServe(host::AppHost& host, int port, const std::string& bind, bool json, std::ostream& out, std::ostream& err);
+int runServe(host::AppHost& host, int port, const std::string& bind, bool asService, bool json, std::ostream& out, std::ostream& err);
+// service status | install | uninstall: the Windows service that runs `serve --service` (install and uninstall need administrator rights)
+int runService(host::AppHost& host, const std::string& action, bool json, std::ostream& out, std::ostream& err);
 // Ends a running `serve` (what Ctrl+C does); for tests and for the process to call on shutdown.
 void requestServeStop();
 

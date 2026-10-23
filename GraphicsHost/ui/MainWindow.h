@@ -3,6 +3,7 @@
 #include <QMainWindow>
 
 #include <memory>
+#include <set>
 
 class QLabel;
 class QSystemTrayIcon;
@@ -56,6 +57,7 @@ private:
     void buildTabs();
     void buildTray();
     void refreshStatus();
+    void notifyAboutProgress();
     void restoreWindowState();
     void saveWindowState();
     QString runtimeSummary() const;
@@ -72,6 +74,9 @@ private:
     QLabel* modelLabel_ = nullptr;
     bool reallyQuit_ = false;
     bool toldAboutTray_ = false;
+    bool notifyBaselined_ = false;
+    std::set<uint64_t> notifiedDownloads_;
+    uint64_t lastSucceeded_ = 0;
 };
 
 }  // namespace gh::ui

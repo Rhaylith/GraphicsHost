@@ -59,6 +59,7 @@ private:
     QSpinBox* rate_ = nullptr;
     QComboBox* logLevel_ = nullptr;
     QCheckBox* safety_ = nullptr;
+    QCheckBox* notifications_ = nullptr;
     QLabel* message_ = nullptr;
     QLabel* hubState_ = nullptr;
     QTableWidget* tokens_ = nullptr;

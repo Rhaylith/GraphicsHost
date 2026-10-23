@@ -43,6 +43,7 @@ struct Settings {
     bool firstRunDone = false;           // the first-run wizard has been shown
     std::string theme = "system";        // system|light|dark
     std::string accent;                  // "" = the default blue, or a colour such as #2b6cb0
+    bool notifications = true;           // tray messages when a download finishes or a generation completes in the background
     ServerSettings server;
     LoggingSettings logging;
     SafetySettings safety;

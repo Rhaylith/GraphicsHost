@@ -162,6 +162,8 @@ SettingsTab::SettingsTab(gh::host::AppHost& host, QWidget* parent) : QWidget(par
     hubRow->addWidget(hubRemove);
     otherForm->addRow(tr("Log level"), logLevel_);
     otherForm->addRow(QString(), safety_);
+    notifications_ = new QCheckBox(tr("Tray notifications (downloads done, images ready while the window is in the background)"), otherBox);
+    otherForm->addRow(QString(), notifications_);
     otherForm->addRow(tr("Hugging Face token"), hubRow);
     layout->addWidget(otherBox);
     layout->addStretch(1);
@@ -218,6 +220,7 @@ void SettingsTab::loadFromSettings() {
     rate_->setValue(st.server.rateLimitPerMinute);
     logLevel_->setCurrentIndex(std::max(0, logLevel_->findData(q(st.logging.level))));
     safety_->setChecked(st.safety.enabled);
+    notifications_->setChecked(st.notifications);
 }
 
 void SettingsTab::apply() {
@@ -239,6 +242,7 @@ void SettingsTab::apply() {
     st.server.rateLimitPerMinute = rate_->value();
     st.logging.level = s(logLevel_->currentData().toString());
     st.safety.enabled = safety_->isChecked();
+    st.notifications = notifications_->isChecked();
     if (st.server.enabled && st.server.lan && !host_.tokens().any()) {
         message_->setText(tr("Letting other computers connect needs at least one access token: create one below first."));
         return;

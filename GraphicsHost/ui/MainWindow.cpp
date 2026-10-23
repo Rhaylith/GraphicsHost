@@ -144,6 +144,7 @@ QString MainWindow::runtimeSummary() const {
 }
 
 void MainWindow::refreshStatus() {
+    notifyAboutProgress();
     statusBar()->showMessage(runtimeSummary());
     const auto loaded = host_.models().loaded();
     const auto active = host_.models().queue().active();
@@ -205,3 +206,27 @@ void MainWindow::saveWindowState() {
 
 }  // namespace gh::ui
 
+
+namespace gh::ui {
+
+// Tray messages for what happens while nobody is looking: a finished (or failed) download, and images made by the API or
+// another window. The first call only notes what is there already.
+void MainWindow::notifyAboutProgress() {
+    const bool show = notifyBaselined_ && tray_ && tray_->isVisible() && host_.settings().notifications;
+    for (const auto& d : host_.downloads().list()) {
+        if (!d->finished() || !notifiedDownloads_.insert(d->id()).second) continue;
+        if (!show) continue;
+        const QString name = q(d->request().label.empty() ? d->request().destination.filename().string() : d->request().label);
+        if (d->state() == gh::models::DownloadState::Completed) tray_->showMessage(tr("Download finished"), name, QSystemTrayIcon::Information, 5000);
+        else if (d->state() == gh::models::DownloadState::Failed) tray_->showMessage(tr("Download failed"), tr("%1: %2").arg(name, q(d->message())), QSystemTrayIcon::Warning, 8000);
+    }
+    const auto counters = host_.generation().counters();
+    if (show && counters.succeeded > lastSucceeded_ && !isActiveWindow()) {
+        const uint64_t n = counters.succeeded - lastSucceeded_;
+        tray_->showMessage(tr("Images ready"), tr("%n generation(s) finished.", "", static_cast<int>(n)), QSystemTrayIcon::Information, 4000);
+    }
+    lastSucceeded_ = counters.succeeded;
+    notifyBaselined_ = true;
+}
+
+}  // namespace gh::ui

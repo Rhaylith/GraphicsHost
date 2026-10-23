@@ -15,8 +15,8 @@ namespace {
 
 using Json = nlohmann::json;
 
-constexpr std::array<const char*, 12> kKnownKeys = {"schemaVersion", "backend", "gpuDevice", "threads", "modelsDir",
-                                                  "interfaceMode",  "server",  "logging",   "safety", "firstRunDone", "theme", "accent"};
+constexpr std::array<const char*, 13> kKnownKeys = {"schemaVersion", "backend", "gpuDevice", "threads", "modelsDir",
+                                                  "interfaceMode",  "server",  "logging",   "safety", "firstRunDone", "theme", "accent", "notifications"};
 
 bool validAccent(const std::string& c) {
     return c.size() == 7 && c[0] == '#' && std::all_of(c.begin() + 1, c.end(), [](unsigned char ch) { return std::isxdigit(ch) != 0; });
@@ -39,6 +39,7 @@ Json toJson(const Settings& s) {
     json["firstRunDone"] = s.firstRunDone;
     json["theme"] = s.theme;
     json["accent"] = s.accent;
+    json["notifications"] = s.notifications;
     json["server"] = {{"enabled", s.server.enabled}, {"port", s.server.port}, {"lan", s.server.lan}, {"requireToken", s.server.requireToken},
                       {"https", s.server.https}, {"tlsCertFile", s.server.tlsCertFile}, {"tlsKeyFile", s.server.tlsKeyFile},
                       {"allowedAddresses", s.server.allowedAddresses}, {"rateLimitPerMinute", s.server.rateLimitPerMinute}};
@@ -61,6 +62,7 @@ Settings settingsFromJson(const Json& json) {
     s.firstRunDone = json.value("firstRunDone", s.firstRunDone);
     s.theme = json.value("theme", s.theme);
     s.accent = json.value("accent", s.accent);
+    s.notifications = json.value("notifications", s.notifications);
     if (const auto it = json.find("server"); it != json.end() && it->is_object()) {
         s.server.enabled = it->value("enabled", s.server.enabled);
         s.server.port = it->value("port", s.server.port);
