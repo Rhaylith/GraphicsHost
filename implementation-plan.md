@@ -362,7 +362,7 @@ Goal: retire the biggest risk (§10) before any application code exists.
   - `GenerationService` (JIT load, defaults < preset < request layering, fit check, gallery storage) is shared by every front end; `AppHost::overrideEngine` lets tests plug in a fake engine. Hanging up cancels the job. Default `response_format` is `b64_json`; `store:false` skips the gallery.
 - [x] 4.4 Native `/api/v1`: generate + job poll/stream/cancel, models load/unload, downloads, discover, gallery, outputs (L)
   - Routes: status, hardware, settings (PUT = admin, partial merge), logs, models (+load/unload/get), defaults, presets, catalog, hub/search, hub/files, downloads (+pause/resume/cancel), updates, generate, jobs (+cancel, SSE events), gallery (+image, thumbnail), `/outputs/...` (images only, never the index). Permissions: read / generate / manage / admin.
-- [ ] 4.5 Request log, `/api/requests`, `/metrics` (S)
+- [x] 4.5 Request log, `/api/v1/requests` (admin, no query strings kept), `/metrics` (Prometheus text) (S)
 - [ ] 4.6 Qt shell: main window, tabs, tray icon, single instance, window-state memory, services → view-model wiring (M)
 - [ ] 4.7 Qt **Generate** tab: prompt boxes, parameter panel with interface-mode gating, model/device picker, live progress and preview, results, context menus (L)
 - [ ] 4.8 Qt **My Models** and **Discover** tabs, download queue (L)

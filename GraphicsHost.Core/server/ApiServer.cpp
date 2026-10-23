@@ -6,11 +6,16 @@
 #include "server/RouteContext.h"
 
 #include <atomic>
+#include <chrono>
+#include <format>
 #include <thread>
 
 namespace gh::server {
 
 using Json = nlohmann::json;
+namespace {
+thread_local std::chrono::steady_clock::time_point t_requestStart;   // set by the pre-routing handler of the same worker thread
+}  // namespace
 namespace fs = std::filesystem;
 
 struct ApiServer::Impl {
@@ -22,10 +27,11 @@ struct ApiServer::Impl {
     std::string bindAddress;
 
     Auth auth;
+    RequestLog requests;
     RouteContext ctx;
 
     explicit Impl(host::AppHost& h)
-        : host(h), auth(h.tokens(), [&h] { return h.settings().server.requireToken; }), ctx{h, auth} {}
+        : host(h), auth(h.tokens(), [&h] { return h.settings().server.requireToken; }), ctx{h, auth, requests} {}
 };
 
 ApiServer::ApiServer(host::AppHost& host) : impl_(std::make_unique<Impl>(host)) {}
@@ -74,6 +80,22 @@ std::string ApiServer::start(const ServerOptions& o) {
         sendError(res, 500, "server_error", "internal error: " + what);
     });
 
+    // the request log: when a request starts, and what became of it
+    s.set_pre_routing_handler([](const httplib::Request&, httplib::Response&) {
+        t_requestStart = std::chrono::steady_clock::now();
+        return httplib::Server::HandlerResponse::Unhandled;
+    });
+    s.set_logger([this](const httplib::Request& req, const httplib::Response& res) {
+        RequestRecord r;
+        r.time = std::format("{:%FT%TZ}", std::chrono::floor<std::chrono::milliseconds>(std::chrono::system_clock::now()));
+        r.method = req.method;
+        r.path = req.path;
+        r.status = res.status;
+        r.milliseconds = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t_requestStart).count();
+        r.remote = req.remote_addr;
+        impl_->requests.add(std::move(r));
+    });
+
     s.Get("/api/v1/health", [](const httplib::Request&, httplib::Response& res) {
         sendJson(res, {{"status", "ok"}, {"name", kAppName}, {"version", kAppVersion}});
     });
@@ -84,6 +106,7 @@ std::string ApiServer::start(const ServerOptions& o) {
     registerGalleryRoutes(s, impl_->ctx);
     registerModelRoutes(s, impl_->ctx);
     registerSystemRoutes(s, impl_->ctx);
+    registerMetricsRoutes(s, impl_->ctx);
 
     // the browser UI
     fs::path web = o.webRoot.empty() ? core::AppPaths::executableDir() / "web" : o.webRoot;

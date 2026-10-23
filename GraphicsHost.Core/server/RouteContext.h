@@ -2,6 +2,7 @@
 
 #include "host/AppHost.h"
 #include "server/Auth.h"
+#include "server/RequestLog.h"
 
 #include <string>
 
@@ -17,6 +18,7 @@ namespace gh::server {
 struct RouteContext {
     host::AppHost& host;
     Auth& auth;
+    RequestLog& requests;
 };
 
 // Checks the request against the permission; sends the 401/403 and returns false when it is not allowed.
@@ -30,5 +32,6 @@ void registerJobRoutes(httplib::Server& server, RouteContext& ctx);
 void registerGalleryRoutes(httplib::Server& server, RouteContext& ctx);
 void registerModelRoutes(httplib::Server& server, RouteContext& ctx);
 void registerSystemRoutes(httplib::Server& server, RouteContext& ctx);
+void registerMetricsRoutes(httplib::Server& server, RouteContext& ctx);
 
 }  // namespace gh::server

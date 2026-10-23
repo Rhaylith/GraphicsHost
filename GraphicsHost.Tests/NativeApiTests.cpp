@@ -274,3 +274,42 @@ TEST_CASE("native: writing needs the matching permission", "[integration][api][n
     CHECK(c.Put("/api/v1/settings", as(manager.secret), "{}", "application/json")->status == 403);   // admin only
     CHECK(c.Delete("/api/v1/presets/x", as(maker.secret))->status == 403);
 }
+
+TEST_CASE("native: the request log and /metrics", "[integration][api][native][metrics]") {
+    GenApp g;
+    auto c = g.client();
+    c.Get("/api/v1/health");
+    c.Get("/api/v1/nothing");
+    c.Get("/api/v1/gallery?text=secret+words");
+    generateAndWait(g, {{"model", "tiny"}, {"prompt", "x"}});
+
+    const json log = test::bodyJson(c.Get("/api/v1/requests?limit=500"));
+    REQUIRE(log["requests"].size() >= 4);
+    bool saw404 = false, sawHealth = false;
+    for (const auto& r : log["requests"]) {
+        if (r["path"] == "/api/v1/nothing") { saw404 = true; CHECK(r["status"] == 404); }
+        if (r["path"] == "/api/v1/health") { sawHealth = true; CHECK(r["method"] == "GET"); CHECK(r["status"] == 200); CHECK(r["ms"].get<double>() >= 0); }
+        CHECK(r["path"].get<std::string>().find('?') == std::string::npos);   // the query string (search text) is not kept
+    }
+    CHECK(saw404);
+    CHECK(sawHealth);
+    CHECK(test::bodyJson(c.Get("/api/v1/requests?limit=2"))["requests"].size() == 2);
+    CHECK(c.Get("/api/v1/requests?limit=x")->status == 400);
+
+    const auto metrics = c.Get("/metrics");
+    REQUIRE(metrics->status == 200);
+    CHECK(metrics->get_header_value("Content-Type").rfind("text/plain", 0) == 0);
+    CHECK(metrics->body.find("graphicshost_jobs_total{outcome=\"succeeded\"} 1") != std::string::npos);
+    CHECK(metrics->body.find("graphicshost_images_generated_total 1") != std::string::npos);
+    CHECK(metrics->body.find("graphicshost_model_loaded 1") != std::string::npos);
+    CHECK(metrics->body.find("graphicshost_http_requests_total{status=\"404\"} 1") != std::string::npos);
+
+    // the log belongs to administrators
+    const auto reader = g.app.host->tokens().create("reader", {"read"});
+    auto settings = g.app.host->settings();
+    settings.server.requireToken = true;
+    g.app.host->updateSettings(settings);
+    const httplib::Headers asReader = {{"Authorization", "Bearer " + reader.secret}};
+    CHECK(c.Get("/api/v1/requests", asReader)->status == 403);
+    CHECK(c.Get("/metrics", asReader)->status == 200);
+}
