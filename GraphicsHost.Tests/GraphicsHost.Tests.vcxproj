@@ -63,6 +63,7 @@
     <ClCompile Include="DownloadTests.cpp" />
     <ClCompile Include="CatalogTests.cpp" />
     <ClCompile Include="HuggingFaceTests.cpp" />
+    <ClCompile Include="ModelServiceTests.cpp" />
     <ClInclude Include="TestHttpServer.h" />
     <ClInclude Include="SafetensorsFixture.h" />
     <ClInclude Include="ModelFixture.h" />
