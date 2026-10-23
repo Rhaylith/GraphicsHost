@@ -13,8 +13,8 @@ namespace {
 
 using Json = nlohmann::json;
 
-constexpr std::array<const char*, 9> kKnownKeys = {"schemaVersion", "backend", "gpuDevice", "threads", "modelsDir",
-                                                  "interfaceMode",  "server",  "logging",   "safety"};
+constexpr std::array<const char*, 10> kKnownKeys = {"schemaVersion", "backend", "gpuDevice", "threads", "modelsDir",
+                                                  "interfaceMode",  "server",  "logging",   "safety", "firstRunDone"};
 
 bool oneOf(const std::string& value, std::initializer_list<const char*> allowed) {
     return std::any_of(allowed.begin(), allowed.end(), [&](const char* a) { return value == a; });
@@ -30,6 +30,7 @@ Json toJson(const Settings& s) {
     json["threads"] = s.threads;
     json["modelsDir"] = s.modelsDir;
     json["interfaceMode"] = s.interfaceMode;
+    json["firstRunDone"] = s.firstRunDone;
     json["server"] = {{"enabled", s.server.enabled}, {"port", s.server.port}, {"lan", s.server.lan}, {"requireToken", s.server.requireToken}};
     json["logging"] = {{"level", s.logging.level}};
     json["safety"] = {{"enabled", s.safety.enabled}};
@@ -47,6 +48,7 @@ Settings settingsFromJson(const Json& json) {
     s.threads = json.value("threads", s.threads);
     s.modelsDir = json.value("modelsDir", s.modelsDir);
     s.interfaceMode = json.value("interfaceMode", s.interfaceMode);
+    s.firstRunDone = json.value("firstRunDone", s.firstRunDone);
     if (const auto it = json.find("server"); it != json.end() && it->is_object()) {
         s.server.enabled = it->value("enabled", s.server.enabled);
         s.server.port = it->value("port", s.server.port);

@@ -35,6 +35,7 @@ struct Settings {
     int threads = 0;                     // CPU threads, 0 = number of physical cores
     std::string modelsDir;               // empty = AppPaths::defaultModelsDir()
     std::string interfaceMode = "user";  // user|power|developer
+    bool firstRunDone = false;           // the first-run wizard has been shown
     ServerSettings server;
     LoggingSettings logging;
     SafetySettings safety;

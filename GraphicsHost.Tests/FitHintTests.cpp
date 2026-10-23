@@ -77,3 +77,30 @@ TEST_CASE("hints: the budget comes from the best supported GPU and only when the
 
     CHECK(budgetFrom(gh::engine::GpuProbe{}, true, ram).gpuMemoryBytes == 0);
 }
+
+#include "models/Recommendation.h"
+
+TEST_CASE("recommend: SDXL when the GPU holds it, otherwise the light model", "[unit][hints][recommend]") {
+    const auto catalog = Catalog::fromJson(nlohmann::json::parse(R"({"schemaVersion":1,"entries":[
+      {"key":"a","name":"Small","kind":"checkpoint","family":"SD 1.x","repo":"x/a","file":"a.safetensors","sizeBytes":4265146304,"sha256":"0000000000000000000000000000000000000000000000000000000000000000","recommended":true},
+      {"key":"b","name":"Big","kind":"checkpoint","family":"SDXL","repo":"x/b","file":"b.safetensors","sizeBytes":6938078334,"sha256":"0000000000000000000000000000000000000000000000000000000000000000","recommended":true},
+      {"key":"c","name":"Gated","kind":"checkpoint","family":"SDXL","repo":"x/c","file":"c.safetensors","sizeBytes":6938078334,"sha256":"0000000000000000000000000000000000000000000000000000000000000000","recommended":true,"gated":true},
+      {"key":"v","name":"Vae","kind":"vae","family":"SDXL","repo":"x/v","file":"v.safetensors","sizeBytes":300000000,"sha256":"0000000000000000000000000000000000000000000000000000000000000000","recommended":true}]})"));
+    REQUIRE(catalog.entries().size() == 4);
+
+    const auto big = recommendCheckpoint(catalog, gpu(24));
+    REQUIRE(big.entry);
+    CHECK(big.entry->key == "b");
+    CHECK(big.why.find("graphics card") != std::string::npos);
+
+    const auto small = recommendCheckpoint(catalog, gpu(8));    // SDXL would need offload
+    REQUIRE(small.entry);
+    CHECK(small.entry->key == "a");
+
+    const auto cpu = recommendCheckpoint(catalog, gpu(0, 64));
+    REQUIRE(cpu.entry);
+    CHECK(cpu.entry->key == "a");
+    CHECK(cpu.why.find("CPU") != std::string::npos);
+
+    CHECK(recommendCheckpoint(Catalog{}, gpu(24)).entry == nullptr);
+}

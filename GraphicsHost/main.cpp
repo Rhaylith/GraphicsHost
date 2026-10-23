@@ -1,5 +1,6 @@
 #include "cli/Cli.h"
 #include "host/AppHost.h"
+#include "ui/FirstRunWizard.h"
 #include "ui/GenerateTab.h"
 #include "ui/MaskEditor.h"
 #include "ui/MainWindow.h"
@@ -84,6 +85,10 @@ int runGui(int argc, char* argv[]) {
     gh::host::AppHost host;
     gh::ui::MainWindow window(host);
     window.show();
+    // the first time: a short wizard (not in the automated modes)
+    if (!automated && !host.settings().firstRunDone) {
+        QTimer::singleShot(0, &app, [&host, &window] { gh::ui::FirstRunWizard(host, &window).exec(); });
+    }
 
     const QStringList args = app.arguments();
     // --smoke-test: open the window, run one event-loop pass and exit (used by CI and the build checks).
@@ -98,7 +103,7 @@ int runGui(int argc, char* argv[]) {
     if (shotArg >= 0 && shotArg + 1 < args.size()) {
         const QString dir = args[shotArg + 1];
         const QString prompt = promptArg >= 0 && promptArg + 1 < args.size() ? args[promptArg + 1] : QString();
-        auto takeShots = [&window, &app, dir] {
+        auto takeShots = [&window, &app, &host, dir] {
             QDir().mkpath(dir);
             for (int i = 0; i < window.tabs()->count(); ++i) {
                 window.tabs()->setCurrentIndex(i);
@@ -107,6 +112,18 @@ int runGui(int argc, char* argv[]) {
                 settle.exec();
                 const QString name = window.tabs()->tabText(i).remove(QLatin1Char('&')).replace(QLatin1Char(' '), QLatin1Char('-')).toLower();
                 window.grab().save(dir + QStringLiteral("/") + QString::number(i + 1) + QStringLiteral("-") + name + QStringLiteral(".png"));
+            }
+            {   // the first-run wizard, page by page
+                gh::ui::FirstRunWizard wizard(host);
+                wizard.show();
+                for (int page = 1; page <= 3; ++page) {
+                    QEventLoop settle;
+                    QTimer::singleShot(300, &settle, &QEventLoop::quit);
+                    settle.exec();
+                    wizard.grab().save(dir + QStringLiteral("/first-run-") + QString::number(page) + QStringLiteral(".png"));
+                    wizard.next();
+                }
+                wizard.hide();
             }
             {   // the mask editor is a dialog, not a tab: show it over a sample picture so it is part of the check
                 QImage sample(512, 384, QImage::Format_RGB888);

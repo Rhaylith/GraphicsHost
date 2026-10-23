@@ -36,6 +36,9 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="ui\MainWindow.cpp" />
     <ClCompile Include="ui\UiUtil.cpp" />
+    <ClCompile Include="ui\FirstRunWizard.cpp" />
+    <ClInclude Include="ui\FirstRunWizard.h" />
+    <QtMoc Include="ui\FirstRunWizard.h" />
     <ClCompile Include="ui\MonitorTab.cpp" />
     <ClInclude Include="ui\MonitorTab.h" />
     <QtMoc Include="ui\MonitorTab.h" />

@@ -398,7 +398,8 @@ Goal: retire the biggest risk (§10) before any application code exists.
 
 ### Phase 6 — Polish and release (L)
 
-- [ ] 6.1 First-run wizard: hardware survey, recommended model, models folder (M)
+- [x] 6.1 First-run wizard: hardware survey, recommended model, models folder (M)
+  - `recommendCheckpoint` (Core, unit-tested: SDXL when the GPU holds it, else the lightest model) feeds a three-page wizard (computer, models folder with free space, first model + download + interface mode). Shown once (`firstRunDone`); Skip counts. Pages are rendered by the screenshot/`[ui]` check; the Finish/download path was not clicked through automatically.
 - [ ] 6.2 Themes (light/dark/accent), interface modes (User / Power user / Developer), translation scaffolding (`.ts`) (M)
 - [ ] 6.3 HTTPS (OpenSSL, generated or user certificate), IP allow-list, rate limits (M)
 - [ ] 6.4 Notifications (download done, generation done), daemon / Windows service mode (M)
