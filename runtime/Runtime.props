@@ -1,7 +1,7 @@
 <Project>
   <!--
     Common body of the runtime DLL projects (sd-cpu-avx2, sd-vulkan). Each project sets
-    RuntimeId, RuntimeBackend and GgmlProperties before importing this file.
+    RuntimeId, RuntimeBackend, GgmlProject and GgmlProjectGuid before importing this file.
     Runtime DLLs link ggml and stable-diffusion statically, so they need no other DLLs besides the system Vulkan loader.
   -->
   <Import Project="$(GhProps)" />
@@ -24,9 +24,8 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)gh_runtime.h" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="$(RepoRoot)ggml\ggml.vcxproj">
-      <Project>{7B3D1E0A-5C2F-4E7A-9A11-0F6E2D4C8A01}</Project>
-      <AdditionalProperties>$(GgmlProperties)</AdditionalProperties>
+    <ProjectReference Include="$(RepoRoot)ggml\$(GgmlProject)">
+      <Project>$(GgmlProjectGuid)</Project>
     </ProjectReference>
     <ProjectReference Include="$(RepoRoot)stable-diffusion\stable-diffusion.vcxproj">
       <Project>{7B3D1E0A-5C2F-4E7A-9A11-0F6E2D4C8A02}</Project>
