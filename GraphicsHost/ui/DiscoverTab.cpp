@@ -62,6 +62,18 @@ gh::models::HardwareBudget budget(gh::host::AppHost& host) {
 
 DiscoverTab::DiscoverTab(gh::host::AppHost& host, QWidget* parent) : QWidget(parent), host_(host) {
     auto* layout = new QVBoxLayout(this);
+    // the hints below assume the runtime that is in use: say so when a usable graphics card is being left out
+    bool gpuFound = false;
+    for (const auto& d : host_.gpu().devices) gpuFound = gpuFound || d.supported;
+    const auto* runtime = host_.selectedRuntime();
+    if (gpuFound && !(runtime && runtime->backend == "vulkan")) {
+        auto* note = new QLabel(tr("A graphics card was found, but the %1 runtime is in use, so the hints below are for the CPU. "
+                                   "Check Settings (Backend) and that runtimes/sd-vulkan.dll is present, then restart GraphicsHost.")
+                                    .arg(runtime ? q(runtime->id) : tr("no")), this);
+        note->setWordWrap(true);
+        note->setStyleSheet(QStringLiteral("QLabel { background: #fff4d6; color: #5c4400; border: 1px solid #e0b84c; padding: 6px; }"));
+        layout->addWidget(note);
+    }
     auto* split = new QSplitter(Qt::Vertical, this);
     layout->addWidget(split);
 
