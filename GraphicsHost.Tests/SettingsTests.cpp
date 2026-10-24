@@ -182,3 +182,21 @@ TEST_CASE("settings: theme and accent are validated and round-trip", "[unit][set
     const auto errors = gh::core::validate(s);
     CHECK(errors.size() == 2);
 }
+
+TEST_CASE("paths: models go to DownloadedModels in the working directory, unless a home is given", "[unit][settings]") {
+    char* old = nullptr;
+    size_t size = 0;
+    _dupenv_s(&old, &size, "GRAPHICSHOST_HOME");
+    const std::string saved = old ? old : "";
+    std::free(old);
+
+    _putenv_s("GRAPHICSHOST_HOME", "");   // as if it were not set
+    CHECK(AppPaths::fromEnvironment().defaultModelsDir() == std::filesystem::current_path() / "DownloadedModels");
+
+    TempDir home;
+    _putenv_s("GRAPHICSHOST_HOME", home.path().string().c_str());
+    CHECK(AppPaths::fromEnvironment().defaultModelsDir() == home.path() / "models");   // an explicit home keeps its models
+    CHECK(AppPaths(home.path()).defaultModelsDir() == home.path() / "models");
+
+    _putenv_s("GRAPHICSHOST_HOME", saved.c_str());
+}

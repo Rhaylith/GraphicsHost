@@ -113,7 +113,8 @@ device is `auto`, with a note; an explicit `--device vulkan0` is never moved, an
 try. The engine's own start-up lines (`ggml_vulkan: ...`) also appear on stderr.
 
 Data lives in `%USERPROFILE%\.graphicshost` (`GRAPHICSHOST_HOME` overrides it): `settings.json`, `logs\`, `runtimes\` for
-user-installed runtimes, `presets\`, `outputs\`, `models\`.
+user-installed runtimes, `presets\`, `outputs\`. Downloaded models go to `DownloadedModels` in the working directory the program
+was started from (change it with the `modelsDir` setting); with `GRAPHICSHOST_HOME` set they stay in `<home>\models` instead.
 
 Exit codes: 0 ok, 1 failure, 2 usage, 3 not found, 4 not authorised, 5 server unreachable, 6 out of memory, 7 cancelled,
 8 conflict.

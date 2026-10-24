@@ -40,6 +40,7 @@
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <PreprocessorDefinitions>NDEBUG;_CRT_SECURE_NO_WARNINGS;GGML_VULKAN_COOPMAT_GLSLC_SUPPORT;GGML_VULKAN_COOPMAT2_GLSLC_SUPPORT;GGML_VULKAN_COOPMAT2_DECODE_VECTOR_GLSLC_SUPPORT;GGML_VULKAN_INTEGER_DOT_GLSLC_SUPPORT;GGML_VULKAN_BFLOAT16_GLSLC_SUPPORT;GGML_VULKAN_FLOAT_E2M1_GLSLC_SUPPORT;GGML_VULKAN_FLOAT_E4M3_GLSLC_SUPPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <MultiProcessorCompilation Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

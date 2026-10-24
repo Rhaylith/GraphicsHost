@@ -29,6 +29,11 @@
     <RuntimeBackend>cpu</RuntimeBackend>
     <GgmlProperties>GgmlCpuVariant=avx2;GgmlVulkan=false</GgmlProperties>
   </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+  </ItemDefinitionGroup>
   <Import Project="Runtime.props" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>
