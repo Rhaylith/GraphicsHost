@@ -13,7 +13,6 @@ What has been run, and what still needs another computer. Run the checklist on e
 * An older AMD card (GCN / Polaris / Vega) and an RDNA 1 or 2 card: does `sd-vulkan` start, does the fit estimator's
   VRAM arithmetic hold, does flash attention work?
 * An APU (shared memory): the estimator treats an integrated GPU's budget as a share of free RAM, which is untested.
-* A CPU without AVX2: `sd-cpu-noavx.dll` is built and selected by CPU detection, but has never run on such a processor.
 * A clean Windows machine (or VM) without Visual Studio, vcpkg or the Vulkan SDK: the package carries the VC++ runtime and
   was run with a bare PATH here, but a real clean install is the only proof.
 * The tray icon, single instance, the first-run wizard's Finish and download path, and the Windows service

@@ -8,7 +8,7 @@ Radeon RX 7900 XTX). They are environment facts, not project bugs.
 Windows Code Integrity (an Application Control policy, ID `{0283ac0f-fff1-49ae-ada1-8a933130cad6}`) can refuse to load
 unsigned binaries the build just produced. On 2026-10-22 the first build of `sd-cpu-avx2.dll` was refused
 (`LoadLibrary` error 4551, Code Integrity events 3033/3077 in `Microsoft-Windows-CodeIntegrity/Operational`) while
-`sd-cpu-noavx.dll` and `sd-vulkan.dll` from the same build loaded. Rebuilding the DLL produced a file that loaded.
+`sd-vulkan.dll` from the same build loaded. Rebuilding the DLL produced a file that loaded.
 
 Consequences and rules:
 

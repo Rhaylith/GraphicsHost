@@ -54,7 +54,7 @@ Output goes to `build\bin\x64\Release`:
 | File | What |
 |---|---|
 | `GraphicsHost.exe` | the application: window with no arguments, command line with arguments |
-| `runtimes\sd-cpu-avx2.dll`, `sd-cpu-noavx.dll`, `sd-vulkan.dll` | the inference runtimes (one is loaded at start-up) |
+| `runtimes\sd-cpu-avx2.dll`, `sd-vulkan.dll` | the inference runtimes (one is loaded at start-up) |
 | `GraphicsHost.Tests.exe` | the tests |
 | `spike.exe`, `spike-vulkan.exe` | Phase 0 spike programs (removed in phase 2) |
 

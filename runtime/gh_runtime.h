@@ -1,7 +1,7 @@
 /*
  * GraphicsHost runtime ABI.
  *
- * Every sd-*.dll (sd-cpu-avx2, sd-cpu-noavx, sd-vulkan) exports exactly this plain C interface. The host loads one of
+ * Every sd-*.dll (sd-cpu-avx2, sd-vulkan) exports exactly this plain C interface. The host loads one of
  * them with LoadLibrary and never includes ggml or stable-diffusion headers, so the runtime can be replaced by a newer
  * build without recompiling the host.
  *
@@ -56,7 +56,7 @@ typedef struct gh_model gh_model;
 typedef struct gh_runtime_info {
     uint32_t struct_size;
     int32_t abi_version;        /* GH_ABI_VERSION the DLL was built with */
-    const char* id;             /* "cpu-avx2", "cpu-noavx", "vulkan" */
+    const char* id;             /* "cpu-avx2", "vulkan" */
     const char* backend;        /* "cpu" or "vulkan" */
     const char* engine_version; /* stable-diffusion.cpp version string */
     const char* engine_commit;

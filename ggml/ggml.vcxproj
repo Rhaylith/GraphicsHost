@@ -2,7 +2,7 @@
 <!--
   ggml as one static library: ggml-base + the backend registry + the x86 CPU backend.
   Replaces the CMake targets ggml-base, ggml and ggml-cpu of the pinned stable-diffusion.cpp submodule.
-  GgmlCpuVariant selects the instruction set: avx2 (default) or noavx.
+  GgmlCpuVariant selects the instruction set: avx2 (the only variant that is built; AVX2 is assumed everywhere).
 -->
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
@@ -34,7 +34,7 @@
     <GgmlSrc>$(Sdcpp)ggml\</GgmlSrc>
     <!-- same-named sources get unique object names in the UniqueObjectNames target below -->
     <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);MSB8027</MSBuildWarningsAsMessages>
-    <!-- one library per variant: ggml-cpu-avx2.lib, ggml-cpu-noavx.lib (and ggml-vulkan.lib below) -->
+    <!-- one library per variant: ggml-cpu-avx2.lib (and ggml-vulkan.lib below) -->
     <TargetName>ggml-cpu-$(GgmlCpuVariant)</TargetName>
     <IntDir>$(RepoRoot)build\obj\ggml-cpu-$(GgmlCpuVariant)\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>

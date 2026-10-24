@@ -53,7 +53,7 @@ GpuProbe noVulkan() {
 
 std::vector<RuntimeCandidate> allThree(const CpuFeatures& cpu, const GpuProbe& gpu) {
     std::vector<RuntimeCandidate> list;
-    for (const char* id : {"cpu-avx2", "cpu-noavx", "vulkan"}) {
+    for (const char* id : {"cpu-avx2", "vulkan"}) {
         RuntimeCandidate c;
         c.id = id;
         c.backend = backendOfRuntimeId(id);
@@ -94,7 +94,6 @@ TEST_CASE("gpu probe never throws and is self-consistent", "[unit][engine]") {
 
 TEST_CASE("runtime ids map to backends", "[unit][engine]") {
     CHECK(backendOfRuntimeId("cpu-avx2") == "cpu");
-    CHECK(backendOfRuntimeId("cpu-noavx") == "cpu");
     CHECK(backendOfRuntimeId("vulkan") == "vulkan");
     CHECK(backendOfRuntimeId("cuda").empty());
 }
@@ -102,9 +101,9 @@ TEST_CASE("runtime ids map to backends", "[unit][engine]") {
 TEST_CASE("compatibility rules", "[unit][engine]") {
     std::string reason;
     CHECK(isRuntimeCompatible("cpu-avx2", modernCpu(), noVulkan(), &reason));
-    CHECK_FALSE(isRuntimeCompatible("cpu-avx2", oldCpu(), noVulkan(), &reason));
-    CHECK(reason.find("AVX2") != std::string::npos);
-    CHECK(isRuntimeCompatible("cpu-noavx", oldCpu(), noVulkan(), nullptr));
+    CHECK(isRuntimeCompatible("cpu-avx2", oldCpu(), noVulkan(), nullptr));   // AVX2 is assumed: the CPU is not even asked
+    CHECK_FALSE(isRuntimeCompatible("cpu-noavx", modernCpu(), noVulkan(), &reason));   // the plain-x86 runtime is gone
+    CHECK(reason.find("unknown") != std::string::npos);
 
     CHECK(isRuntimeCompatible("vulkan", modernCpu(), amdGpu(), nullptr));
     CHECK_FALSE(isRuntimeCompatible("vulkan", modernCpu(), nvidiaOnly(), &reason));
@@ -114,16 +113,14 @@ TEST_CASE("compatibility rules", "[unit][engine]") {
     CHECK_FALSE(isRuntimeCompatible("something", modernCpu(), amdGpu(), nullptr));
 }
 
-TEST_CASE("auto prefers Vulkan, then avx2, then noavx", "[unit][engine]") {
+TEST_CASE("auto prefers Vulkan, then the CPU runtime", "[unit][engine]") {
     CHECK(chooseRuntime(allThree(modernCpu(), amdGpu()), "auto")->id == "vulkan");
     CHECK(chooseRuntime(allThree(modernCpu(), noVulkan()), "auto")->id == "cpu-avx2");
-    CHECK(chooseRuntime(allThree(oldCpu(), noVulkan()), "auto")->id == "cpu-noavx");
     CHECK(chooseRuntime(allThree(modernCpu(), nvidiaOnly()), "auto")->id == "cpu-avx2");  // NVIDIA is not v1
 }
 
 TEST_CASE("explicit backend settings are honoured or refused", "[unit][engine]") {
     CHECK(chooseRuntime(allThree(modernCpu(), amdGpu()), "cpu")->id == "cpu-avx2");
-    CHECK(chooseRuntime(allThree(oldCpu(), amdGpu()), "cpu")->id == "cpu-noavx");
     CHECK(chooseRuntime(allThree(modernCpu(), amdGpu()), "vulkan")->id == "vulkan");
     CHECK(chooseRuntime(allThree(modernCpu(), noVulkan()), "vulkan") == nullptr);  // never silently falls back
     CHECK(chooseRuntime({}, "auto") == nullptr);
@@ -145,7 +142,7 @@ TEST_CASE("discovery finds sd-*.dll in the bundled and the user folder", "[unit]
     gh::test::TempDir dir;
     const auto bundled = dir.path() / "bin" / "runtimes";
     const auto user = dir.path() / "home" / "runtimes";
-    gh::test::writeText(bundled / "sd-cpu-noavx.dll", "x");
+    gh::test::writeText(bundled / "sd-cpu-avx2.dll", "x");
     gh::test::writeText(bundled / "readme.txt", "x");
     gh::test::writeText(bundled / "other.dll", "x");
     gh::test::writeText(user / "nightly" / "sd-vulkan.dll", "x");   // one sub-folder level is allowed
@@ -153,7 +150,7 @@ TEST_CASE("discovery finds sd-*.dll in the bundled and the user folder", "[unit]
 
     const auto found = discoverRuntimesIn(bundled, user, modernCpu(), amdGpu());
     REQUIRE(found.size() == 3);
-    CHECK(found[0].id == "cpu-noavx");
+    CHECK(found[0].id == "cpu-avx2");
     CHECK(found[0].bundled);
     CHECK(found[0].compatible);
 
@@ -182,9 +179,9 @@ TEST_CASE("loading something that is not a runtime fails with a message", "[unit
 }
 
 TEST_CASE("the bundled CPU runtime loads and reports itself", "[integration][engine]") {
-    const auto dll = gh::core::AppPaths::executableDir() / "runtimes" / "sd-cpu-noavx.dll";
+    const auto dll = gh::core::AppPaths::executableDir() / "runtimes" / "sd-cpu-avx2.dll";
     if (!std::filesystem::exists(dll)) {
-        SKIP("sd-cpu-noavx.dll is not next to the test executable (build the whole solution)");
+        SKIP("sd-cpu-avx2.dll is not next to the test executable (build the whole solution)");
     }
     std::string error;
     auto runtime = Runtime::load(dll, error);
@@ -193,7 +190,7 @@ TEST_CASE("the bundled CPU runtime loads and reports itself", "[integration][eng
         WARN("could not load the runtime: " << error);
         SKIP("runtime DLL could not be loaded on this machine");
     }
-    CHECK(runtime->id() == "cpu-noavx");
+    CHECK(runtime->id() == "cpu-avx2");
     CHECK(runtime->backend() == "cpu");
     CHECK_FALSE(runtime->engineVersion().empty());
     CHECK(runtime->listDevices().find("CPU") != std::string::npos);

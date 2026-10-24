@@ -1,6 +1,6 @@
 <Project>
   <!--
-    Common body of the runtime DLL projects (sd-cpu-avx2, sd-cpu-noavx, sd-vulkan). Each project sets
+    Common body of the runtime DLL projects (sd-cpu-avx2, sd-vulkan). Each project sets
     RuntimeId, RuntimeBackend and GgmlProperties before importing this file.
     Runtime DLLs link ggml and stable-diffusion statically, so they need no other DLLs besides the system Vulkan loader.
   -->

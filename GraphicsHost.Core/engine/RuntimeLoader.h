@@ -16,7 +16,7 @@ namespace gh::engine {
 
 // One sd-<id>.dll the application found, with a verdict on whether this machine can run it.
 struct RuntimeCandidate {
-    std::string id;       // "cpu-avx2", "cpu-noavx", "vulkan"
+    std::string id;       // "cpu-avx2", "vulkan"
     std::string backend;  // "cpu" or "vulkan"
     std::filesystem::path path;
     bool bundled = true;  // next to the exe, as opposed to the user's runtimes folder
@@ -39,7 +39,7 @@ std::vector<RuntimeCandidate> discoverRuntimesIn(const std::filesystem::path& bu
                                                  const GpuProbe& gpu);
 
 // The runtime to use for the backend setting ("auto", "vulkan" or "cpu"), or nullptr if none fits.
-//   auto   : Vulkan if compatible, otherwise the best CPU runtime (avx2 before noavx)
+//   auto   : Vulkan if compatible, otherwise the best CPU runtime (avx2)
 //   vulkan : the Vulkan runtime only
 //   cpu    : the best CPU runtime
 // A user-installed runtime wins over a bundled one with the same id.

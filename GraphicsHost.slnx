@@ -20,7 +20,6 @@
   </Folder>
   <Folder Name="/runtime/">
     <Project Path="runtime/sd-cpu-avx2.vcxproj" Id="7b3d1e0a-5c2f-4e7a-9a11-0f6e2d4c8a05" />
-    <Project Path="runtime/sd-cpu-noavx.vcxproj" Id="7b3d1e0a-5c2f-4e7a-9a11-0f6e2d4c8a06" />
     <Project Path="runtime/sd-vulkan.vcxproj" Id="7b3d1e0a-5c2f-4e7a-9a11-0f6e2d4c8a07" />
   </Folder>
   <Folder Name="/spike/">
