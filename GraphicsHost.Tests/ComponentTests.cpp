@@ -64,7 +64,7 @@ TEST_CASE("components: the pieces of SD 1.5 produce plausible tensors on Vulkan"
 
     REQUIRE(api.sessionBegin(m->model) == GH_OK);
     Tensor hidden(api), pooled(api);
-    REQUIRE(api.textEncode(m->model, "a lighthouse on a cliff", -1, 512, 512, &hidden.t, &pooled.t) == GH_OK);
+    REQUIRE(api.textEncode(m->model, "a lighthouse on a cliff", -1, 512, 512, 0, &hidden.t, &pooled.t) == GH_OK);
     CHECK(hidden.t.ndim == 3);
     CHECK(hidden.t.shape[0] == 768);   // the CLIP width of SD 1.x
     CHECK(hidden.t.shape[1] >= 77);
@@ -90,7 +90,7 @@ TEST_CASE("components: the pieces of SD 1.5 produce plausible tensors on Vulkan"
     CHECK(x.t.shape[2] == 4);
 
     Tensor uncondHidden(api);
-    REQUIRE(api.textEncode(m->model, "", -1, 512, 512, &uncondHidden.t, nullptr) == GH_OK);
+    REQUIRE(api.textEncode(m->model, "", -1, 512, 512, 0, &uncondHidden.t, nullptr) == GH_OK);
     gh_denoise_args args{};
     args.struct_size = sizeof(args);
     args.x = &x.t;
@@ -136,9 +136,11 @@ struct PipelineSettings {
 // The whole pipeline from component calls and the host's Euler loop: an RGB float image in 0..1, row by row.
 std::vector<float> runFromComponents(const Runtime::Api& api, gh_model* model, const PipelineSettings& s, double* secondsInLoop = nullptr) {
     REQUIRE(api.sessionBegin(model) == GH_OK);
-    Tensor hidden(api), uncond(api);
-    REQUIRE(api.textEncode(model, s.prompt.c_str(), -1, s.size, s.size, &hidden.t, nullptr) == GH_OK);
-    REQUIRE(api.textEncode(model, s.negative.c_str(), -1, s.size, s.size, &uncond.t, nullptr) == GH_OK);
+    Tensor hidden(api), uncond(api), pooled(api), unpooled(api);
+    REQUIRE(api.textEncode(model, s.prompt.c_str(), -1, s.size, s.size, 0, &hidden.t, &pooled.t) == GH_OK);
+    // SDXL (a pooled vector exists) with an empty negative prompt: all zeros, as the engine does
+    const bool zeroOut = s.negative.empty() && pooled.t.ndim > 0;
+    REQUIRE(api.textEncode(model, s.negative.c_str(), -1, s.size, s.size, zeroOut ? 1 : 0, &uncond.t, &unpooled.t) == GH_OK);
 
     gh_generate_params gp{};
     gp.struct_size = sizeof(gp);
@@ -166,6 +168,8 @@ std::vector<float> runFromComponents(const Runtime::Api& api, gh_model* model, c
         args.x = &in;
         args.sigma = sigma;
         args.cond_hidden = &hidden.t;
+        args.cond_pooled = pooled.t.ndim > 0 ? &pooled.t : nullptr;   // SDXL: pooled text + size conditioning
+        args.uncond_pooled = unpooled.t.ndim > 0 ? &unpooled.t : nullptr;
         args.uncond_hidden = &uncond.t;
         args.cfg_scale = s.cfg;
         Tensor result(api);
@@ -285,4 +289,29 @@ TEST_CASE("components: the host loop costs less than 3 % per step over the engin
     const double overhead = (hostLoop - engine) / engine * 100.0;
     WARN("engine loop " << engine << " s/step, host loop " << hostLoop << " s/step, overhead " << overhead << " %");
     CHECK(overhead < 3.0);
+}
+
+TEST_CASE("components: SDXL through the same path (two encoders, pooled and size conditioning)", "[model][vulkan][components][sdxl]") {
+    auto m = loadOrSkip("sd_xl_base_1.0.safetensors");
+    const auto& api = m->runtime->api();
+
+    // the second encoder and the size conditioning show in the tensors
+    REQUIRE(api.sessionBegin(m->model) == GH_OK);
+    {
+        Tensor hidden(api), pooled(api);
+        REQUIRE(api.textEncode(m->model, "a lighthouse", -1, 1024, 1024, 0, &hidden.t, &pooled.t) == GH_OK);
+        CHECK(hidden.t.shape[0] == 2048);   // CLIP-L (768) and CLIP-G (1280) side by side
+        REQUIRE(pooled.t.ndim >= 1);
+        CHECK(pooled.t.shape[0] == 2816);   // pooled CLIP-G (1280) plus six size and crop values embedded (6 x 256)
+    }
+    api.sessionEnd(m->model);
+
+    PipelineSettings s;
+    s.size = 1024;
+    s.steps = 6;
+    const auto reference = runWithGenerate(api, m->model, s);
+    const auto fromParts = runFromComponents(api, m->model, s);
+    const double difference = meanAbsDifference255(reference, fromParts);
+    INFO("mean absolute difference per colour value (0..255): " << difference);
+    CHECK(difference < 0.5);
 }

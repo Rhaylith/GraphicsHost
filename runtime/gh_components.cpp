@@ -95,7 +95,7 @@ GH_API void gh_session_end(gh_model* model) {
     }
 }
 
-GH_API int32_t gh_text_encode(gh_model* model, const char* text, int32_t clip_skip, int32_t width, int32_t height, gh_tensor* hidden,
+GH_API int32_t gh_text_encode(gh_model* model, const char* text, int32_t clip_skip, int32_t width, int32_t height, int32_t zero_out, gh_tensor* hidden,
                               gh_tensor* pooled) {
     StableDiffusionGGML* sd = engine_of(model);
     if (!sd || !hidden) return fail(GH_ERR_INVALID_ARGUMENT, "gh_text_encode: model and hidden are required");
@@ -104,6 +104,7 @@ GH_API int32_t gh_text_encode(gh_model* model, const char* text, int32_t clip_sk
     ConditionerParams params;
     params.text = text ? text : "";
     params.clip_skip = clip_skip;
+    params.zero_out_masked = zero_out != 0;
     params.width = width;
     params.height = height;
     SDCondition cond = sd->get_learned_condition(params);

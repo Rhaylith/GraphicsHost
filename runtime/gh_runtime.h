@@ -174,8 +174,9 @@ typedef struct gh_denoise_args {
 
 GH_API int32_t gh_session_begin(gh_model* model);
 GH_API void gh_session_end(gh_model* model);
-/* hidden and pooled (may be NULL) are filled in; pooled stays empty (ndim 0) for models without one. */
-GH_API int32_t gh_text_encode(gh_model* model, const char* text, int32_t clip_skip, int32_t width, int32_t height, gh_tensor* hidden,
+/* hidden and pooled (may be NULL) are filled in; pooled stays empty (ndim 0) for models without one. zero_out != 0 gives the
+ * all-zero encoding SDXL uses for an empty negative prompt (the engine does this when the negative prompt is empty). */
+GH_API int32_t gh_text_encode(gh_model* model, const char* text, int32_t clip_skip, int32_t width, int32_t height, int32_t zero_out, gh_tensor* hidden,
                               gh_tensor* pooled);
 /* The sigmas the engine would use for these generate params (steps, sampler, scheduler, size): steps + 1 values. Release the
  * array with gh_float_array_free. */
