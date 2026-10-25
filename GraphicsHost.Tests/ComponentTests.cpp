@@ -315,3 +315,15 @@ TEST_CASE("components: SDXL through the same path (two encoders, pooled and size
     INFO("mean absolute difference per colour value (0..255): " << difference);
     CHECK(difference < 0.5);
 }
+
+TEST_CASE("components: sd-vulkan.dll announces the component functions", "[integration][vulkan][components]") {
+    const auto dll = gh::core::AppPaths::executableDir() / "runtimes" / "sd-vulkan.dll";
+    if (!std::filesystem::exists(dll)) SKIP("sd-vulkan.dll is not next to the test executable");
+    std::string error;
+    auto runtime = Runtime::load(dll, error);
+    if (!runtime) SKIP("cannot load the Vulkan runtime: " << error);   // no Vulkan loader on this machine
+    CHECK(runtime->hasComponents());
+    CHECK((runtime->features() & GH_FEATURE_COMPONENTS) != 0);
+    CHECK((runtime->features() & GH_FEATURE_IMG2IMG) != 0);
+    CHECK(runtime->backend() == "vulkan");
+}

@@ -59,6 +59,24 @@ jobs:
         shell: pwsh
         run: build\bin\x64\Release\GraphicsHost.Tests.exe "[integration]"
 
+      # A software Vulkan driver (Mesa lavapipe) so that the [vulkan] tests can run on a runner without a GPU. Tests that
+      # need a real checkpoint skip themselves; results differ slightly from a GPU, so the tests that compare images use
+      # tolerances. NOT YET RUN ON GITHUB: if the download or the extraction fails the step only warns and the tests skip.
+      - name: Software Vulkan driver (lavapipe)
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          $release = Invoke-RestMethod https://api.github.com/repos/pal1000/mesa-dist-win/releases/latest
+          $asset = $release.assets | Where-Object { $_.name -like '*release-msvc.7z' } | Select-Object -First 1
+          Invoke-WebRequest $asset.browser_download_url -OutFile mesa.7z
+          7z x mesa.7z -omesa -y | Out-Null
+          $icd = Get-ChildItem mesa -Recurse -Filter 'lvp_icd*.json' | Select-Object -First 1
+          "VK_DRIVER_FILES=$($icd.FullName)" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+
+      - name: Vulkan tests (software driver)
+        shell: pwsh
+        run: build\bin\x64\Release\GraphicsHost.Tests.exe "[integration][vulkan]" --allow-running-no-tests
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
