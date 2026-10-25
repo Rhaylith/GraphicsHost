@@ -20,6 +20,12 @@ public:
     using std::runtime_error::runtime_error;
 };
 
+// Thrown by a node that noticed the job was interrupted (its stop token is set); the executor ends the job quietly.
+class Interrupted : public std::exception {
+public:
+    const char* what() const noexcept override { return "interrupted"; }
+};
+
 // A sub-graph a node returns instead of values (node expansion): the executor validates it, runs it with ids derived from
 // the node's own id, and the node's outputs are the listed outputs of the sub-graph.
 struct Expansion {
@@ -39,6 +45,7 @@ struct NodeContext {
     std::string nodeId;
     std::string jobId;
     std::map<std::string, Value> inputs;   // widgets and linked inputs; lazy inputs only after they were requested
+    std::map<std::string, NodeRef> links;  // where the linked inputs come from (a node that expands refers to these in its sub-graph)
     std::stop_token stop;                  // set when the job is interrupted: long loops check it
     // Reports progress inside the node (a sampler's step); both may be empty.
     std::function<void(int step, int steps)> progress;
