@@ -248,3 +248,41 @@ TEST_CASE("components: gh_generate repeats itself, so differences to it mean som
     INFO("gh_generate against itself: " << self);
     CHECK(self < 0.05);
 }
+
+TEST_CASE("components: the host loop costs less than 3 % per step over the engine's own loop", "[model][vulkan][components][perf]") {
+    auto m = loadOrSkip();
+    const auto& api = m->runtime->api();
+    PipelineSettings s;
+
+    // Seconds per sampling step from two runs of different length: the encoders, the decode and the first-call set-up
+    // are the same in both and drop out of the difference.
+    auto seconds = [&](bool host, int steps) {
+        PipelineSettings p = s;
+        p.steps = steps;
+        if (host) {
+            double loop = 0;
+            runFromComponents(api, m->model, p, &loop);
+            return loop;
+        }
+        const auto t0 = std::chrono::steady_clock::now();
+        runWithGenerate(api, m->model, p);
+        return std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+    };
+    runWithGenerate(api, m->model, s);   // warm-up: shader compilation, first allocations
+    runFromComponents(api, m->model, s);
+
+    const int shortRun = 6, longRun = 26;
+    auto perStep = [&](bool host) {
+        double best = 1e9;
+        for (int repeat = 0; repeat < 2; ++repeat) {
+            const double a = seconds(host, shortRun), b = seconds(host, longRun);
+            best = std::min(best, (b - a) / (longRun - shortRun));
+        }
+        return best;
+    };
+    const double engine = perStep(false);
+    const double hostLoop = perStep(true);
+    const double overhead = (hostLoop - engine) / engine * 100.0;
+    WARN("engine loop " << engine << " s/step, host loop " << hostLoop << " s/step, overhead " << overhead << " %");
+    CHECK(overhead < 3.0);
+}
