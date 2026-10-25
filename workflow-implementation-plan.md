@@ -625,7 +625,7 @@ Vulkan. A software Vulkan driver runs the fixture tests in CI (W0.7).
 - [x] W1.7 Docs generator: renders the reference tables from the registry and diffs them with `docs/workflow-node-reference.md` (S)
 
 ### W2 — Executor, queue, history (L)
-- [ ] W2.1 Planner (ancestors of outputs, partial run), topological order, cycle check (S)
+- [x] W2.1 Planner (ancestors of outputs, partial run), topological order, cycle check (S)
 - [ ] W2.2 Fingerprints, `OutputCache` with the four policies (M)
 - [ ] W2.3 Lazy inputs, list mapping, node expansion with stable ids (M)
 - [ ] W2.4 Events bus; per-node progress; interrupt between nodes and per step (S)
