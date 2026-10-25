@@ -80,6 +80,7 @@
     <ClCompile Include="GraphRegistryTests.cpp" />
     <ClCompile Include="WorkflowTests.cpp" />
     <ClCompile Include="ValidatorTests.cpp" />
+    <ClCompile Include="TipsTests.cpp" />
     <ClCompile Include="ComponentTests.cpp" />
     <ClCompile Include="TlsAndLimitsTests.cpp" />
     <ClCompile Include="ApiContractTests.cpp" />
@@ -88,6 +89,7 @@
     <ClInclude Include="TestHttpServer.h" />
     <ClInclude Include="SafetensorsFixture.h" />
     <ClInclude Include="ModelFixture.h" />
+    <ClInclude Include="RepoRoot.h" />
     <ClInclude Include="TestUtil.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
