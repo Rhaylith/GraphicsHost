@@ -56,6 +56,12 @@
     <ClCompile Include="host\**\*.cpp" />
     <ClCompile Include="sampling\**\*.cpp" />
     <ClInclude Include="sampling\**\*.h" />
+    <ClCompile Include="tensor\**\*.cpp" />
+    <ClInclude Include="tensor\**\*.h" />
+    <ClCompile Include="graph\**\*.cpp" />
+    <ClInclude Include="graph\**\*.h" />
+    <ClCompile Include="nodes\**\*.cpp" />
+    <ClInclude Include="nodes\**\*.h" />
     <ClInclude Include="host\**\*.h" />
     <ClInclude Include="core\**\*.h" />
     <ClInclude Include="engine\**\*.h" />

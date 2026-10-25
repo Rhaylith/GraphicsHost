@@ -615,7 +615,8 @@ none of which this plan needs). Main-plan step 5.7 (upscaler, ControlNet) is del
 Vulkan. A software Vulkan driver runs the fixture tests in CI (W0.7).
 
 ### W1 — Graph model (M–L)
-- [ ] W1.1 `tensor/` library; conversion to and from `engine::Image` and the existing `ImageCodec` (S)
+- [x] W1.1 `tensor/` library; conversion to and from `engine::Image` and the existing `ImageCodec` (S)
+  - `GraphicsHost.Core/tensor/Tensor.h`: float32, up to 5-D, element-wise ops, slerp, channel statistics, concat/slice/crop/pad (constant, replicate, reflect)/flip/rotate, resize (nearest, bilinear, bicubic, area, lanczos; antialiased when shrinking), gaussian blur, sharpen, dilate/erode, conversion to and from `engine::Image` and alpha masks. Large loops use `std::execution::par_unseq`. Not done yet: f16 storage, strided views, bislerp (latent-specific, W6.1).
 - [ ] W1.2 Types, `NodeDef` builder, registry, node catalogue JSON (M)
 - [ ] W1.3 Workflow (editor) format and job format, conversion (subgraphs, bypass, mute, reroutes, constants), migrations (M)
 - [ ] W1.4 Validator with per-node, per-input errors (S)
