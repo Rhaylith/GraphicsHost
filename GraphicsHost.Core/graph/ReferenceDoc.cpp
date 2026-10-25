@@ -1,5 +1,7 @@
 #include "graph/ReferenceDoc.h"
 
+#include <algorithm>
+#include <cctype>
 #include <sstream>
 
 namespace gh::graph {
@@ -38,10 +40,15 @@ std::vector<std::string> cells(const std::string& line) {
 ReferenceDoc parseReferenceDoc(const std::string& markdown) {
     ReferenceDoc doc;
     std::istringstream in(markdown);
-    std::string line, section, table;
+    std::string line, section, table, nodeSection;
     while (std::getline(in, line)) {
         if (starts(line, "## ")) {
             section = starts(line, "## C.") ? "C" : starts(line, "## O.") ? "O" : starts(line, "## S.") ? "S" : "";
+            if (starts(line, "## N") && line.size() > 4 && std::isdigit(static_cast<unsigned char>(line[4]))) {
+                const size_t dot = line.find('.');
+                section = "N";
+                nodeSection = line.substr(3, dot == std::string::npos ? std::string::npos : dot - 3);
+            }
             table.clear();
             continue;
         }
@@ -54,7 +61,40 @@ ReferenceDoc parseReferenceDoc(const std::string& markdown) {
         if (!starts(line, "| ")) continue;
         const auto c = cells(line);
         if (c.size() < 2) continue;
-        if (section == "S" && c.size() >= 3 && starts(c[0], "`")) {
+        if (section == "N" && c.size() >= 4) {
+            if (c[0].rfind("Node (", 0) == 0) continue;   // header row
+            if (!c[0].empty()) {
+                DocNode node;
+                node.section = nodeSection;
+                const size_t open = c[0].rfind("(`");
+                const size_t close = c[0].rfind("`)");
+                if (open == std::string::npos || close == std::string::npos || close < open) continue;
+                node.display = trimmed(c[0].substr(0, open));
+                node.id = c[0].substr(open + 2, close - open - 2);
+                doc.nodes.push_back(std::move(node));
+            }
+            if (doc.nodes.empty()) continue;
+            DocParam p;
+            p.type = c[2];
+            p.tip = c[3];
+            size_t at = 0;
+            bool ok = true;
+            while (at <= c[1].size()) {
+                const size_t comma = c[1].find(", ", at);
+                const std::string name = c[1].substr(at, comma == std::string::npos ? std::string::npos : comma - at);
+                const bool identifier = !name.empty() && std::isalpha(static_cast<unsigned char>(name[0])) &&
+                                        std::all_of(name.begin(), name.end(), [](unsigned char ch) { return std::isalnum(ch) || ch == '_'; });
+                if (!identifier) ok = false;
+                p.names.push_back(name);
+                if (comma == std::string::npos) break;
+                at = comma + 2;
+            }
+            if (!ok) {
+                p.names.clear();
+                p.loose = true;
+            }
+            doc.nodes.back().params.push_back(std::move(p));
+        } else if (section == "S" && c.size() >= 3 && starts(c[0], "`")) {
             // the keys at the start of the first cell: `a`, `b` (words after them, such as "(existing)", are not keys)
             size_t at = 0;
             while (at < c[0].size() && c[0][at] == '`') {

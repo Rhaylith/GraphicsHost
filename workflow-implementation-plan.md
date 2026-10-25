@@ -622,7 +622,7 @@ Vulkan. A software Vulkan driver runs the fixture tests in CI (W0.7).
 - [x] W1.4 Validator with per-node, per-input errors (S)
 - [x] W1.5 Tooltip infrastructure: `tips::` constants, per-option tips, `QT_TR_NOOP` extraction, catalogue export (S)
 - [x] W1.6 Coverage test: every input has a tooltip; every widget, every option tooltip and every setting has one containing an example marker (`Example:` or `e.g.`) (S)
-- [ ] W1.7 Docs generator: renders the reference tables from the registry and diffs them with `docs/workflow-node-reference.md` (S)
+- [x] W1.7 Docs generator: renders the reference tables from the registry and diffs them with `docs/workflow-node-reference.md` (S)
 
 ### W2 — Executor, queue, history (L)
 - [ ] W2.1 Planner (ancestors of outputs, partial run), topological order, cycle check (S)
