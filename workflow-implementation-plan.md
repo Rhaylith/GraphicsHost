@@ -606,7 +606,8 @@ none of which this plan needs). Main-plan step 5.7 (upscaler, ControlNet) is del
 - [x] W0.4 SDXL through the same path (dual encoders, pooled + size conditioning) (S)
   - `[sdxl]` test: 2048-wide hidden states and a 2816-wide pooled vector (pooled CLIP-G plus the size and crop embeddings); SDXL base 1024², 6 steps, euler/discrete: mean difference to `gh_generate` 0.25 of 255. One host rule was needed: an empty negative prompt on SDXL is encoded as all zeros (`zero_out` argument of `gh_text_encode`); without it the images differed by 7.6.
 - [x] W0.5 (done as the `[unit][naming]` test `NamingTests.cpp`, which CI runs with the other unit tests, instead of a script: PowerShell scripts are disabled on the development machine) Naming check in CI (`.github/workflows/build.yml`): a script in `tools/` fails on the reference product's name in any tracked file (the pattern is stored as character codes so the script itself does not contain the word) (S)
-- [ ] W0.6 **Go/no-go**: host-side sampling confirmed, or fall back to runtime-side samplers with a sampler-id ABI (S)
+- [x] W0.6 **Go/no-go**: host-side sampling confirmed, or fall back to runtime-side samplers with a sampler-id ABI (S)
+  - **Go.** Evidence and the notes for later steps in [docs/workflow-w0-results.md](docs/workflow-w0-results.md).
 - [ ] W0.7 (the `/arch:AVX2` half is done in `props/GraphicsHost.props`; the software-Vulkan CI step is still to do) CI: install a software Vulkan driver on the Windows runner, run `[integration][vulkan]` tests; host code built with `/arch:AVX2` in `props/Core.props` (S)
 
 **Exit:** a `[model]` test builds an image from component calls plus a host sampler, identical to `gh_generate`, on
