@@ -84,6 +84,7 @@
     <ClCompile Include="TipCoverageTests.cpp" />
     <ClCompile Include="ReferenceDiffTests.cpp" />
     <ClCompile Include="PlannerTests.cpp" />
+    <ClCompile Include="OutputCacheTests.cpp" />
     <ClCompile Include="ComponentTests.cpp" />
     <ClCompile Include="TlsAndLimitsTests.cpp" />
     <ClCompile Include="ApiContractTests.cpp" />
