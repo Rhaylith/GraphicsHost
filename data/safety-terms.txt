@@ -1,0 +1,21 @@
+# Words and phrases the optional safety filter refuses in a prompt (one per line, whole words, any case).
+# This is a word list, not an image classifier: it is easy to get around and it can refuse harmless prompts.
+# Add your own terms to safety-terms.txt in the data folder; they are used together with these.
+nsfw
+nude
+nudes
+naked
+porn
+porno
+pornographic
+pornography
+hentai
+erotic
+xxx
+topless
+genitals
+gore
+gory
+beheading
+decapitation
+dismemberment

@@ -27,13 +27,16 @@ AppPaths::AppPaths(std::filesystem::path root) : root_(std::move(root)) {}
 
 AppPaths AppPaths::fromEnvironment() {
     if (const std::string home = environmentVariable("GRAPHICSHOST_HOME"); !home.empty()) {
-        return AppPaths(std::filesystem::path(home));
+        return AppPaths(std::filesystem::path(home));   // an explicit home keeps everything inside it, models too
     }
     std::string profile = environmentVariable("USERPROFILE");
     if (profile.empty()) {
         profile = ".";
     }
-    return AppPaths(std::filesystem::path(profile) / ".graphicshost");
+    AppPaths paths(std::filesystem::path(profile) / ".graphicshost");
+    std::error_code ec;
+    paths.setDefaultModelsDir(std::filesystem::current_path(ec) / "DownloadedModels");
+    return paths;
 }
 
 std::filesystem::path AppPaths::executableDir() {

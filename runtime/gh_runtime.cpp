@@ -52,6 +52,9 @@ void on_progress(int step, int steps, float seconds, void*) {
     }
 }
 
+// The engine prints its own progress bar to stderr when no callback is set; this keeps it quiet between calls.
+void ignore_progress(int, int, float, void*) {}
+
 void on_log(sd_log_level_t level, const char* text, void*) {
     gh_log_fn fn = nullptr;
     void* user = nullptr;
@@ -101,6 +104,7 @@ GH_API int32_t gh_runtime_get_info(gh_runtime_info* out) {
     info.engine_version = sd_version();
     info.engine_commit = sd_commit();
     info.system_info = sd_get_system_info();
+    info.features = GH_FEATURE_IMG2IMG | GH_FEATURE_INPAINT | GH_FEATURE_LORA;
     std::memcpy(out, &info, size < sizeof(info) ? size : sizeof(info));
     return GH_OK;
 }
@@ -154,6 +158,7 @@ GH_API gh_model* gh_load(const gh_load_params* params) {
         }
         cp.flash_attn = params->flash_attention != 0;
 
+        sd_set_progress_callback(ignore_progress, nullptr);
         sd_ctx_t* ctx = new_sd_ctx(&cp);
         if (!ctx) {
             fail(GH_ERR_LOAD_FAILED, std::string("failed to load model: ") + params->model_path);
@@ -208,6 +213,61 @@ GH_API int32_t gh_generate(gh_model* model, const gh_generate_params* params, gh
         gp.sample_params.sample_steps = params->steps > 0 ? params->steps : gp.sample_params.sample_steps;
         gp.sample_params.guidance.txt_cfg = params->cfg_scale;
 
+        // image to image (ABI fields appended in 5.2: only read when the caller's struct has them)
+        std::vector<uint8_t> initPixels;
+        if (has_field(params->struct_size, offsetof(gh_generate_params, strength), sizeof(params->strength)) && params->init_image &&
+            params->init_image->data && params->init_image->width > 0 && params->init_image->height > 0) {
+            const gh_image& in = *params->init_image;
+            if (in.channels != 3 && in.channels != 4) {
+                return fail(GH_ERR_INVALID_ARGUMENT, "gh_generate: init_image must have 3 or 4 channels");
+            }
+            if (static_cast<int32_t>(in.width) != params->width || static_cast<int32_t>(in.height) != params->height) {
+                return fail(GH_ERR_INVALID_ARGUMENT, "gh_generate: init_image must have the size of the result (width x height)");
+            }
+            // the engine wants RGB: drop an alpha channel
+            const size_t pixels = static_cast<size_t>(in.width) * in.height;
+            initPixels.resize(pixels * 3);
+            for (size_t i = 0; i < pixels; ++i) {
+                std::memcpy(&initPixels[i * 3], &in.data[i * in.channels], 3);
+            }
+            gp.init_image = sd_image_t{in.width, in.height, 3, initPixels.data()};
+            gp.strength = params->strength;
+        }
+
+        // inpainting (ABI field appended in 5.3): the engine wants one channel, 255 where the picture is repainted
+        std::vector<uint8_t> maskPixels;
+        if (has_field(params->struct_size, offsetof(gh_generate_params, mask_image), sizeof(params->mask_image)) && params->mask_image &&
+            params->mask_image->data) {
+            const gh_image& m = *params->mask_image;
+            if (!gp.init_image.data) {
+                return fail(GH_ERR_INVALID_ARGUMENT, "gh_generate: mask_image needs an init_image");
+            }
+            if ((m.channels != 3 && m.channels != 4) || static_cast<int32_t>(m.width) != params->width ||
+                static_cast<int32_t>(m.height) != params->height) {
+                return fail(GH_ERR_INVALID_ARGUMENT, "gh_generate: mask_image must be RGB(A) and have the size of the result");
+            }
+            const size_t pixels = static_cast<size_t>(m.width) * m.height;
+            maskPixels.resize(pixels);
+            for (size_t i = 0; i < pixels; ++i) {
+                maskPixels[i] = m.data[i * m.channels] >= 128 ? 255 : 0;
+            }
+            gp.mask_image = sd_image_t{m.width, m.height, 1, maskPixels.data()};
+        }
+
+        // LoRAs (ABI fields appended in 5.4)
+        std::vector<sd_lora_t> loras;
+        if (has_field(params->struct_size, offsetof(gh_generate_params, lora_count), sizeof(params->lora_count)) && params->loras &&
+            params->lora_count > 0) {
+            for (int32_t i = 0; i < params->lora_count; ++i) {
+                if (!params->loras[i].path || !*params->loras[i].path) {
+                    return fail(GH_ERR_INVALID_ARGUMENT, "gh_generate: a LoRA has no path");
+                }
+                loras.push_back(sd_lora_t{false, params->loras[i].multiplier, params->loras[i].path});
+            }
+            gp.loras = loras.data();
+            gp.lora_count = static_cast<uint32_t>(loras.size());
+        }
+
         sample_method_t method = sd_get_default_sample_method(model->ctx);
         if (params->sampler && *params->sampler) {
             method = str_to_sample_method(params->sampler);
@@ -237,7 +297,7 @@ GH_API int32_t gh_generate(gh_model* model, const gh_generate_params* params, gh
             g_progress = progress;
             g_progress_user = user;
         }
-        sd_set_progress_callback(progress ? on_progress : nullptr, nullptr);
+        sd_set_progress_callback(progress ? on_progress : ignore_progress, nullptr);
         sd_cancel_generation(model->ctx, SD_CANCEL_RESET);
 
         const auto t0 = std::chrono::steady_clock::now();

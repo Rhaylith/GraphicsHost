@@ -11,12 +11,11 @@ namespace fs = std::filesystem;
 
 namespace {
 
-constexpr int kRuntimePriorityCount = 2;
+constexpr int kRuntimePriorityCount = 1;
 
 // Lower rank = preferred.
 int cpuRank(std::string_view id) {
     if (id == "cpu-avx2") return 0;
-    if (id == "cpu-noavx") return 1;
     return kRuntimePriorityCount;
 }
 
@@ -87,16 +86,13 @@ std::string backendOfRuntimeId(std::string_view id) {
     return {};
 }
 
-bool isRuntimeCompatible(std::string_view id, const CpuFeatures& cpu, const GpuProbe& gpu, std::string* reason) {
+bool isRuntimeCompatible(std::string_view id, const CpuFeatures& /*cpu: AVX2 is assumed*/, const GpuProbe& gpu, std::string* reason) {
     auto fail = [&](const char* text) {
         if (reason) *reason = text;
         return false;
     };
     if (id == "cpu-avx2") {
-        return cpu.canRunAvx2Runtime() ? true : fail("this CPU lacks AVX2, FMA or F16C");
-    }
-    if (id == "cpu-noavx") {
-        return true;
+        return true;   // every supported computer has AVX2 (the project does not support older CPUs)
     }
     if (id == "vulkan") {
         if (!gpu.vulkanAvailable) {
@@ -192,6 +188,7 @@ std::unique_ptr<Runtime> Runtime::load(const fs::path& dll, std::string& error) 
     runtime->backend_ = info.backend ? info.backend : "";
     runtime->engineVersion_ = info.engine_version ? info.engine_version : "";
     runtime->systemInfo_ = info.system_info ? info.system_info : "";
+    runtime->features_ = info.features;   // zero for a runtime that predates the field
     return runtime;
 }
 

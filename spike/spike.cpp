@@ -40,7 +40,7 @@ int main(int argc, char** argv) {
     int steps = 20, width = 512, height = 512, threads = 0;
     float cfg = 7.0f;
     int64_t seed = 1;
-    bool list = false, vae_tiling = false;
+    bool list = false, vae_tiling = false, flash_attn = false, offload = false;
 
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
@@ -56,6 +56,8 @@ int main(int argc, char** argv) {
         else if (a == "--threads") threads = std::atoi(next());
         else if (a == "--out") out = next();
         else if (a == "--vae-tiling") vae_tiling = true;
+        else if (a == "--flash-attn") flash_attn = true;
+        else if (a == "--offload") offload = true;
         else if (a == "--size") std::sscanf(next(), "%dx%d", &width, &height);
         else { std::fprintf(stderr, "unknown argument: %s\n", a.c_str()); return 2; }
     }
@@ -91,6 +93,8 @@ int main(int argc, char** argv) {
     cp.model_path = model.c_str();
     cp.backend = backend.c_str();
     if (threads > 0) cp.n_threads = threads;
+    cp.flash_attn = flash_attn;
+    if (offload) cp.params_backend = "cpu";
 
     auto t0 = Clock::now();
     sd_ctx_t* ctx = new_sd_ctx(&cp);

@@ -1,0 +1,63 @@
+<Project DefaultTargets="Package" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!--
+    Builds the portable package: build\dist\GraphicsHost-<version>-win-x64.zip.
+      msbuild GraphicsHost.slnx -p:Configuration=Release -p:Platform=x64 -m      (the build comes first)
+      msbuild installer\Package.proj
+    The zip holds the exe, the vcpkg and Qt DLLs, the runtimes, the data and web folders, the translations and the Visual C++
+    runtime (app-local, so no redistributable has to be installed). It is a package, not an installer: there is no
+    WiX or MSIX tooling on the build machine (see implementation-plan.md, 6.5).
+  -->
+  <PropertyGroup>
+    <Configuration Condition="'$(Configuration)'==''">Release</Configuration>
+    <RepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..'))\</RepoRoot>
+    <BuildDir>$(RepoRoot)build\bin\x64\$(Configuration)\</BuildDir>
+    <VersionText>$([System.IO.File]::ReadAllText('$(RepoRoot)GraphicsHost.Core\core\Version.h'))</VersionText>
+    <AppVersion>$([System.Text.RegularExpressions.Regex]::Match('$(VersionText)', 'kAppVersion = "([^"]+)"').Groups[1].Value)</AppVersion>
+    <PackageName>GraphicsHost-$(AppVersion)-win-x64</PackageName>
+    <Stage>$(RepoRoot)build\dist\$(PackageName)\</Stage>
+    <ZipFile>$(RepoRoot)build\dist\$(PackageName).zip</ZipFile>
+    <VsRoot>$([System.IO.Path]::GetFullPath('$(MSBuildToolsPath)\..\..\..'))\</VsRoot>
+  </PropertyGroup>
+
+  <Target Name="Package" DependsOnTargets="Check;Stage">
+    <Delete Files="$(ZipFile)" />
+    <ZipDirectory SourceDirectory="$(Stage)" DestinationFile="$(ZipFile)" />
+    <Message Importance="high" Text="Package: $(ZipFile)" />
+  </Target>
+
+  <Target Name="Check">
+    <Error Condition="'$(AppVersion)'==''" Text="Could not read the version from core\Version.h" />
+    <Error Condition="!Exists('$(BuildDir)GraphicsHost.exe')" Text="Build the solution first (Release|x64): $(BuildDir)GraphicsHost.exe is missing" />
+    <Error Condition="!Exists('$(BuildDir)runtimes\sd-cpu-avx2.dll')" Text="The runtime DLLs are missing in $(BuildDir)runtimes" />
+  </Target>
+
+  <Target Name="Stage">
+    <ItemGroup>
+      <Dll Include="$(BuildDir)*.dll" />
+      <Runtime Include="$(BuildDir)runtimes\*.dll" />
+      <Data Include="$(BuildDir)data\**\*" />
+      <Web Include="$(BuildDir)web\**\*" />
+      <Translation Include="$(BuildDir)translations\*.qm" />
+      <Platform Include="$(BuildDir)platforms\qwindows.dll;$(BuildDir)platforms\qoffscreen.dll" />
+      <Style Include="$(BuildDir)styles\*.dll" />
+      <ImageFormat Include="$(BuildDir)imageformats\*.dll" />
+      <IconEngine Include="$(BuildDir)iconengines\*.dll" />
+      <Crt Include="$(VsRoot)VC\Redist\MSVC\*\x64\Microsoft.VC145.CRT\*.dll" />   <!-- the newest version is listed last and wins -->
+    </ItemGroup>
+    <RemoveDir Directories="$(Stage)" />
+    <MakeDir Directories="$(Stage)" />
+    <Copy SourceFiles="$(BuildDir)GraphicsHost.exe" DestinationFolder="$(Stage)" />
+    <Copy SourceFiles="@(Dll)" DestinationFolder="$(Stage)" />
+    <Copy SourceFiles="@(Crt)" DestinationFolder="$(Stage)" />
+    <Copy SourceFiles="@(Runtime)" DestinationFolder="$(Stage)runtimes" />
+    <Copy SourceFiles="@(Data)" DestinationFiles="@(Data->'$(Stage)data\%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Copy SourceFiles="@(Web)" DestinationFiles="@(Web->'$(Stage)web\%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Copy SourceFiles="@(Translation)" DestinationFolder="$(Stage)translations" />
+    <Copy SourceFiles="@(Platform)" DestinationFolder="$(Stage)platforms" />
+    <Copy SourceFiles="@(Style)" DestinationFolder="$(Stage)styles" />
+    <Copy SourceFiles="@(ImageFormat)" DestinationFolder="$(Stage)imageformats" />
+    <Copy SourceFiles="@(IconEngine)" DestinationFolder="$(Stage)iconengines" />
+    <Warning Condition="!Exists('$(Stage)vcruntime140.dll')" Text="The Visual C++ runtime (VC145.CRT) was not found under $(VsRoot): the package then needs the redistributable installed" />
+    <Copy SourceFiles="$(MSBuildThisFileDirectory)NOTICE.txt;$(MSBuildThisFileDirectory)README-portable.txt" DestinationFolder="$(Stage)" />
+  </Target>
+</Project>

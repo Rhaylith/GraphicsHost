@@ -5,7 +5,7 @@
 namespace gh::core {
 
 // Where the application keeps its files. Everything lives below one root folder:
-//   settings.json  presets/  runtimes/  logs/  outputs/  models/
+//   settings.json  presets/  runtimes/  logs/  outputs/  (models: see defaultModelsDir)
 class AppPaths {
 public:
     // GRAPHICSHOST_HOME if set (tests use this), otherwise %USERPROFILE%\.graphicshost.
@@ -21,13 +21,17 @@ public:
     std::filesystem::path runtimesDir() const { return root_ / "runtimes"; }
     std::filesystem::path logsDir() const { return root_ / "logs"; }
     std::filesystem::path outputsDir() const { return root_ / "outputs"; }
-    std::filesystem::path defaultModelsDir() const { return root_ / "models"; }
+    // Where downloaded models go unless settings.modelsDir says otherwise: DownloadedModels in the working directory the
+    // program was started in (fromEnvironment); <root>/models for a home given explicitly (GRAPHICSHOST_HOME, tests).
+    std::filesystem::path defaultModelsDir() const { return modelsDir_.empty() ? root_ / "models" : modelsDir_; }
+    void setDefaultModelsDir(std::filesystem::path dir) { modelsDir_ = std::move(dir); }
 
     // Creates the root and all sub-folders; throws std::filesystem::filesystem_error on failure.
     void ensureDirectories() const;
 
 private:
     std::filesystem::path root_;
+    std::filesystem::path modelsDir_;
 };
 
 }  // namespace gh::core

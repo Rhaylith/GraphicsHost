@@ -7,12 +7,17 @@
 namespace gh::host {
 
 AppHost::AppHost(std::optional<std::filesystem::path> home)
-    : paths_(home ? core::AppPaths(*home) : core::AppPaths::fromEnvironment()), store_(paths_) {
+    : paths_(home ? core::AppPaths(*home) : core::AppPaths::fromEnvironment()),
+      store_(paths_),
+      presets_(paths_.presetsDir()),
+      modelDefaults_(paths_.root() / "model-defaults.json"),
+      tokens_(paths_.root() / "tokens.json") {
     paths_.ensureDirectories();
     core::LoadResult loaded = store_.load();
     settings_ = std::move(loaded.settings);
     settingsWarning_ = std::move(loaded.warning);
 
+    library_.setFolders({modelsDir()});
     log::init(paths_.logsDir(), settings_.logging.level);
     log::info("GraphicsHost starting, data folder " + paths_.root().string());
     if (loaded.migrated) {
@@ -43,6 +48,12 @@ AppHost::AppHost(std::optional<std::filesystem::path> home)
 }
 
 AppHost::~AppHost() {
+    generation_.reset();  // stops observing the queue
+    models_.reset();  // cancels running jobs, then frees the model
+    engine_.reset();
+    modelService_.reset();
+    downloads_.reset();  // keeps partial files for the next start
+    gallery_.reset();
     log::info("GraphicsHost stopping");
     log::shutdown();
 }
@@ -53,9 +64,27 @@ const engine::RuntimeCandidate* AppHost::selectedRuntime() const {
 
 void AppHost::updateSettings(core::Settings settings) {
     store_.save(settings);  // validates first
+    const engine::RuntimeCandidate* before = selectedRuntime();
+    const std::string runtimeBefore = before ? before->id : std::string();
     settings_ = std::move(settings);
+    library_.setFolders({modelsDir()});
     log::setLevel(settings_.logging.level);
     log::info("settings saved");
+
+    // another runtime (backend setting) needs another engine: drop the loaded one; it is created again on next use
+    const engine::RuntimeCandidate* after = selectedRuntime();
+    if ((after ? after->id : std::string()) != runtimeBefore) {
+        std::lock_guard<std::mutex> lock(serviceMutex_);
+        if (models_ && models_->queue().active() == 0) {
+            models_->unload();
+            engine_.reset();
+            log::info("runtime changed to " + (after ? after->id : std::string("(none)")) + ": the loaded model was unloaded");
+        } else if (models_) {
+            log::warn("the runtime setting changed while a generation is queued: it applies after a restart");
+        } else {
+            engine_.reset();
+        }
+    }
 }
 
 std::unique_ptr<engine::Runtime> AppHost::loadSelectedRuntime(std::string& error) const {
@@ -73,6 +102,151 @@ std::unique_ptr<engine::Runtime> AppHost::loadSelectedRuntime(std::string& error
         log::error(error);
     }
     return runtime;
+}
+
+}  // namespace gh::host
+
+namespace gh::host {
+
+std::filesystem::path AppHost::modelsDir() const {
+    return settings_.modelsDir.empty() ? paths_.defaultModelsDir() : std::filesystem::path(settings_.modelsDir);
+}
+
+std::shared_ptr<engine::IImageEngine> AppHost::engine(std::string* error) {
+    std::lock_guard<std::mutex> lock(serviceMutex_);
+    if (!engine_) {
+        std::string problem;
+        std::shared_ptr<engine::Runtime> runtime = loadSelectedRuntime(problem);
+        if (!runtime) {
+            engineError_ = problem;
+        } else {
+            engine_ = engine::makeRuntimeEngine(std::move(runtime));
+            engineError_.clear();
+        }
+    }
+    if (!engine_ && error) {
+        *error = engineError_;
+    }
+    return engine_;
+}
+
+engine::ModelManager& AppHost::models() {
+    std::lock_guard<std::mutex> lock(serviceMutex_);
+    if (!models_) {
+        models_ = std::make_unique<engine::ModelManager>([this] { return engine(); });
+    }
+    return *models_;
+}
+
+gallery::GalleryStore& AppHost::gallery() {
+    std::lock_guard<std::mutex> lock(serviceMutex_);
+    if (!gallery_) {
+        gallery_ = std::make_unique<gallery::GalleryStore>(paths_.outputsDir());
+    }
+    return *gallery_;
+}
+
+presets::PresetStore& AppHost::presets() {
+    return presets_;
+}
+
+presets::ModelDefaultsStore& AppHost::modelDefaults() {
+    return modelDefaults_;
+}
+
+}  // namespace gh::host
+
+namespace gh::host {
+
+models::ModelLibrary& AppHost::library() {
+    return library_;
+}
+
+}  // namespace gh::host
+
+#include "core/SecretStore.h"
+
+namespace gh::host {
+
+const models::Catalog& AppHost::catalog() {
+    std::lock_guard<std::mutex> lock(serviceMutex_);
+    if (!catalog_) {
+        catalog_ = std::make_unique<models::Catalog>(models::Catalog::load(
+            {core::AppPaths::executableDir() / "data" / "catalog.json", paths_.root() / "catalog.json"}));
+        for (const auto& w : catalog_->warnings()) log::warn("catalog: " + w);
+    }
+    return *catalog_;
+}
+
+models::DownloadManager& AppHost::downloads() {
+    std::lock_guard<std::mutex> lock(serviceMutex_);
+    if (!downloads_) {
+        downloads_ = std::make_unique<models::DownloadManager>(2);
+    }
+    return *downloads_;
+}
+
+models::ModelService& AppHost::modelService() {
+    const models::Catalog& cat = catalog();
+    auto& dl = downloads();
+    std::lock_guard<std::mutex> lock(serviceMutex_);
+    if (!modelService_) {
+        models::ModelServiceConfig config;
+        config.modelsDir = modelsDir();
+        // GRAPHICSHOST_HUB_URL points the application at another Hugging Face compatible server (the tests use it)
+        if (const char* hub = std::getenv("GRAPHICSHOST_HUB_URL"); hub && *hub) config.hubBaseUrl = hub;
+        config.token = [] { return core::huggingFaceToken().value_or(std::string()); };
+        modelService_ = std::make_unique<models::ModelService>(cat, library_, dl, modelDefaults_, std::move(config));
+    }
+    return *modelService_;
+}
+
+}  // namespace gh::host
+
+namespace gh::host {
+
+server::TokenStore& AppHost::tokens() {
+    return tokens_;
+}
+
+}  // namespace gh::host
+
+namespace gh::host {
+
+void AppHost::overrideEngine(std::shared_ptr<engine::IImageEngine> engine) {
+    std::lock_guard<std::mutex> lock(serviceMutex_);
+    engine_ = std::move(engine);
+    engineError_.clear();
+}
+
+}  // namespace gh::host
+
+namespace gh::host {
+
+GenerationService& AppHost::generation() {
+    models();  // GenerationService observes the queue; create that first (it takes serviceMutex_ itself)
+    std::lock_guard<std::mutex> lock(generationMutex_);
+    if (!generation_) generation_ = std::make_unique<GenerationService>(*this);
+    return *generation_;
+}
+
+}  // namespace gh::host
+
+namespace gh::host {
+
+HardwareMonitor& AppHost::monitor() {
+    return monitor_;
+}
+
+}  // namespace gh::host
+
+namespace gh::host {
+
+engine::SafetyVerdict AppHost::checkSafety(const engine::GenerationRequest& request) const {
+    if (!settings_.safety.enabled && !request.safetyFilter) return {};   // off unless the host or the request turns it on
+    const engine::BlocklistFilter filter(engine::BlocklistFilter::readTerms(
+        {core::AppPaths::executableDir() / "data" / "safety-terms.txt", paths_.root() / "safety-terms.txt"}));
+    return filter.checkPrompt(request.prompt);
 }
 
 }  // namespace gh::host

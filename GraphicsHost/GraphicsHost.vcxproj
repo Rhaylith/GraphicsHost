@@ -27,7 +27,7 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <Import Project="$(GhProps)" />
   <PropertyGroup>
-    <QtModules>Core;Gui;Widgets</QtModules>
+    <QtModules>Core;Gui;Widgets;Charts</QtModules>
     <TargetName>GraphicsHost</TargetName>
   </PropertyGroup>
   <Import Project="$(RepoRoot)props\Core.props" />
@@ -35,9 +35,50 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="ui\MainWindow.cpp" />
+    <ClCompile Include="ui\UiUtil.cpp" />
+    <ClCompile Include="ui\Theme.cpp" />
+    <ClInclude Include="ui\Theme.h" />
+    <ClCompile Include="ui\FirstRunWizard.cpp" />
+    <ClInclude Include="ui\FirstRunWizard.h" />
+    <QtMoc Include="ui\FirstRunWizard.h" />
+    <ClCompile Include="ui\MonitorTab.cpp" />
+    <ClInclude Include="ui\MonitorTab.h" />
+    <QtMoc Include="ui\MonitorTab.h" />
+    <ClCompile Include="ui\MaskEditor.cpp" />
+    <ClInclude Include="ui\MaskEditor.h" />
+    <QtMoc Include="ui\MaskEditor.h" />
+    <ClCompile Include="ui\GalleryTab.cpp" />
+    <ClInclude Include="ui\GalleryTab.h" />
+    <QtMoc Include="ui\GalleryTab.h" />
+    <ClInclude Include="ui\ImageView.h" />
+    <ClCompile Include="ui\SettingsTab.cpp" />
+    <ClInclude Include="ui\SettingsTab.h" />
+    <QtMoc Include="ui\SettingsTab.h" />
+    <ClCompile Include="ui\LogsTab.cpp" />
+    <ClInclude Include="ui\LogsTab.h" />
+    <QtMoc Include="ui\LogsTab.h" />
+    <ClCompile Include="ui\ModelsTab.cpp" />
+    <ClInclude Include="ui\ModelsTab.h" />
+    <QtMoc Include="ui\ModelsTab.h" />
+    <ClCompile Include="ui\DiscoverTab.cpp" />
+    <ClInclude Include="ui\DiscoverTab.h" />
+    <QtMoc Include="ui\DiscoverTab.h" />
+    <ClCompile Include="ui\GenerateTab.cpp" />
+    <ClInclude Include="ui\GenerateTab.h" />
+    <QtMoc Include="ui\GenerateTab.h" />
+    <ClInclude Include="ui\UiUtil.h" />
     <ClInclude Include="ui\MainWindow.h" />
     <QtMoc Include="ui\MainWindow.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Import Project="$(RepoRoot)props\Data.targets" />
   <Import Project="$(RepoRoot)props\Qt.targets" />
+  <!-- translations\*.ts (made with lupdate, see translations\README.md) become translations\*.qm next to the exe -->
+  <Target Name="CompileTranslations" AfterTargets="Build" Condition="Exists('$(QtToolsDir)lrelease.exe')">
+    <ItemGroup>
+      <TsFile Include="$(MSBuildProjectDirectory)\translations\*.ts" />
+    </ItemGroup>
+    <MakeDir Directories="$(OutDir)translations" />
+    <Exec Command="&quot;$(QtToolsDir)lrelease.exe&quot; -silent &quot;%(TsFile.FullPath)&quot; -qm &quot;$(OutDir)translations\%(TsFile.Filename).qm&quot;" Condition="'@(TsFile)' != ''" />
+  </Target>
 </Project>

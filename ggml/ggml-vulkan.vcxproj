@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The Vulkan variant of ggml (ggml-vulkan.lib): ggml.vcxproj with GgmlVulkan=true. It is its own project so that
+  Visual Studio builds it as a project of the solution; a project reference that only adds a property to ggml.vcxproj is
+  built without that property by the IDE, and ggml-vulkan.lib would never be made.
+-->
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <GgmlVulkan>true</GgmlVulkan>
+    <GgmlCpuVariant>avx2</GgmlCpuVariant>
+  </PropertyGroup>
+  <Import Project="ggml.vcxproj" />
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{7B3D1E0A-5C2F-4E7A-9A11-0F6E2D4C8A0B}</ProjectGuid>
+  </PropertyGroup>
+</Project>

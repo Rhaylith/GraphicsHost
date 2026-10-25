@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GraphicsHost</title>
+  <link rel="stylesheet" href="app.css">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+</head>
+<body>
+  <header>
+    <h1>GraphicsHost</h1>
+    <nav id="tabs">
+      <button data-tab="generate" class="active">Generate</button>
+      <button data-tab="gallery">Gallery</button>
+      <button data-tab="models">My Models</button>
+      <button data-tab="discover">Discover</button>
+      <button data-tab="settings">Settings</button>
+      <button data-tab="logs">Logs</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Generate -->
+    <section id="tab-generate" class="tab active">
+      <div class="split">
+        <form id="gen-form" class="panel params" autocomplete="off">
+          <label>Model <select id="g-model"></select></label>
+          <label>Preset <select id="g-preset"></select>
+            <span class="row" style="margin-top:4px"><button type="button" class="small" id="p-save">Save these settings…</button><button type="button" class="small" id="p-export">Export</button><button type="button" class="small" id="p-import">Import…</button><button type="button" class="small danger" id="p-delete">Delete</button></span>
+            <input id="p-file" type="file" accept=".json,application/json" hidden>
+          </label>
+          <label>Prompt <textarea id="g-prompt" rows="4" placeholder="Describe the image…"></textarea></label>
+          <label>Negative prompt <textarea id="g-negative" rows="2" placeholder="What to keep out"></textarea></label>
+          <label>LoRAs <input id="g-loras" type="text" list="g-lora-list" placeholder="name:0.8, other  (or &lt;lora:name:0.8&gt; in the prompt)"><datalist id="g-lora-list"></datalist></label>
+          <div class="row">
+            <label>Width <input id="g-width" type="number" min="64" max="4096" step="64" placeholder="auto"></label>
+            <label>Height <input id="g-height" type="number" min="64" max="4096" step="64" placeholder="auto"></label>
+          </div>
+          <div class="row">
+            <label>Images <input id="g-count" type="number" min="1" max="16" value="1"></label>
+            <label>Seed <input id="g-seed" type="number" min="-1" placeholder="random"></label>
+          </div>
+          <label>Source image (optional, for image to image)
+            <input id="g-source" type="file" accept="image/*">
+            <span id="g-source-note" class="muted"></span> <button type="button" id="g-source-clear" class="small" hidden>Clear</button>
+          </label>
+          <label>Strength (how much of the source is replaced) <input id="g-strength" type="number" min="0.05" max="1" step="0.05" value="0.75"></label>
+          <div class="advanced">
+            <div class="row">
+              <label>Steps <input id="g-steps" type="number" min="1" max="150" placeholder="auto"></label>
+              <label>CFG scale <input id="g-cfg" type="number" min="0" max="30" step="0.5" placeholder="auto"></label>
+            </div>
+            <div class="row">
+              <label>Sampler <select id="g-sampler"></select></label>
+              <label>Scheduler <select id="g-scheduler"></select></label>
+            </div>
+          </div>
+          <div class="buttons">
+            <button type="submit" id="g-go" class="primary">Generate</button>
+            <button type="button" id="g-cancel" disabled>Cancel</button>
+          </div>
+        </form>
+        <div class="panel results">
+          <div id="g-view" class="viewer"><p class="muted">Your images appear here.</p></div>
+          <div id="g-thumbs" class="thumbs"></div>
+          <progress id="g-progress" value="0" max="1"></progress>
+          <p id="g-status" class="muted">Ready.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Gallery -->
+    <section id="tab-gallery" class="tab">
+      <div class="toolbar">
+        <input id="gal-search" type="search" placeholder="Search prompts…">
+        <span id="gal-count" class="muted"></span>
+      </div>
+      <div id="gal-grid" class="grid"></div>
+      <div class="toolbar"><button id="gal-more" hidden>Load more</button></div>
+    </section>
+
+    <!-- My Models -->
+    <section id="tab-models" class="tab">
+      <p id="m-summary" class="muted"></p>
+      <table id="m-table"><thead><tr><th>File</th><th>Kind</th><th>Family</th><th class="num">Size</th><th>VAE</th><th>State</th><th></th></tr></thead><tbody></tbody></table>
+      <p id="m-status" class="muted"></p>
+    </section>
+
+    <!-- Discover -->
+    <section id="tab-discover" class="tab">
+      <h2>Catalog</h2>
+      <div class="toolbar">
+        <input id="d-filter" type="search" placeholder="Filter…">
+        <select id="d-family"><option value="">Any family</option><option>SD 1.x</option><option>SDXL</option></select>
+      </div>
+      <table id="d-catalog"><thead><tr><th>Name</th><th>Kind</th><th>Family</th><th class="num">Size</th><th>On this computer</th><th>State</th><th></th></tr></thead><tbody></tbody></table>
+      <h2>Search Hugging Face</h2>
+      <form id="d-search-form" class="toolbar"><input id="d-query" type="search" placeholder="e.g. dreamshaper"><button>Search</button><span id="d-hub-status" class="muted"></span></form>
+      <div class="split two">
+        <table id="d-repos"><thead><tr><th>Repository</th><th class="num">Downloads</th><th>License</th><th>Access</th></tr></thead><tbody></tbody></table>
+        <table id="d-files"><thead><tr><th>File</th><th>Kind</th><th class="num">Size</th><th>On this computer</th><th></th></tr></thead><tbody></tbody></table>
+      </div>
+      <h2>Downloads</h2>
+      <table id="d-downloads"><thead><tr><th>File</th><th>State</th><th>Progress</th><th>Speed</th><th></th></tr></thead><tbody></tbody></table>
+      <p id="d-status" class="muted"></p>
+    </section>
+
+    <!-- Settings -->
+    <section id="tab-settings" class="tab">
+      <form id="s-form" class="panel narrow">
+        <h2>Engine</h2>
+        <label>Backend <select id="s-backend"><option value="auto">Automatic</option><option value="vulkan">Vulkan GPU</option><option value="cpu">CPU</option></select></label>
+        <label>CPU threads (0 = automatic) <input id="s-threads" type="number" min="0" max="512"></label>
+        <label>Models folder <input id="s-modelsdir" type="text" placeholder="default"></label>
+        <label>Interface <select id="s-mode"><option value="user">Simple</option><option value="power">Advanced</option><option value="developer">Developer</option></select></label>
+        <h2>Server</h2>
+        <label class="check"><input id="s-lan" type="checkbox"> Let other computers connect (needs a token)</label>
+        <label class="check"><input id="s-require" type="checkbox"> Require a token on this computer too</label>
+        <label>Port <input id="s-port" type="number" min="1" max="65535"></label>
+        <label class="check"><input id="s-https" type="checkbox"> Use https (a self-signed certificate is made)</label>
+        <label>Allowed addresses <input id="s-allowed" type="text" placeholder="everyone, e.g. 192.168.1.0/24, 10.0.0.5"></label>
+        <label>Rate limit (requests a minute, 0 = none) <input id="s-rate" type="number" min="0" max="100000"></label>
+        <h2>Other</h2>
+        <label>Log level <select id="s-log"><option>trace</option><option>debug</option><option>info</option><option>warn</option><option>error</option></select></label>
+        <label class="check"><input id="s-safety" type="checkbox"> Safety filter</label>
+        <div class="buttons"><button class="primary" type="submit">Apply</button></div>
+        <p id="s-status" class="muted"></p>
+      </form>
+      <div class="panel narrow">
+        <h2>Access tokens</h2>
+        <table id="s-tokens"><thead><tr><th>Name</th><th>Permissions</th><th>Last used</th><th></th></tr></thead><tbody></tbody></table>
+        <form id="s-token-form" class="row">
+          <input id="s-token-name" type="text" placeholder="Name, e.g. my phone" required>
+          <select id="s-token-perm"><option value="read,generate">read + generate</option><option value="read">read only</option><option value="read,generate,manage">+ manage</option><option value="read,generate,manage,admin">admin</option></select>
+          <button>Create</button>
+        </form>
+        <p id="s-token-status" class="muted"></p>
+      </div>
+    </section>
+
+    <!-- Logs -->
+    <section id="tab-logs" class="tab">
+      <div class="toolbar">
+        <select id="l-level"><option>trace</option><option>debug</option><option selected>info</option><option>warn</option><option>error</option></select>
+        <span id="l-count" class="muted"></span>
+      </div>
+      <pre id="l-view" class="log"></pre>
+    </section>
+  </main>
+
+  <footer id="status">Connecting…</footer>
+
+  <dialog id="dlg"><div id="dlg-body"></div></dialog>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <string>
 #include <string_view>
@@ -37,5 +38,10 @@ std::vector<Entry> tail(size_t maxEntries);
 // Receives the native engine's log (gh_log_fn): 0 debug, 1 verbose, 2 info, 3 warning, 4 error. Trailing newlines
 // are trimmed and the text is prefixed with "[engine] ".
 void nativeLog(int level, const char* text);
+
+// Warnings and errors the engine logged recently (kept even when the log level hides them), so a failed load or
+// generation can be explained: take a mark before the call, ask for the errors since the mark afterwards.
+uint64_t nativeMark();
+std::vector<std::string> nativeErrorsSince(uint64_t mark);
 
 }  // namespace gh::log

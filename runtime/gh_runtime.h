@@ -1,7 +1,7 @@
 /*
  * GraphicsHost runtime ABI.
  *
- * Every sd-*.dll (sd-cpu-avx2, sd-cpu-noavx, sd-vulkan) exports exactly this plain C interface. The host loads one of
+ * Every sd-*.dll (sd-cpu-avx2, sd-vulkan) exports exactly this plain C interface. The host loads one of
  * them with LoadLibrary and never includes ggml or stable-diffusion headers, so the runtime can be replaced by a newer
  * build without recompiling the host.
  *
@@ -45,17 +45,23 @@ typedef enum gh_status {
     GH_ERR_INTERNAL = -5
 } gh_status;
 
+/* What a runtime can do beyond plain text-to-image (gh_runtime_info.features). */
+#define GH_FEATURE_IMG2IMG 0x1u   /* gh_generate_params.init_image + strength */
+#define GH_FEATURE_INPAINT 0x2u   /* gh_generate_params.mask_image (with init_image) */
+#define GH_FEATURE_LORA 0x4u      /* gh_generate_params.loras */
+
 typedef struct gh_model gh_model;
 
 /* Describes the runtime itself. Pointers stay valid until the DLL is unloaded. */
 typedef struct gh_runtime_info {
     uint32_t struct_size;
     int32_t abi_version;        /* GH_ABI_VERSION the DLL was built with */
-    const char* id;             /* "cpu-avx2", "cpu-noavx", "vulkan" */
+    const char* id;             /* "cpu-avx2", "vulkan" */
     const char* backend;        /* "cpu" or "vulkan" */
     const char* engine_version; /* stable-diffusion.cpp version string */
     const char* engine_commit;
     const char* system_info;    /* CPU feature line reported by ggml */
+    uint32_t features;          /* GH_FEATURE_* bits; 0 when the DLL predates the field */
 } gh_runtime_info;
 
 typedef struct gh_load_params {
@@ -69,6 +75,11 @@ typedef struct gh_load_params {
     int32_t clip_on_cpu;        /* run the text encoder on the CPU */
     int32_t vae_on_cpu;         /* run the VAE on the CPU */
 } gh_load_params;
+
+typedef struct gh_lora {
+    const char* path;           /* .safetensors LoRA file */
+    float multiplier;           /* strength, usually 0.2 to 1.2; negative values subtract the style */
+} gh_lora;
 
 typedef struct gh_generate_params {
     uint32_t struct_size;
@@ -84,6 +95,14 @@ typedef struct gh_generate_params {
     const char* scheduler;      /* e.g. "karras"; NULL = model default */
     int32_t clip_skip;          /* -1 = model default */
     int32_t vae_tiling;         /* 0/1 */
+    /* appended in step 5.2: needs GH_FEATURE_IMG2IMG */
+    const struct gh_image* init_image; /* start from this picture (RGB); NULL = text to image */
+    float strength;             /* 0..1: how much of init_image is replaced (1 = ignore it); used with init_image */
+    /* appended in step 5.3: needs GH_FEATURE_INPAINT */
+    const struct gh_image* mask_image; /* with init_image: white (255) = repaint, black (0) = keep; RGB or RGBA, same size as the result; NULL = no mask */
+    /* appended in step 5.4: needs GH_FEATURE_LORA */
+    const gh_lora* loras;       /* applied for this generation only; NULL = none */
+    int32_t lora_count;
 } gh_generate_params;
 
 typedef struct gh_image {

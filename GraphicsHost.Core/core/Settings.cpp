@@ -1,9 +1,11 @@
 #include "core/Settings.h"
 
 #include "core/AtomicFile.h"
+#include "server/ClientLimits.h"
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <filesystem>
 #include <stdexcept>
 
@@ -13,8 +15,12 @@ namespace {
 
 using Json = nlohmann::json;
 
-constexpr std::array<const char*, 9> kKnownKeys = {"schemaVersion", "backend", "gpuDevice", "threads", "modelsDir",
-                                                  "interfaceMode",  "server",  "logging",   "safety"};
+constexpr std::array<const char*, 13> kKnownKeys = {"schemaVersion", "backend", "gpuDevice", "threads", "modelsDir",
+                                                  "interfaceMode",  "server",  "logging",   "safety", "firstRunDone", "theme", "accent", "notifications"};
+
+bool validAccent(const std::string& c) {
+    return c.size() == 7 && c[0] == '#' && std::all_of(c.begin() + 1, c.end(), [](unsigned char ch) { return std::isxdigit(ch) != 0; });
+}
 
 bool oneOf(const std::string& value, std::initializer_list<const char*> allowed) {
     return std::any_of(allowed.begin(), allowed.end(), [&](const char* a) { return value == a; });
@@ -30,7 +36,13 @@ Json toJson(const Settings& s) {
     json["threads"] = s.threads;
     json["modelsDir"] = s.modelsDir;
     json["interfaceMode"] = s.interfaceMode;
-    json["server"] = {{"enabled", s.server.enabled}, {"port", s.server.port}, {"lan", s.server.lan}};
+    json["firstRunDone"] = s.firstRunDone;
+    json["theme"] = s.theme;
+    json["accent"] = s.accent;
+    json["notifications"] = s.notifications;
+    json["server"] = {{"enabled", s.server.enabled}, {"port", s.server.port}, {"lan", s.server.lan}, {"requireToken", s.server.requireToken},
+                      {"https", s.server.https}, {"tlsCertFile", s.server.tlsCertFile}, {"tlsKeyFile", s.server.tlsKeyFile},
+                      {"allowedAddresses", s.server.allowedAddresses}, {"rateLimitPerMinute", s.server.rateLimitPerMinute}};
     json["logging"] = {{"level", s.logging.level}};
     json["safety"] = {{"enabled", s.safety.enabled}};
     return json;
@@ -47,10 +59,20 @@ Settings settingsFromJson(const Json& json) {
     s.threads = json.value("threads", s.threads);
     s.modelsDir = json.value("modelsDir", s.modelsDir);
     s.interfaceMode = json.value("interfaceMode", s.interfaceMode);
+    s.firstRunDone = json.value("firstRunDone", s.firstRunDone);
+    s.theme = json.value("theme", s.theme);
+    s.accent = json.value("accent", s.accent);
+    s.notifications = json.value("notifications", s.notifications);
     if (const auto it = json.find("server"); it != json.end() && it->is_object()) {
         s.server.enabled = it->value("enabled", s.server.enabled);
         s.server.port = it->value("port", s.server.port);
         s.server.lan = it->value("lan", s.server.lan);
+        s.server.requireToken = it->value("requireToken", s.server.requireToken);
+        s.server.https = it->value("https", s.server.https);
+        s.server.tlsCertFile = it->value("tlsCertFile", s.server.tlsCertFile);
+        s.server.tlsKeyFile = it->value("tlsKeyFile", s.server.tlsKeyFile);
+        s.server.rateLimitPerMinute = it->value("rateLimitPerMinute", s.server.rateLimitPerMinute);
+        if (const auto a = it->find("allowedAddresses"); a != it->end() && a->is_array()) s.server.allowedAddresses = a->get<std::vector<std::string>>();
     }
     if (const auto it = json.find("logging"); it != json.end() && it->is_object()) {
         s.logging.level = it->value("level", s.logging.level);
@@ -80,6 +102,21 @@ std::vector<FieldError> validate(const Settings& s) {
     }
     if (!oneOf(s.interfaceMode, {"user", "power", "developer"})) {
         errors.push_back({"interfaceMode", "must be user, power or developer"});
+    }
+    if (!oneOf(s.theme, {"system", "light", "dark"})) {
+        errors.push_back({"theme", "must be system, light or dark"});
+    }
+    if (!s.accent.empty() && !validAccent(s.accent)) {
+        errors.push_back({"accent", "must be empty or a colour like #2b6cb0"});
+    }
+    for (const auto& a : s.server.allowedAddresses) {
+        if (!server::IpAllowList::valid(a)) errors.push_back({"server.allowedAddresses", "not an address or range: " + a});
+    }
+    if (s.server.rateLimitPerMinute < 0 || s.server.rateLimitPerMinute > 100000) {
+        errors.push_back({"server.rateLimitPerMinute", "must be between 0 (no limit) and 100000"});
+    }
+    if (s.server.https && (s.server.tlsCertFile.empty() != s.server.tlsKeyFile.empty())) {
+        errors.push_back({"server.tlsCertFile", "give both a certificate and a key file, or neither (a certificate is made for you)"});
     }
     if (s.server.port < 1 || s.server.port > 65535) {
         errors.push_back({"server.port", "must be between 1 and 65535"});

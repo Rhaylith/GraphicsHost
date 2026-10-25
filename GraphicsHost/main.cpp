@@ -1,11 +1,18 @@
 #include "cli/Cli.h"
 #include "host/AppHost.h"
+#include "ui/FirstRunWizard.h"
+#include "ui/GenerateTab.h"
+#include "ui/MaskEditor.h"
+#include "ui/Theme.h"
 #include "ui/MainWindow.h"
 
 #include <QApplication>
 #include <QCoreApplication>
+#include <QDir>
+#include <QEventLoop>
 #include <QStringList>
 #include <QTimer>
+#include <QTabWidget>
 
 #include <windows.h>
 
@@ -14,6 +21,7 @@
 
 #include <cstdio>
 #include <iostream>
+#include <string>
 
 namespace {
 
@@ -51,19 +59,111 @@ void bindStandardStreams() {
 }
 
 int runGui(int argc, char* argv[]) {
+    // Only one GraphicsHost per user session: a second start asks the first to show its window and ends. Not for the
+    // automated modes, which must be able to run next to a real instance.
+    const bool automated = [&] {
+        for (int i = 1; i < argc; ++i) {
+            const std::string a = argv[i];
+            if (a == "--smoke-test" || a == "--screenshot-dir") return true;
+        }
+        return false;
+    }();
+    HANDLE instanceMutex = nullptr;
+    if (!automated) {
+        instanceMutex = CreateMutexW(nullptr, TRUE, L"Local\\GraphicsHost.SingleInstance");
+        if (instanceMutex && GetLastError() == ERROR_ALREADY_EXISTS) {
+            PostMessageW(HWND_BROADCAST, gh::ui::MainWindow::raiseMessageId(), 0, 0);
+            CloseHandle(instanceMutex);
+            return 0;
+        }
+    }
+
     QApplication app(argc, argv);
     QCoreApplication::setApplicationName(QStringLiteral("GraphicsHost"));
     QCoreApplication::setOrganizationName(QStringLiteral("GraphicsHost"));
+    QApplication::setQuitOnLastWindowClosed(true);
 
     gh::host::AppHost host;
+    gh::ui::installTranslations(app);
+    gh::ui::applyTheme(app, host.settings());
     gh::ui::MainWindow window(host);
     window.show();
+    // the first time: a short wizard (not in the automated modes)
+    if (!automated && !host.settings().firstRunDone) {
+        QTimer::singleShot(0, &app, [&host, &window] { gh::ui::FirstRunWizard(host, &window).exec(); });
+    }
 
+    const QStringList args = app.arguments();
     // --smoke-test: open the window, run one event-loop pass and exit (used by CI and the build checks).
-    if (app.arguments().contains(QStringLiteral("--smoke-test"))) {
+    if (args.contains(QStringLiteral("--smoke-test"))) {
         QTimer::singleShot(0, &app, &QCoreApplication::quit);
     }
-    return app.exec();
+    // --screenshot-dir <dir>: save a picture of every tab and exit (the UI checks in the test plan).
+    // --generate-prompt <text>: first generate a small image on the Generate tab and wait for it, so the picture shows
+    // a finished generation (the model must be in the data folder; use GRAPHICSHOST_HOME to point at a prepared one).
+    const int shotArg = static_cast<int>(args.indexOf(QStringLiteral("--screenshot-dir")));
+    const int promptArg = static_cast<int>(args.indexOf(QStringLiteral("--generate-prompt")));
+    if (shotArg >= 0 && shotArg + 1 < args.size()) {
+        const QString dir = args[shotArg + 1];
+        const QString prompt = promptArg >= 0 && promptArg + 1 < args.size() ? args[promptArg + 1] : QString();
+        auto takeShots = [&window, &app, &host, dir] {
+            QDir().mkpath(dir);
+            for (int i = 0; i < window.tabs()->count(); ++i) {
+                window.tabs()->setCurrentIndex(i);
+                QEventLoop settle;   // let the tab load what it loads in the background
+                QTimer::singleShot(window.tabs()->tabText(i) == QLatin1String("Monitor") ? 3500 : 700, &settle, &QEventLoop::quit);   // the monitor needs a few readings
+                settle.exec();
+                const QString name = window.tabs()->tabText(i).remove(QLatin1Char('&')).replace(QLatin1Char(' '), QLatin1Char('-')).toLower();
+                window.grab().save(dir + QStringLiteral("/") + QString::number(i + 1) + QStringLiteral("-") + name + QStringLiteral(".png"));
+            }
+            {   // the first-run wizard, page by page
+                gh::ui::FirstRunWizard wizard(host);
+                wizard.show();
+                for (int page = 1; page <= 3; ++page) {
+                    QEventLoop settle;
+                    QTimer::singleShot(300, &settle, &QEventLoop::quit);
+                    settle.exec();
+                    wizard.grab().save(dir + QStringLiteral("/first-run-") + QString::number(page) + QStringLiteral(".png"));
+                    wizard.next();
+                }
+                wizard.hide();
+            }
+            {   // the mask editor is a dialog, not a tab: show it over a sample picture so it is part of the check
+                QImage sample(512, 384, QImage::Format_RGB888);
+                for (int y = 0; y < sample.height(); ++y) for (int x = 0; x < sample.width(); ++x) sample.setPixel(x, y, qRgb(x / 2, y / 2, 160));
+                gh::ui::MaskEditor editor(sample, QImage());
+                editor.show();
+                QEventLoop settle;
+                QTimer::singleShot(300, &settle, &QEventLoop::quit);
+                settle.exec();
+                editor.grab().save(dir + QStringLiteral("/") + QString::number(window.tabs()->count() + 1) + QStringLiteral("-mask-editor.png"));
+            }
+            app.quit();
+        };
+        QTimer::singleShot(300, &app, [&window, &app, takeShots, prompt] {
+            if (prompt.isEmpty()) {
+                takeShots();
+                return;
+            }
+            auto* tab = window.generateTab();
+            tab->loadParameters({{"prompt", prompt.toStdString()}, {"width", 128}, {"height", 128}, {"steps", 4}, {"seed", 7}}, QString());
+            tab->onGenerate();
+            auto* wait = new QTimer(&app);
+            auto* ticks = new int(0);
+            QObject::connect(wait, &QTimer::timeout, &app, [=, &window] {
+                ++*ticks;
+                if (!window.generateTab()->busy() || *ticks > 1200) {   // up to 10 minutes
+                    wait->stop();
+                    std::cout << "generate: " << window.generateTab()->statusText().toStdString() << std::endl;
+                    takeShots();
+                }
+            });
+            wait->start(500);
+        });
+    }
+    const int code = app.exec();
+    if (instanceMutex) CloseHandle(instanceMutex);
+    return code;
 }
 
 }  // namespace
