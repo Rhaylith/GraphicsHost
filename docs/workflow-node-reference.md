@@ -35,7 +35,7 @@ Contents: [C Common](#c-common-tooltips) · [O Options](#o-option-tooltips) · [
 | `C.seed` | The random number that creates the starting noise. The same seed with the same settings gives the same image; a different seed gives a different composition. Example: seed 42 always gives the same lighthouse; change it to 43 for a new variation with everything else unchanged. |
 | `C.seedControl` | What happens to the seed after each run is queued: *fixed* keeps it, *increment* adds 1, *decrement* subtracts 1, *randomize* picks a new one. Example: set *increment* and queue 4 times to get seeds 100, 101, 102, 103. |
 | `C.steps` | How many denoising steps the sampler takes. More steps give finer detail up to a point, then only cost time. Example: 20–30 for most models with *euler* or *dpm++ 2M*; 1–4 for Turbo/Lightning/LCM models; 50 rarely helps. |
-| `C.cfg` | Classifier-free guidance scale: how strongly the image follows the prompt versus the negative prompt. Higher is more literal but can look burnt or oversaturated. Example: 7 for SD 1.5, 5–7 for SDXL, 1.0 for Turbo and distilled FLUX models (1.0 also skips the negative pass and runs twice as fast). |
+| `C.cfg` | Classifier-free guidance scale: how strongly the image follows the prompt versus the negative prompt. Higher is more literal but can look burnt or oversaturated. Example: 7.5 for SD 1.5, 7 for SDXL (the built-in family defaults), 1.0 for Turbo and distilled FLUX models (1.0 also skips the negative pass and runs twice as fast). |
 | `C.sampler` | The numerical method used to remove noise step by step. Hover an option to see what it is good for. Example: *euler* is fast and safe; *dpm++ 2M* is sharp at 20–30 steps; *euler ancestral* adds variety but never fully converges. |
 | `C.scheduler` | How the noise level drops across the steps. Hover an option for details. Example: *karras* spends more steps at low noise for fine detail; *simple* or *normal* suit flow models such as SD3 and FLUX; *sgm uniform* suits Turbo/LCM. |
 | `C.denoise` | How much of the input latent is replaced: 1.0 starts from pure noise, lower values keep more of the input image. Example: 1.0 for text-to-image; 0.5 for image-to-image that keeps the composition; 0.3 for a light retouch of a hi-res-fix pass. |
@@ -58,7 +58,7 @@ Contents: [C Common](#c-common-tooltips) · [O Options](#o-option-tooltips) · [
 | `C.image` | An image or a batch of images (video frames are a batch). Example: the IMAGE output of Load Image or VAE Decode. |
 | `C.x` | Horizontal offset in pixels from the left edge. Example: 256 places the item a quarter of the way across a 1024-wide image. |
 | `C.y` | Vertical offset in pixels from the top edge. Example: 0 aligns with the top. |
-| `C.device` | Where this component runs. *default* follows the memory mode; *cpu* forces system RAM and the CPU to save VRAM. Example: put a 9 GB T5 text encoder on *cpu* so the diffusion model fits on an 8 GB GPU. |
+| `C.device` | Which Vulkan GPU this component runs on, and whether its weights live in VRAM. *auto* follows the memory mode; *GPU, weights in RAM* keeps the weights in system RAM and streams them to the GPU, saving VRAM at some speed cost. Example: put a 9 GB T5 text encoder on *GPU, weights in RAM* so the diffusion model stays fully in VRAM on a 12 GB card. |
 | `C.weightDtype` | Number format of the weights in memory. Smaller formats use less memory and may lose a little quality. Example: *fp8 e4m3* halves the VRAM of a FLUX model compared with *fp16*; *default* keeps the file's format. |
 | `C.tileSize` | Size in pixels of the tiles processed one at a time. Smaller tiles use less memory but take longer and may show seams. Example: 512 for SDXL VAE decode on an 8 GB GPU; 256 if it still runs out of memory. |
 | `C.overlap` | Pixels shared between neighbouring tiles, blended to hide seams. Example: 64 with tile size 512; raise it if you see grid lines. |
@@ -158,11 +158,15 @@ Contents: [C Common](#c-common-tooltips) · [O Options](#o-option-tooltips) · [
 | Node (`id`) | Parameter | Type · range · default | Tooltip |
 |---|---|---|---|
 | Load Checkpoint (`loader.checkpoint`) | checkpoint | model list *checkpoints* | A single file holding the diffusion model, text encoder(s) and VAE. Example: `sd_xl_base_1.0.safetensors` gives MODEL, TEXT_ENCODER and VAE outputs for SDXL. |
+| | device | combo auto, vulkan0, vulkan1 … · **auto** | Which Vulkan GPU runs the model. *auto* uses the GPU chosen in Settings (`gpuDevice`). Example: *vulkan1* to render on a second card while the first drives the desktop. |
+| | flashAttention | bool · **auto** | A faster, memory-saving attention kernel. *auto* turns it on for SD 1.x above 512² on Vulkan, where it was measured 5× faster. Example: on for SD 1.5 at 768². |
+| | offloadToRam | bool · **auto** | Keep the weights in system RAM and stream them to the GPU, for cards with little VRAM. Measured almost free on SDXL (3.04 vs 2.89 s/step). Example: on for SDXL on an 8 GB card. |
+| | idleUnloadMinutes | int 0 … 1440 · **10** | Unload the model after this many idle minutes; 0 keeps it loaded. Example: 0 on a dedicated server. |
 | Load Diffusion Model (`loader.diffusionModel`) | model | model list *diffusion_models* | A diffusion model without text encoder or VAE (common for FLUX, SD3.5, Wan). Load the encoders and VAE separately. Example: `flux1-dev.safetensors`. |
 | | weightDtype | combo default, fp8 e4m3, fp8 e4m3 fast, fp8 e5m2 · **default** | → C.weightDtype + *fp8 e4m3 fast* also computes in fp8 where the GPU supports it. |
 | Load Text Encoders (`loader.textEncoders`) | encoder1 … encoder4 | model list *text_encoders* (2–4 optional) | One file per encoder; the family decides how many are needed. Example: FLUX needs `clip_l.safetensors` and `t5xxl_fp16.safetensors`; SD3.5 adds `clip_g.safetensors`; HiDream uses four. |
 | | family | combo auto, sd1, sdxl, sd3, flux, hunyuan video, hidream, stable cascade, stable audio, mochi, ltxv, pixart, cosmos, lumina2, wan, chroma, ace, omnigen2, qwen image · **auto** | Which model family these encoders are for; *auto* guesses from the files. Example: set *flux* when a T5 file alone is ambiguous. |
-| | device | combo default, cpu · **default** | → C.device |
+| | device | combo auto, GPU weights in VRAM, GPU weights in RAM · **auto** | → C.device |
 | Load VAE (`loader.vae`) | vae | model list *vae* + *preview decoders* + *pixel space* | The autoencoder to use instead of the checkpoint's. Example: `sdxl_vae_fp16fix.safetensors`; *taesdxl* decodes very fast at lower quality; *pixel space* for models that work directly on pixels. |
 | Load LoRA (`loader.lora`) | lora | model list *loras* | A small add-on that teaches a style, character or concept. Example: `watercolor_v2.safetensors`; add its trigger word to the prompt if it has one. |
 | | strengthModel | float −100 … 100 · 0.01 · **1.0** | How strongly the LoRA changes the diffusion model; negative values push away from it. Example: 0.7 for a softer style; −0.5 to suppress what the LoRA adds. |
@@ -264,7 +268,7 @@ Contents: [C Common](#c-common-tooltips) · [O Options](#o-option-tooltips) · [
 | | seed | int 0 … 2⁶⁴−1 · **0** | → C.seed |
 | | seedControl | combo fixed, increment, decrement, randomize · **randomize** | → C.seedControl |
 | | steps | int 1 … 10000 · **20** | → C.steps |
-| | cfg | float 0 … 100 · 0.1 · **7.0** | → C.cfg |
+| | cfg | float 0 … 100 · 0.1 · **family default** (7.5 SD 1.x, 7.0 SDXL) | → C.cfg |
 | | sampler | combo (O.sampler) · **euler** | → C.sampler |
 | | scheduler | combo (O.scheduler) · **normal** | → C.scheduler |
 | | denoise | float 0 … 1 · 0.01 · **1.0** | → C.denoise |
@@ -298,7 +302,7 @@ The split pipeline: **Noise** + **Guider** + **Sampler** + **Sigmas** → Sample
 | | noiseScale | float 0 … 100 · 0.01 · **1.0** | Multiplier on that fresh noise. Example: 1.02 slightly increases texture. |
 | DPM++ 2M SDE Sampler (`sampling.samplerDpmpp2mSde`) | solver | combo midpoint, heun · **midpoint** | Second-order correction method. Example: *heun* is a little sharper. |
 | | eta, noiseScale | float · **1.0, 1.0** | As Euler Ancestral. Example: eta 0.7 for calmer textures. |
-| | noiseDevice | combo gpu, cpu · **gpu** | Where the SDE noise is made; *cpu* gives the same image on any GPU. Example: *cpu* for reproducible results across machines. |
+| | noiseGenerator | combo setting default, cpu-compatible, philox · **setting default** | Random generator for the SDE noise (made on the host, so it is identical on every GPU). *cpu-compatible* matches the generator most tools use for seeds. Example: *cpu-compatible* to reproduce a seed shared from another tool. |
 | DPM++ 3M SDE / DPM++ SDE Sampler (`sampling.samplerDpmpp3mSde`, `sampling.samplerDpmppSde`) | eta, noiseScale, noiseDevice | as above | As DPM++ 2M SDE. |
 | | r (SDE only) | float 0 … 100 · 0.01 · **0.5** | Position of the intermediate step. Example: 0.5 (midpoint). |
 | DPM Adaptive Sampler (`sampling.samplerDpmAdaptive`) | order | int 2 … 3 · **3** | Solver order. Example: 2 for speed. |
@@ -662,27 +666,31 @@ The split pipeline: **Noise** + **Guider** + **Sampler** + **Sigmas** → Sample
 
 ### S.1 Engine and server (`settings.json`)
 
+Settings that already exist (`backend`, `gpuDevice`, `interfaceMode`, `theme`, `accent`, `notifications`, `server.*`,
+`logging.level`, `safety.enabled`) keep the help text the Settings tab has today; W1.6 checks that each of them also
+has an example. Rows marked *(existing)* below get new wording because the workflow system uses them too.
+
 | Key | Values · default | Tooltip |
 |---|---|---|
-| `memory.mode` | gpu-only, high, normal, low, none, cpu · **normal** | How models use VRAM. *high* keeps everything loaded; *normal* moves models in and out as needed; *low* splits models between GPU and RAM; *none* streams weights every step; *cpu* never uses the GPU. Example: *low* for SDXL on a 6 GB card. |
+| `memory.mode` | gpu-only, high, normal, low, stream · **normal** | How models use VRAM; every mode computes on the Vulkan GPU. *high* keeps everything loaded; *normal* moves models in and out as needed; *low* keeps part of a model in RAM; *stream* keeps all weights in RAM and streams them each step. Example: *low* for SDXL on a 6 GB card. |
 | `memory.reserveVramMb` | 0 … 65536 · **512** | VRAM left free for the desktop and other apps. Example: 1024 while gaming or streaming. |
 | `memory.asyncOffload` | bool · **true** | Move weights between RAM and VRAM in the background while the GPU works. Example: off if the driver is unstable. |
-| `graph.cache.policy` | last, lru, ram, none · **last** | Which node results are kept between runs, so unchanged parts are skipped. Example: *lru* with size 20 when switching between several workflows. |
-| `graph.cache.size` | 1 … 1000 / GB · **10** | Entries for *lru*, or free-RAM threshold in GB for *ram*. Example: 16 GB with *ram*. |
-| `graph.preview.method` | none, fast, decoder · **fast** | Live preview during sampling: *fast* is a rough colour map, *decoder* uses a tiny VAE (sharper, slightly slower). Example: *decoder* to judge faces early. |
-| `graph.preview.everyNSteps` | 1 … 100 · **1** | How often a preview is made. Example: 5 to save time on CPU. |
-| `graph.preview.maxSize` | 64 … 2048 · **512** | Longest side of previews in pixels. Example: 256 over a slow LAN. |
-| `graph.rng` | cpu, philox · **cpu** | Random generator for noise. *cpu* gives the same image on any machine. Example: keep *cpu* to share reproducible seeds. |
+| `graph.cachePolicy` | last, lru, ram, none · **last** | Which node results are kept between runs, so unchanged parts are skipped. Example: *lru* with size 20 when switching between several workflows. |
+| `graph.cacheSize` | 1 … 1000 / GB · **10** | Entries for *lru*, or free-RAM threshold in GB for *ram*. Example: 16 GB with *ram*. |
+| `graph.previewMethod` | none, fast, decoder · **fast** | Live preview during sampling: *fast* is a rough colour map, *decoder* uses a tiny VAE (sharper, slightly slower). Example: *decoder* to judge faces early. |
+| `graph.previewEveryNSteps` | 1 … 100 · **1** | How often a preview is made. Example: 5 to save a little time on long video runs. |
+| `graph.previewMaxSize` | 64 … 2048 · **512** | Longest side of previews in pixels. Example: 256 over a slow LAN. |
+| `graph.rng` | cpu-compatible, philox · **cpu-compatible** | Random generator for noise, run on the host so the noise is identical on any GPU. *cpu-compatible* matches the generator most tools use for seeds. Example: keep *cpu-compatible* to share reproducible seeds. |
 | `graph.historyMaxItems` | 0 … 1 000 000 · **10000** | History entries kept (0 = unlimited). Files are not deleted. Example: 500 for a small database. |
 | `graph.seedControlTiming` | after, before · **after** | Whether seeds change after or before queueing. Example: *before* to see the seed that will be used. |
 | `precision.diffusion` | auto, fp32, fp16, bf16, fp8 e4m3, fp8 e5m2 · **auto** | Default number format of diffusion models in memory. Example: *fp8 e4m3* to fit FLUX in 12 GB. |
 | `precision.textEncoder` | auto, fp32, fp16, bf16, fp8 e4m3 · **auto** | Same for text encoders. Example: *fp8 e4m3* halves T5's 9 GB. |
 | `precision.vae` | auto, fp32, fp16, bf16 · **auto** | Same for VAEs. Example: *fp32* if decoded images are black. |
 | `precision.vaeFallbackFp32` | bool · **true** | Retry a decode in fp32 when the result contains invalid values. Example: keep on. |
-| `engine.threads` | 0 … 512 · **0** | CPU threads for CPU work (0 = physical cores). Example: 8 to keep the PC responsive. |
-| `engine.flashAttention` | bool · **true** | Memory-saving attention kernel. Example: off if images show artefacts on an old driver. |
-| `paths.input`, `paths.output`, `paths.temp` | folder · **under data folder** | Where input, output and temporary files live. Example: `D:\Renders` for outputs. |
-| `paths.modelPathsFile` | file · **model-paths.json** | Extra model folders per type. Example: point *loras* at a shared network folder. |
+| `threads` (existing) | 0 … 512 · **0** | CPU threads for host-side work in workflows (image nodes, sampler maths, encoding files; 0 = physical cores). Model computation always runs on the GPU. Example: 8 to keep the PC responsive. |
+| `modelsDir` (existing) | folder · **DownloadedModels in the working directory** | Where models are found and downloaded to; kind subfolders (`loras/`, `vae/`, ...) are recognised. Example: `E:\AI\models`. |
+| `paths.inputDir`, `paths.tempDir` | folder · **under the data folder** | Where uploaded inputs and temporary previews live; outputs stay in the gallery's outputs folder. Example: `D:\Inputs` for a shared input folder. |
+| `model-paths.json` (file in the data folder) | per kind: list of folders · **none** | Extra model folders per kind. Example: `{"loras": ["\\\\nas\\loras"]}` adds a network share for LoRAs. |
 | `output.embedWorkflow` | bool · **true** | Store the workflow inside saved files. Example: off for privacy when sharing. |
 | `output.filenameCounterDigits` | 1 … 9 · **5** | Digits of the counter in file names. Example: 3 gives `fox_001.png`. |
 | `server.maxUploadMb` | 1 … 4096 · **100** | Largest accepted upload. Example: 1024 for video inputs. |

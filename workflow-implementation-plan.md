@@ -5,8 +5,27 @@ a checkpoint, encode a prompt, sample, decode, upscale, save) in a visual editor
 graph. A local engine runs only the parts that changed, keeps loaded models in memory, and streams progress and previews
 back. The same graph can be saved as a file, embedded in the images it produced, and sent to an HTTP API.
 
-It builds on [implementation-plan.md](implementation-plan.md) (phases 0 to 6: runtime DLLs, settings, model library,
-HTTP server, Qt UI). Where the two disagree, this plan wins for the areas it covers (§14 lists the overrides).
+It builds on [implementation-plan.md](implementation-plan.md). Where the two disagree, this plan wins for the areas it
+covers (§14 lists the overrides).
+
+**Starting point (2026-10-25).** The main plan is done except the stretch items (5.7 upscaler/ControlNet, 6.6
+auto-update), an MSI installer, and testing on other hardware (6.7). What already exists, and is reused rather than rebuilt:
+
+| Exists | Where | Used by this plan for |
+|---|---|---|
+| Two runtimes, `sd-cpu-avx2.dll` and `sd-vulkan.dll` (the non-AVX2 one was dropped), ABI v1 with `struct_size` appends and `GH_FEATURE_*` bits (img2img, inpaint, LoRA) | `runtime/gh_runtime.h`, `gh_runtime.cpp`; `ggml/ggml.vcxproj` + `ggml-vulkan.vcxproj` | the component functions of §5 are appended the same way, in `sd-vulkan.dll` only; `sd-cpu-avx2.dll` is left as it is for the existing Generate path and gets no workflow features |
+| SD 1.5 and SDXL verified on the RX 7900 XTX (SD1.5 512² 6.9 s, SDXL 1024² 25.6 s), VRAM calibration | `docs/phase0-results.md`, `docs/vram-measurements.md`, `engine/FitEstimator` | golden references (W0), memory estimates (W3) |
+| `IImageEngine` / `ILoadedModel`, `JobQueue` (one worker, observer, cancel), `ModelManager` (one model, idle TTL), `GenerationRequest`/`LoadOptions` with validator and JSON, `knownSamplers()`/`knownSchedulers()` | `GraphicsHost.Core/engine/` | the queue is generalised (W2.5); `ModelManager` gives way to the component cache (W3.3) |
+| `GenerationService`, `AppHost`, `HardwareMonitor` | `GraphicsHost.Core/host/` | graph jobs go through the same service layer |
+| Gallery (dated folders, sidecar JSON, SQLite index), image codecs with embedded parameters | `gallery/GalleryStore`, `engine/ImageCodec` | outputs and history (W2.5, W6.4) |
+| Model library, model cards, catalog, downloads, Hugging Face client, fit hints, update check, recommendation | `GraphicsHost.Core/models/` (**not in git, see W0.0**) | model folders and the missing-models flow (W3.1, W8.16) |
+| HTTP server with JSON errors, `SseStream`, tokens with `read`/`generate`/`manage`/`admin`, HTTPS, allow-list, rate limit, request log, metrics | `GraphicsHost.Core/server/`, `docs/api.md` | the graph routes and events (§7) |
+| Qt tabs Generate, Gallery, My Models, Discover, Settings, Monitor, Logs; `MaskEditor`, `ImageView`, themes with accent, interface modes, translation scaffolding (`graphicshost_de.ts`), first-run wizard, tray | `GraphicsHost/ui/` | the Workflows tab (§8) reuses the mask editor, image view, theme and modes |
+| Browser UI in plain HTML/JS (`web/`, about 700 lines) | `web/` | kept as it is until W9 (§9) |
+| Presets and per-model defaults, safety word filter (off by default), CLI verbs, portable package (`installer/Package.proj`) | `presets/`, `engine/SafetyFilter`, `cli/`, `installer/` | templates (W8.13), safety on graph prompts (W4.2), `graph` CLI verbs (W7.5), packaging (W13.5) |
+| Test tags `[unit]`, `[integration]`, `[model]`, `[api]`, `[ui]`, `[network]` (about 230 cases without models or network) | `GraphicsHost.Tests/` | the same tags (§12) |
+
+So the W phases can start now; nothing in the main plan blocks them.
 
 Effort: **S** ≤ 2 d · **M** 3–5 d · **L** 6–10 d · **XL** > 10 d (one engineer, includes tests).
 
@@ -32,7 +51,12 @@ part of this plan: every node and setting it lists is a deliverable, and its too
    or its tooltip has no example (W1.6).
 5. **Local first.** Everything runs offline once models are present. Network access happens only for model downloads, the
    plugin registry, and the update check, and each one is a setting that can be turned off.
-6. **Hardware scope is unchanged from the main plan:** CPU and Vulkan on AMD in v1.
+6. **Vulkan only, AVX2 always.** All model computation runs on Vulkan (AMD in v1) through `sd-vulkan.dll`; there is no
+   CPU inference path, no CPU fallback and no "CPU only" mode in the workflow system. Low VRAM is handled by keeping
+   weights in RAM and streaming them to the GPU (`offload_params_to_cpu`, still Vulkan compute) and by partial
+   residency, never by moving a component to the CPU. Host-side C++ (tensor maths, samplers, image nodes, codecs) is
+   built with `/arch:AVX2` and assumes AVX2 everywhere: no scalar fallback, no runtime CPU dispatch. A machine without a
+   usable Vulkan device gets a clear "a Vulkan GPU is required for workflows" message.
 
 ---
 
@@ -47,10 +71,10 @@ What "all the features" means for this plan. Each row is delivered by the phase 
 | **Execution** | Validation with per-node, per-input errors; run only the ancestors of output nodes; run up to one selected output ("partial run"); caching of node outputs by input fingerprint so only changed parts rerun; cache policies (keep last, LRU, RAM-pressure, none); lazy inputs (an input evaluated only when the node asks for it); list inputs and outputs (a node maps over a list or receives the whole list); node expansion (a node returns a sub-graph at run time, which makes loops and control flow possible); interrupt; per-node progress; previews during sampling | W2 |
 | **Queue and history** | FIFO job queue with "add to front"; batch count (queue the same graph N times); auto-queue (re-queue when the previous run finishes, or when the graph changes); cancel a running or pending job; history with outputs, timings, status and errors; reopen any past job's graph | W2, W7 |
 | **Models** | Model folders per type (checkpoints, diffusion models, text encoders, VAEs, LoRAs, ControlNets and adapters, CLIP-vision encoders, style models, upscale models, embeddings, hypernetworks, GLIGEN, PhotoMaker, preview decoders); extra model folders from a config file; hot rescan; companion detection; download of missing models referenced by a workflow | W3 |
-| **Memory** | Load on demand, keep in VRAM while useful, offload to RAM, evict by LRU under memory pressure; partial loading for low VRAM; memory modes (*GPU only, high VRAM, normal, low VRAM, no VRAM, CPU*); reserved VRAM; precision per component (fp32, fp16, bf16, fp8 storage, ggml quantisations); "free memory" and "unload models" actions | W3 |
+| **Memory** | Load on demand, keep in VRAM while useful, offload to RAM, evict by LRU under memory pressure; partial loading for low VRAM; memory modes (*GPU only, high VRAM, normal, low VRAM, streaming*); reserved VRAM; precision per component (fp32, fp16, bf16, fp8 storage, ggml quantisations); "free memory" and "unload models" actions | W3 |
 | **Weights and patches** | LoRA and LyCORIS variants (LoCon, LoHa, LoKr, DoRA, full diff) on model and text encoder with separate strengths; patches applied lazily and undone without reloading; scheduled LoRA strength over the sampling run (hooks and keyframes); model merging (simple, per block, add, subtract); save merged checkpoints and extract LoRAs | W3, W10 |
 | **Text** | Tokenisers (CLIP BPE, T5/mT5 SentencePiece, LLM BPE for newer text encoders); prompt weighting `(word:1.2)`, nesting `((word))`, escaping `\(`; textual-inversion embeddings `embedding:name`; per-encoder prompts (SDXL `g`/`l`, SD3 `l`/`g`/`t5`); clip-skip; dynamic prompt choices `{red|green|blue}`; `//` and `/* */` comments in prompts | W4 |
-| **Sampling** | One-node sampler and the split pipeline (noise source + guider + sampler + sigma schedule); ~35 samplers and 9 schedulers (§6.4); custom sigma tools (split, flip, set first, extend); model sampling types (eps, v-prediction, x0, LCM, flow / rectified flow with shift, EDM, zero-terminal-SNR); CFG variants (rescale, dual CFG, perpendicular negative, CFG++, APG, CFG-Zero*); reproducible seeds with a CPU RNG and a Philox RNG | W4, W10 |
+| **Sampling** | One-node sampler and the split pipeline (noise source + guider + sampler + sigma schedule); ~35 samplers and 9 schedulers (§6.4); custom sigma tools (split, flip, set first, extend); model sampling types (eps, v-prediction, x0, LCM, flow / rectified flow with shift, EDM, zero-terminal-SNR); CFG variants (rescale, dual CFG, perpendicular negative, CFG++, APG, CFG-Zero*); reproducible seeds with a CPU-compatible RNG and a Philox RNG, both run on the host | W4, W10 |
 | **Conditioning** | Combine, concat, average; area (pixels or percent) and strength; mask conditioning; timestep ranges; zero-out; SDXL size/crop conditioning; ControlNet, T2I-Adapter, control-LoRA, union ControlNet types, diff ControlNet, with strength and start/end; style models; CLIP-vision encode; unCLIP; GLIGEN boxes; inpaint conditioning; instruct-pix2pix; reference latents for edit models; PhotoMaker | W5 |
 | **Latents, images, masks** | Empty latents per family; VAE encode/decode, tiled and temporal-tiled; inpaint encode with mask growth; latent upscale (several methods), composite, blend, arithmetic, batch tools, crop, flip, rotate, noise masks; image scale/crop/pad/blend/blur/sharpen/quantise/invert/stitch/morphology; masks from images and colours, mask maths, grow, feather, threshold; model upscalers (ESRGAN family) with tiling | W6 |
 | **Inputs and outputs** | Load image (with alpha as mask), load mask, load latent, load video, load audio, webcam capture; save/preview image (PNG with embedded workflow, JPEG, WebP), animated WebP/PNG, video, audio, latents; filename prefixes with date and node-value tokens | W6, W11 |
@@ -59,7 +83,7 @@ What "all the features" means for this plan. Each row is delivered by the phase 
 | **Video, audio, 3D** | Image-to-video (SVD), text/image-to-video (Wan 2.x, LTX-Video, Hunyuan Video, Mochi, Cosmos); video CFG schedules; audio generation (Stable Audio Open, ACE-Step) with audio VAE and save as FLAC/MP3/Opus; image-to-3D (Hunyuan3D 2) to voxels and mesh, save GLB, 3D preview | W11 |
 | **Editor** | Infinite canvas, pan/zoom, minimap, grid snapping, alignment tools; node search (double-click canvas, or drop a link on empty canvas for a type-filtered search); node library sidebar; model library sidebar with previews; workflow browser; templates browser; queue and history (assets) sidebar; image previews in nodes; per-node progress and execution highlight; error badges on nodes and inputs; link styles; selection toolbox; copy/paste with or without links; undo/redo; workflow tabs; mask editor; image crop and compare views; settings dialog; keyboard shortcut editor; light/dark themes; translations | W8 |
 | **Browser editor** | The same editor in a browser (WebAssembly), talking to the local server; works over LAN with tokens | W9 |
-| **API** | Queue a job, read queue, cancel, interrupt, history, download outputs, upload inputs, node catalogue (all node definitions with types, ranges, defaults, tooltips), model lists, embeddings list, system stats, free memory; WebSocket event stream with status, start, cached nodes, executing node, step progress, node outputs, errors, interruption, completion, and binary preview frames | W7 |
+| **API** | Queue a job, read queue, cancel, interrupt, history, download outputs, upload inputs, node catalogue (all node definitions with types, ranges, defaults, tooltips), model lists, embeddings list, system stats, free memory; Server-Sent Events stream with status, start, cached nodes, executing node, step progress, previews, node outputs, errors, interruption, completion; `graph` CLI verbs | W7 |
 | **Extensibility** | Native plugin DLLs with a C ABI for new nodes, new widget kinds (desktop), new model formats and new server routes; plugin registry and in-app plugin manager (install, update, disable, remove, safe mode); per-plugin settings | W12 |
 | **Multi-user** | Optional user accounts on a shared server: own settings, workflows, inputs/outputs subfolders | W12 |
 | **Training** | Train a LoRA from a folder of images inside a workflow (stretch) | W12 |
@@ -70,40 +94,54 @@ Out of scope: cloud "partner API" nodes that call paid remote services (this is 
 
 ## 3. Architecture
 
+New folders are marked **new**; everything else exists and is extended.
+
 ```
 GraphicsHost/
-├─ runtime/                       existing sd-*.dll; ABI v2 adds components (§5)
-│  ├─ gh_runtime.h                ABI v1 (single-shot generate, kept)
-│  └─ gh_components.h             ABI v2: components, tensors, denoise step, VAE, encoders
+├─ runtime/                       sd-vulkan.dll (workflows); sd-cpu-avx2.dll unchanged for the Generate path
+│  ├─ gh_runtime.h                ABI v1 + the component functions appended under GH_FEATURE_COMPONENTS (§5)
+│  └─ arch/                       new: own ggml modules for architectures the pinned engine lacks (W10/W11)
 ├─ GraphicsHost.Core/
-│  ├─ tensor/     Tensor (CPU float32/f16, up to 5-D), elementwise ops, resize, blur, morphology, image/mask codecs
-│  ├─ text/       tokenisers (CLIP BPE, SentencePiece, LLM BPE), prompt parser (weights, embeddings, choices, comments)
-│  ├─ models/     ModelFolders, ModelIndex, ComponentCache, MemoryManager, WeightPatcher (LoRA/hooks)
-│  ├─ sampling/   noise/RNG, sigma schedules, model-sampling types, samplers, guiders, CFG patches
-│  ├─ graph/      types, NodeDef + registry, Workflow (editor format), JobGraph (job format), Validator,
-│  │              Executor, OutputCache, JobQueue, History, Events
-│  ├─ nodes/      built-in nodes, one .cpp per category (loaders, conditioning, sampling, latent, image, mask, ...)
-│  ├─ plugins/    plugin loader, registry client, plugin manager
-│  └─ server/     /api/v1/graph routes, WebSocket events, uploads, file views
-├─ GraphicsHost/ui/graph/         Qt editor: Canvas, NodeItem, LinkItem, widgets, panels, mask editor (§8)
-├─ GraphicsHost.Web/              the same editor sources built with Qt for WebAssembly (§9)
-├─ plugins/sdk/                   gh_node_plugin.h, C++ helper header, example plugin project
-└─ GraphicsHost.Tests/            [unit] [api] [integration] [golden] tests
+│  ├─ engine/     existing; JobQueue generalised to any job kind; ImageCodec gains metadata chunks for workflows
+│  ├─ models/     existing library/catalog/downloads; adds ComponentCache, MemoryManager, WeightPatcher
+│  ├─ gallery/    existing; adds the history tables and workflow/job columns
+│  ├─ host/       existing; adds GraphService next to GenerationService
+│  ├─ server/     existing; adds GraphRoutes, FileRoutes (uploads, views), SSE graph events
+│  ├─ cli/        existing; adds GraphCommands (`graph run`, `graph nodes`, `graph validate`)
+│  ├─ tensor/     new: Tensor (CPU float32/f16, up to 5-D), elementwise ops, resize, blur, morphology
+│  ├─ text/       new: tokenisers (CLIP BPE, SentencePiece, LLM BPE), prompt parser (weights, embeddings, choices, comments)
+│  ├─ sampling/   new: noise/RNG, sigma schedules, model-sampling types, samplers, guiders, CFG patches
+│  ├─ graph/      new: types, NodeDef + registry, Workflow (editor format), JobGraph (job format), Validator,
+│  │              Executor, OutputCache, Events
+│  ├─ nodes/      new: built-in nodes, one .cpp per category (loaders, conditioning, sampling, latent, image, mask, ...)
+│  └─ plugins/    new: plugin loader, registry client, plugin manager
+├─ GraphicsHost/ui/               existing tabs; MaskEditor and ImageView reused by the editor
+│  └─ graph/                      new: Workflows tab: Canvas, NodeItem, LinkItem, widgets, panels (§8)
+├─ GraphicsHost.Web/              new: the same editor sources built with Qt for WebAssembly (§9)
+├─ web/                           existing plain HTML/JS browser UI, unchanged until W9
+├─ sdk/                           new: gh_node_plugin.h, C++ helper header, example plugin project
+└─ GraphicsHost.Tests/            existing tags [unit] [integration] [model] [api] [ui] [network]
 ```
 
+No new folder may be named `models/`, `logs/`, `build/` or `bin/`: `.gitignore` patterns for data folders must stay
+anchored (W0.0).
+
 **Data flow of one job.** Editor (desktop or browser) → `Workflow` → converted to a `JobGraph` (muted nodes removed,
-bypassed nodes short-circuited, subgraphs flattened, reroutes and constants folded) → `POST /api/v1/graph/jobs` or a direct
-call to `JobQueue` → `Validator` → `Executor` on the **graph thread** → nodes call `ComponentCache` / `MemoryManager` /
-`sampling` / runtime ABI v2 → events (`Events` bus) to the WebSocket and to the Qt editor → outputs written to the output
-folder and the gallery index → `History`.
+bypassed nodes short-circuited, subgraphs flattened, reroutes and constants folded) → `POST /api/v1/graph/jobs`, the
+`graph run` verb, or `GraphService` directly → `Validator` → the shared `JobQueue` → `Executor` on the queue's worker →
+nodes call `ComponentCache` / `MemoryManager` / `sampling` / the runtime → events to the SSE stream and to the Qt editor
+→ outputs into `GalleryStore` → history.
 
-**Threads.** One graph thread runs jobs one at a time (the GPU is one resource). Node code may use a CPU thread pool for
-image maths. The runtime DLL is called only from the graph thread (it is not re-entrant; ABI v1 rule). The UI thread
-never blocks on the engine; it receives events through `QMetaObject::invokeMethod`.
+**Threads.** The existing `JobQueue` worker runs every job, generation or graph, one at a time (the GPU is one resource).
+Node code may use a CPU thread pool for image maths. The runtime DLL is called only from that worker (ABI v1 rule:
+`gh_generate` is not re-entrant, progress and log callbacks are process-wide). The UI thread never blocks on the engine;
+it receives events through `QMetaObject::invokeMethod`, as the Generate tab does today.
 
-**Relationship to the existing single-shot generator.** The Generate tab and `/v1/images/generations` keep working. In
-phase W4 they are re-implemented as a fixed built-in workflow template, so there is one engine path and one place where
-sampling is implemented. ABI v1 `gh_generate` stays as a reference for golden tests.
+**Relationship to the existing single-shot generator.** The Generate tab, the browser UI, `gen`, `POST /api/v1/generate`
+and `/v1/images/generations` keep working on ABI v1 unchanged. Once the graph path matches it image for image (W4.10),
+`GenerationService` builds a fixed workflow from a `GenerationRequest` instead of calling `gh_generate`, so there is one
+engine path and one place where sampling is implemented. `gh_generate` stays in the DLLs as the reference for the
+`[model]` parity tests.
 
 ---
 
@@ -214,11 +252,14 @@ A link is `[nodeId, outputIndex]`. `outputs` is optional (default: all output no
 
 ---
 
-## 5. Engine: runtime ABI v2 ("components")
+## 5. Engine: component functions in the runtime ABI
 
-ABI v1 calls one function that runs the whole pipeline. Node graphs need the pipeline in pieces: encode text once, run
-the model once per step under a host-side sampler, decode with a chosen VAE. ABI v2 is added next to v1 in the same
-DLLs.
+`gh_generate` runs the whole pipeline in one call (with img2img, inpaint and LoRA appended in main-plan phase 5). Node
+graphs need the pipeline in pieces: encode text once, run the model once per step under a host-side sampler, decode with
+a chosen VAE. The component functions are **appended to `gh_runtime.h`** the way phase 5 extended it: new functions and
+types, a new feature bit `GH_FEATURE_COMPONENTS` in `gh_runtime_info.features`, and `GH_ABI_VERSION` stays 1 because
+nothing existing changes. The host looks the new functions up with `GetProcAddress`, so an older DLL without them still
+loads and simply reports "graph features unavailable".
 
 ```c
 typedef enum gh_component_kind { GH_DIFFUSION, GH_TEXT_ENCODER, GH_VAE, GH_CONTROL, GH_CLIP_VISION,
@@ -251,11 +292,17 @@ GH_API void    gh_component_close(gh_component*);
 - **Tokenisers and prompt weighting are in the host** (`text/`), so the runtime gets token ids, per-token weights and
   injected embedding vectors and never parses prompts.
 - Implementation inside the runtime: built from stable-diffusion.cpp's model classes (CLIP, T5, UNet, MMDiT, Flux,
-  Wan, VAE, TAE, ESRGAN, ControlNet, PhotoMaker) driven through our own shim, plus our own ggml modules for
-  architectures the pinned engine version lacks (W10). New ggml code lives in `runtime/arch/` with one file per
-  architecture and the same internal interface.
-- `struct_size` rules and error handling as ABI v1. `GH_ABI_VERSION` becomes 2; a v1-only DLL is still loadable for the
-  Generate tab and reported as "graph features unavailable".
+  Wan, VAE, TAE, ESRGAN, ControlNet, PhotoMaker) driven through our own shim next to the existing `gh_runtime.cpp`, plus
+  our own ggml modules for architectures the pinned engine version (`fd21ecf`) lacks (W10). New ggml code lives in
+  `runtime/arch/` with one file per architecture and the same internal interface. Both DLL projects compile the same
+  sources, as today.
+- LoRA today is passed per generation (`gh_generate_params.loras`) and applied by the engine. The component path moves
+  this to `gh_component_set_patches` so a patched model stays patched across steps and jobs; the per-generation path
+  stays for ABI v1 callers.
+- `struct_size` rules, `gh_last_error()` and the `gh_status` codes as today; `EngineErrorCode` (incl. `OutOfMemory`,
+  `Cancelled`) maps component errors to the CLI exit codes and API error codes that already exist.
+- The pinned engine commit is the one Phase 0 verified. Upgrading it (needed for several W10 families) is a deliberate
+  step with the `[model]` parity tests and `tools/measure-vram.ps1` rerun.
 
 ---
 
@@ -264,8 +311,10 @@ GH_API void    gh_component_close(gh_component*);
 ### 6.1 Tensor library (`tensor/`)
 A small owned tensor type: `float` and `f16` storage, shapes up to 5-D, strided views for batch slicing, and the ops the
 nodes need (add, mul, lerp, slerp, clamp, mean/std per channel, interpolate nearest/bilinear/bicubic/area/lanczos/
-bislerp, gaussian blur, sharpen, morphology, rotate/flip, pad, crop, concat). AVX2 paths through MSVC auto-vectorisation
-and `<immintrin.h>` where measured; parallel loops on the CPU pool. Image codecs reuse libpng, libjpeg-turbo, libwebp.
+bislerp, gaussian blur, sharpen, morphology, rotate/flip, pad, crop, concat). Compiled with `/arch:AVX2` (AVX2 and FMA
+are assumed, so intrinsics from `<immintrin.h>` are used directly where measured to help, with no fallback path);
+parallel loops on the CPU pool. These are small host-side operations on latents and images, not model inference.
+Image codecs reuse libpng, libjpeg-turbo, libwebp.
 
 ### 6.2 Text (`text/`)
 - Tokenisers: CLIP BPE (vocab + merges files embedded or loaded with the encoder), SentencePiece unigram (T5, mT5),
@@ -278,18 +327,30 @@ and `<immintrin.h>` where measured; parallel loops on the CPU pool. Image codecs
   multiply; a text-encoder option.
 
 ### 6.3 Models and memory (`models/`)
-- **`ModelFolders`**: one folder per type under the models root, plus any extra roots listed in
-  `model-paths.json` (per type: list of folders; a folder may serve several types). Files are listed with relative
-  sub-paths (`sdxl/base.safetensors`), so combos stay stable when folders are added.
-- **`ModelIndex`**: header scan (safetensors/GGUF/ckpt) gives architecture, family, size and hash (SHA-256 on demand,
-  cached in SQLite); preview image next to the file (`name.png`/`name.preview.png`) for the model library sidebar.
+- **Model kinds in the existing `ModelLibrary`.** Today the library scans one models folder (`modelsDir`, default
+  `DownloadedModels` in the working directory) in the `publisher/repo/file` layout, reads safetensors/GGUF headers
+  (`ModelCard`: family, defaults, companions) and links a VAE through `<file>.source.json`. It is extended with a
+  **kind** per file (checkpoint, diffusion model, text encoder, VAE, LoRA, ControlNet/adapter, CLIP vision, style model,
+  upscaler, embedding, hypernetwork, GLIGEN, PhotoMaker, preview decoder), detected from the header and overridable by
+  placing the file under a kind subfolder (`loras/`, `vae/`, ...). Extra roots per kind come from
+  `model-paths.json` in the data folder. Combos list files by their path relative to the root, so they stay stable when
+  roots are added. Downloads from the catalog and Hugging Face keep working as they are.
+- **Previews and hashes:** a preview image next to the file (`name.preview.png`) for the model library sidebar; SHA-256
+  from `core/Sha256` (already used for downloads), cached with the card.
 - **`ComponentCache`**: an opened component is shared by every node that loads the same file with the same options;
-  reference-counted handles in node outputs.
-- **`MemoryManager`**: knows the device budget (from `GpuDevices`), every component's resident size, and an estimate of
-  the activation memory of the next call (from the component's info and the latent size). Before each runtime call it
-  makes room: evicts least-recently-used components to RAM, then from RAM to disk (close), then chooses partial
-  residency. Memory modes (setting `memory.mode`): `gpu-only`, `high`, `normal` (default), `low` (partial residency
-  allowed), `none` (stream weights each call), `cpu`. `memory.reserveVramMb` keeps room for the desktop.
+  reference-counted handles in node outputs. It replaces `ModelManager`'s one-checkpoint policy for graph jobs and keeps
+  its idle unload (`LoadOptions.ttlMinutes`, default 10) per component. The Generate path keeps using `ModelManager`
+  until W4.10, and the two never hold the same file twice: `ModelManager` asks the cache first.
+- **`MemoryManager`**: knows the device budget (from `GpuDevices`/`HardwareMonitor`), every component's resident size,
+  and an estimate of the activation memory of the next call. The estimate starts from `FitEstimator`'s measured
+  constants (SD 1.x ≈ 1450 MiB + 3130 MiB/MP, SDXL ≈ 1100 MiB + 2540 MiB/MP, `docs/vram-measurements.md`) and gets a
+  per-component measurement step for every new family (`tools/measure-vram.ps1`). Before each runtime call it makes room:
+  evicts least-recently-used components to RAM, then closes them, then chooses partial residency. Memory modes
+  (setting `memory.mode`): `gpu-only`, `high`, `normal` (default), `low` (partial residency allowed), `stream` (weights
+  stay in RAM and are streamed to the GPU each call). Every mode computes on the GPU. `memory.reserveVramMb` keeps room for the desktop (the measured idle desktop on the dev
+  machine is about 1.24 GiB). Weight offload already exists in the runtime (`offload_params_to_cpu`, measured nearly
+  free on SDXL) and is the first tool before partial residency; flash attention stays on by default for SD 1.x above
+  512² on Vulkan, where it was measured 5× faster.
 - **`WeightPatcher`**: LoRA files are parsed into key-mapped low-rank (or full) deltas for the target component. A
   `MODEL`/`TEXT_ENCODER` value carries a list of `{patch, strength, schedule}`; the runtime receives the list and applies
   it when the weights are next used, keeping the originals so a different list can be applied without reloading.
@@ -306,7 +367,7 @@ All implemented from the papers, as host C++ over `Tensor`:
 | Samplers | euler, euler ancestral, heun, heun++, dpm2, dpm2 ancestral, lms, dpm fast, dpm adaptive, dpm++ 2S ancestral, dpm++ SDE, dpm++ 2M, dpm++ 2M SDE, dpm++ 3M SDE, ddpm, ddim, lcm, ipndm, ipndm-v, deis, uni-pc (bh1, bh2), res multistep (+ ancestral), gradient estimation, ER-SDE, SEEDS-2/3, SA-solver; CFG++ variants of euler, euler ancestral, dpm++ 2S ancestral, dpm++ 2M, res multistep | Karras 2022; Lu 2022 (DPM-Solver, ++); Zhang & Chen 2022 (DEIS, iPNDM); Zhao 2023 (UniPC); Luo 2023 (LCM); Song 2020 (DDIM); Zhang 2023 (RES); Cui 2023 (ER-SDE); Gonzalez 2023 (SEEDS); Xue 2023 (SA-Solver); Chung 2024 (CFG++); Permenter & Yuan 2023 (gradient estimation) |
 | Schedulers | normal (uniform in timestep), karras, exponential, sgm uniform, simple, ddim uniform, beta, linear-quadratic, KL-optimal; plus parametric nodes for karras, exponential, poly-exponential, VP, beta, laplace, align-your-steps, GITS, optimal steps, turbo | Karras 2022; Lee 2024 (beta); Sabour 2024 (AYS); Chen 2024 (GITS); Pham 2025 (optimal steps) |
 | Guidance | CFG, rescale CFG, dual CFG (nested and regular), perpendicular negative, CFG-Zero*, adaptive projected guidance (APG), linear and triangle video CFG, skip-layer guidance, PAG, SAG | Ho & Salimans 2022; Lin 2023; Armandpour 2023; Fan 2025; Sadat 2024; Ahn 2024; Hong 2022 |
-| Noise / RNG | `cpu` (mt19937 + Box–Muller, matching the CPU generator most tools use, so seeds are comparable), `philox` (counter-based, matches common GPU generators); per-batch-item seeds; ancestral noise device option; SDE noise via Brownian tree | — |
+| Noise / RNG | `cpu-compatible` (mt19937 + Box–Muller, matching the CPU generator most tools use, so seeds are comparable; always run on the host), `philox` (counter-based, matches common GPU generators); per-batch-item seeds; noise generator selectable per sampler; SDE noise via Brownian tree | — |
 
 - Sampler interface: `sample(denoiseFn, x, sigmas, extra, callback, rng) -> x`. `denoiseFn` is the **guider**: it wraps
   the model evaluation, conditioning selection by area/mask/timestep, ControlNet application, CFG and CFG patches.
@@ -333,10 +394,18 @@ All implemented from the papers, as host C++ over `Tensor`:
    interrupt checked between nodes and at every sampler step.
 
 ### 6.6 Queue and history
-- `JobQueue`: job id, number, priority (front/back), client id, graph, status. Operations: add, add-front, cancel
-  pending, interrupt running, clear pending, read.
-- `History`: status, timings per node, output file list, error, the job graph and editor workflow; kept in the gallery
-  SQLite database; size limit (setting `history.maxItems`, default 10 000) with pruning of oldest entries (files stay).
+- The existing `JobQueue` (one worker thread, `Job` with state/progress/result/cancel via `std::stop_source`, an
+  observer, finished jobs trimmed) is generalised: a `Job` holds a `JobWork` (either a `GenerationRequest` on a loaded
+  model, as now, or a `JobGraph`) so generation and graph jobs share one queue and one GPU. Added: priority (front/back),
+  client id, a queue number, "clear pending", and node-level progress (`StepProgress` gains the node id).
+- History: status, timings per node, output list, error, the job graph and editor workflow. Stored in the gallery's
+  SQLite database (new tables plus a schema migration; `GalleryStore::rescan` learns to read the workflow chunk). Every
+  saved output is a normal gallery entry, so the Gallery tab, `/api/v1/gallery` and "reuse parameters" see graph outputs
+  too ("reuse" opens the workflow when the entry has one). Size limit `graph.historyMaxItems` (default 10 000) prunes
+  history rows, never files.
+- The safety filter applies to graph jobs: when `safety.enabled` (or the job's own flag) is on, every prompt string that
+  reaches a text-encode node is checked by `ISafetyFilter::checkPrompt` during validation, and a refusal is reported as
+  a validation error on that node (`EngineErrorCode::Blocked`).
 - Seed widgets with *control after run* (`fixed`, `increment`, `decrement`, `randomize`) are applied by the **client**
   after queueing, so the queued graph is exact and history is reproducible. Setting: apply before or after queueing.
 
@@ -344,28 +413,36 @@ All implemented from the papers, as host C++ over `Tensor`:
 
 ## 7. Server API
 
-Under the main plan's `/api/v1`, same auth and LAN rules.
+Added to the existing native API (`server/`, documented in `docs/api.md`): same error shape
+(`{"error": {message, type, code}}`), same tokens and permissions, LAN/HTTPS/allow-list/rate-limit rules, and the
+existing 64 MB body cap checked before parsing (uploads get their own cap, `server.maxUploadMb`). New route files
+`GraphRoutes.cpp` and `FileRoutes.cpp` register through `RouteContext` like the others.
 
-| Route | Purpose |
-|---|---|
-| `POST /api/v1/graph/jobs` | queue a job (`job`, optional `workflow`, `front`, `client.id`, `count`); returns `{id, number}` or validation errors per node and input |
-| `GET /api/v1/graph/jobs` | running + pending; `DELETE /api/v1/graph/jobs/{id}` cancels; `DELETE /api/v1/graph/jobs` clears pending |
-| `POST /api/v1/graph/interrupt` | stop the running job (optionally only if its id matches) |
-| `GET /api/v1/graph/history[?max=&offset=]`, `GET .../history/{id}`, `DELETE ...` | history |
-| `GET /api/v1/graph/nodes`, `GET .../nodes/{type}` | node catalogue: inputs, types, ranges, defaults, options, tooltips (localised by `Accept-Language`), category, description |
-| `GET /api/v1/graph/models/{folder}`, `GET .../embeddings` | lists for combos; `POST .../models/download` fetches a missing model by URL or catalog key |
-| `POST /api/v1/files/upload` | multipart image/mask/video/audio into `input/` (optional subfolder, overwrite flag; mask upload merges into the alpha of an existing image) |
-| `GET /api/v1/files/view?name=&folder=&kind=output|input|temp[&preview=webp;80]` | file download / preview |
-| `GET /api/v1/graph/system` | versions, devices, VRAM/RAM total and free, memory mode, runtime |
-| `POST /api/v1/graph/free` | unload models and/or clear caches |
-| `GET/PUT /api/v1/userdata/{path}` | user workflows, settings, templates (per user in multi-user mode) |
-| `GET /api/v1/graph/templates` | built-in and plugin workflow templates |
-| `WS /api/v1/graph/events?client=` | event stream (below) |
+| Route | Permission | Purpose |
+|---|---|---|
+| `POST /api/v1/graph/jobs` | generate | queue a job (`job`, optional `workflow`, `front`, `client`, `count`); 202 with `{id, number}`, or 400 `invalid_parameters` with errors per node and input |
+| `GET /api/v1/graph/jobs`, `GET .../jobs/{id}` | read | running + pending (the existing `GET jobs` lists them too, with a `kind` field) |
+| `POST .../jobs/{id}/cancel`, `POST .../jobs/clear` | generate | cancel one (running or pending), clear pending; same verbs as the existing `jobs/{id}/cancel` |
+| `GET /api/v1/graph/history?limit=&offset=`, `GET/DELETE .../history/{id}` | read, manage | history |
+| `GET /api/v1/graph/nodes`, `GET .../nodes/{type}` | read | node catalogue: inputs, types, ranges, defaults, options, tooltips (localised by `Accept-Language`), interface mode, category, description |
+| `GET /api/v1/graph/models/{kind}`, `GET .../embeddings` | read | lists for combos; missing models are fetched with the existing `POST models/get` (catalog key or repository + file) |
+| `POST /api/v1/files/upload` | generate | multipart image/mask/video/audio into the input folder (optional subfolder, overwrite flag; a mask upload merges into the alpha of an existing image) |
+| `GET /api/v1/files/view?name=&folder=&kind=input\|temp[&preview=webp;80]` | read | inputs and temp previews; outputs keep using `GET /outputs/<path>` and `gallery/{id}/image\|thumbnail` |
+| `POST /api/v1/graph/free` | manage | unload models and/or clear caches (extends `models/unload`) |
+| `GET/PUT/DELETE /api/v1/userdata/{path}` | read, manage | user workflows, editor settings, keymap, subgraphs (per user in multi-user mode) |
+| `GET /api/v1/graph/templates` | read | built-in and plugin workflow templates |
+| `GET /api/v1/graph/events?client=` | read | **Server-Sent Events** stream (below) |
 
-WebSocket events (JSON text frames, our names): `queue` (length), `job.started`, `job.cached` (node ids),
-`node.started`, `node.progress` (`value`, `max`, node id), `node.output` (UI summary such as image file names),
-`job.error` (node, type, message, input, traceback-free details), `job.interrupted`, `job.finished`. Binary frames carry
-preview images: 4-byte type, 4-byte format, then the encoded image; a preview carries the node id.
+System information stays on the existing `GET status`, `hardware` and `hardware/usage`, with memory mode and resident
+components added.
+
+**Events use SSE, not WebSocket.** The server already streams job progress with `SseStream`
+(`GET jobs/{id}/events`), cpp-httplib serves SSE without extra dependencies, and every client direction that matters
+(queue, cancel, upload) is a normal request. Event names (ours): `queue` (length), `job.started`, `job.cached` (node
+ids), `node.started`, `node.progress` (`value`, `max`, node id), `node.preview` (node id + URL of a small WebP in the temp
+folder, at most `graph.preview.everyNSteps`), `node.output` (UI summary such as gallery ids), `job.error` (node, type,
+message, input), `job.interrupted`, `job.finished`. A client reconnecting with `Last-Event-ID` gets missed events from
+a short ring buffer. A WebSocket transport can be added later behind the same event bus if preview latency demands it.
 
 ---
 
@@ -404,8 +481,14 @@ node-editor library, so the same code builds for WebAssembly).
 - **Running:** Queue button with batch count, "queue front", auto-queue mode (off / after each run / when changed),
   "run selected outputs only", interrupt, clear queue; executing node outlined; cached nodes marked; errors focus the
   first bad node and list all errors in a panel.
-- **Mask editor:** opened from an image widget: brush (size, hardness, opacity), eraser, fill, invert, clear, zoom,
-  paint on alpha; saves as an uploaded mask. Also a crop tool and an A/B image compare view.
+- **Mask editor:** the existing `ui/MaskEditor` (built for inpainting in main-plan 5.3) opened from an image widget,
+  extended with hardness, opacity, fill, invert and painting on alpha; saves as an uploaded mask. Also a crop tool and
+  an A/B image compare view built on `ui/ImageView`.
+- **Interface modes:** every widget and setting carries the existing interface-mode tag (`user`, `power`,
+  `developer`; setting `interfaceMode`). The Workflows tab itself is `power`; in `user` mode it shows templates with
+  only their `user` widgets (prompt, size, seed), so the tab is usable without wiring nodes.
+- **Look and feel:** link and type colours come from the existing `ui/Theme` (light/dark, accent colour); all strings go
+  through `tr()` into the existing translation files.
 - **Missing pieces:** loading a workflow with unknown node types lists the plugins that provide them (from the registry);
   missing models are listed with download buttons when the model is in the catalog or the workflow carries a URL.
 - **Settings dialog:** every editor setting listed in the reference document, searchable, each with its tooltip.
@@ -419,10 +502,13 @@ node-editor library, so the same code builds for WebAssembly).
 ## 9. Browser editor (C++ compiled to WebAssembly)
 
 - The editor sources (`ui/graph/`) are written against an `EditorBackend` interface: the desktop build calls services in
-  process; the browser build talks to `/api/v1` over HTTP and WebSocket (`QNetworkAccessManager`, `QWebSocket`).
+  process; the browser build talks to `/api/v1` over HTTP and reads the SSE event stream (`QNetworkAccessManager`).
 - `GraphicsHost.Web` builds those sources with **Qt for WebAssembly** (Emscripten). The output (`.wasm`, Qt's generated
-  loader) is embedded in the exe as resources and served at `/editor/`. This replaces the hand-written JS browser UI of the
-  main plan (§14).
+  loader) is copied next to the exe like `web/` is today (`props/Data.targets`), included by `installer/Package.proj`,
+  and served at `/editor/`.
+- The existing plain-JS browser UI in `web/` (Generate, Gallery, My Models, Discover, Settings, Logs) predates this plan
+  and stays as it is; no new JS is written. Once W9 ships, its pages can be rebuilt as panels of the WebAssembly app and
+  `web/` retired; that is a separate decision (§14).
 - Limits in the browser build: no native plugins' custom widgets (plugins can still add nodes; their inputs use the
   standard widgets), file access through upload/download, clipboard through the browser permission prompt.
 - Risk: building Qt for WebAssembly from MSBuild. W9.1 is a spike; the fallback is a separate Emscripten build invoked
@@ -432,7 +518,7 @@ node-editor library, so the same code builds for WebAssembly).
 
 ## 10. Plugins
 
-- **ABI:** `plugins/sdk/gh_node_plugin.h`, plain C like the runtime ABI. A plugin DLL exports
+- **ABI:** `sdk/gh_node_plugin.h`, plain C like the runtime ABI, with the same `struct_size` and feature-bit rules. A plugin DLL exports
   `gh_plugin_info()` and `gh_plugin_register(gh_registry*)`. Through the registry it declares nodes (same features as
   built-ins: types, widgets, tooltips, lazy, lists, expansion, fingerprint), custom value types, model folder types,
   server routes, settings, and (desktop only) custom widget factories. A header-only C++ helper gives the same builder
@@ -450,13 +536,25 @@ node-editor library, so the same code builds for WebAssembly).
 
 ## 11. Settings
 
-New keys in `settings.json` (main plan §6 conventions; each with a validator and a tooltip in the reference document):
-`graph.cache.policy`, `graph.cache.size`, `graph.preview.method`, `graph.preview.everyNSteps`, `graph.preview.maxSize`,
-`graph.rng`, `graph.historyMaxItems`, `memory.mode`, `memory.reserveVramMb`, `memory.asyncOffload`,
-`precision.diffusion`, `precision.textEncoder`, `precision.vae`, `precision.vaeFallbackFp32`, `paths.input`,
-`paths.output`, `paths.temp`, `paths.modelPathsFile`, `output.embedWorkflow`, `output.filenameCounterDigits`,
-`plugins.enabled`, `plugins.safeMode`, `plugins.registryUrl`, `users.multiUser`, and editor settings under `editor.*`
-(stored per user). The full list with tooltips is §S of the reference document.
+Each new option follows `docs/adding-options.md` (declare, `toJson`/`settingsFromJson`, `kKnownKeys`, `validate()`, CLI
+`config set`, Settings tab, tests). Adding keys with defaults needs no migration; the gallery database change (W2.5)
+does.
+
+- **Reused, unchanged:** `backend`, `gpuDevice`, `threads`, `modelsDir`, `interfaceMode`, `theme`, `accent`,
+  `notifications`, `server.*` (port, LAN, tokens, HTTPS, allow-list, rate limit), `logging.level`, `safety.enabled`.
+  Load options `flashAttention`, `offloadParamsToCpu` and `ttlMinutes` stay per load, as loader node widgets and
+  per-model defaults. `clipOnCpu` and `vaeOnCpu` (CPU compute) are not offered by workflows. `backend` must resolve to
+  Vulkan for graph jobs; with `backend = cpu`, or no usable Vulkan device, the Workflows tab and `/api/v1/graph/jobs`
+  report that a Vulkan GPU is required.
+- **New, camelCase as the conventions require:** `graph.cachePolicy`, `graph.cacheSize`, `graph.previewMethod`,
+  `graph.previewEveryNSteps`, `graph.previewMaxSize`, `graph.rng`, `graph.historyMaxItems`, `graph.seedControlTiming`,
+  `memory.mode`, `memory.reserveVramMb`, `memory.asyncOffload`, `precision.diffusion`, `precision.textEncoder`,
+  `precision.vae`, `precision.vaeFallbackFp32`, `paths.inputDir`, `paths.tempDir`, `output.embedWorkflow`,
+  `output.filenameCounterDigits`, `server.maxUploadMb`, `plugins.enabled`, `plugins.safeMode`, `plugins.registryUrl`,
+  `users.multiUser`, `network.downloadsAllowed`. Outputs stay in the gallery's outputs folder.
+- **Editor settings** (`editor.*`) are per user, stored under user data, not in `settings.json`.
+
+The full list with tooltips is §S of the reference document.
 
 ---
 
@@ -467,33 +565,51 @@ New keys in `settings.json` (main plan §6 conventions; each with a validator an
   toy analytic denoiser (Gaussian data, exact x0 known) for convergence order; validator errors; executor ordering,
   caching, lazy, lists, expansion, bypass/mute; workflow ↔ job conversion; file format migrations; **tooltip coverage
   test** (W1.6).
-- `[golden]`: fixed seeds on tiny fixture models (SD1-style and DiT-style, a few MB, generated by us) must reproduce
-  stored latents within tolerance on CPU; regenerate only on deliberate changes.
-- `[integration]`: real models (skipped when absent): SD1.5 and SDXL text-to-image through the graph must match ABI v1
-  `gh_generate` output for the same seed/sampler on CPU; LoRA on/off; ControlNet; inpaint.
-- `[api]`: server on an ephemeral port: queue, events order, interrupt, uploads, history, node catalogue schema.
-- Editor: model-level tests for undo/redo, copy/paste, subgraph convert/unpack, file round trip; screenshot smoke tests
-  with `QTest`.
+The existing tags and fixtures are reused (`TestUtil.h`, `ModelFixture.h`, `SafetensorsFixture.h`, `ApiTestUtil.h`,
+`TestHttpServer.h`); the "no model, no network" run (`~[model]~[network]`) must stay fast and green in CI.
+
+- `[integration]`: the component functions against a built runtime DLL with tiny fixture weights (SD1-style and
+  DiT-style, a few MB, generated by us with `SafetensorsFixture`): fixed seeds reproduce stored latents within a
+  tolerance on `sd-vulkan.dll`; regenerate only on deliberate changes. They need a Vulkan device: on the development
+  machine the RX 7900 XTX; in CI (GitHub runners have no GPU) a software Vulkan driver (SwiftShader or Mesa lavapipe
+  for Windows) installed by the workflow, with a looser tolerance because results differ slightly between drivers.
+  Tests that need Vulkan are tagged `[vulkan]` as well and skip themselves cleanly when no device exists.
+- `[model]`: real checkpoints (`models\v1-5-pruned-emaonly.safetensors`, `models\sd_xl_base_1.0.safetensors`, skipped
+  when absent): the graph's text-to-image, img2img, inpaint and LoRA results must match `gh_generate` on
+  `sd-vulkan.dll` for the same seed, sampler and scheduler (this is what W4.10 depends on); later ControlNet and each
+  new family. The existing CPU-runtime `[model]` tests stay for the Generate path.
+- `[api]`: server on an ephemeral port with the fake engine, as `ApiContractTests`: queue, SSE event order, cancel,
+  uploads, history, node catalogue schema, permissions per route.
+- `[ui]`: the existing offscreen smoke test extended to the Workflows tab (`tools/ui-shots.ps1`); editor model-level
+  tests for undo/redo, copy/paste, subgraph convert/unpack and file round trips are `[unit]`.
 
 ---
 
 ## 13. Phases
 
-Prerequisites from the main plan: phases 1–3 (runtime DLLs, `GenerationRequest`, job queue, model library) and 4.1–4.2
-(HTTP server, auth). W phases start after main-plan phase 3; W7 needs main-plan 4.1–4.2; W8 needs 4.6 (Qt shell).
+Every prerequisite in the main plan is done (phases 0–6, except its stretch items, the MSI and other-hardware checks,
+none of which this plan needs). Main-plan step 5.7 (upscaler, ControlNet) is delivered here by W6.2 and W5.2 instead.
 
 ### W0 — Spike: the pipeline in pieces (L)
-- [ ] W0.1 ABI v2 skeleton in `gh_components.h`; SD1.5 text encoder, UNet and VAE exposed as separate components (M)
-- [ ] W0.2 Host-side Euler sampler over `gh_denoise`; same seed and settings as `gh_generate` give the same image on CPU (M)
-- [ ] W0.3 Measure per-step overhead of the host loop vs the in-runtime loop (SD1.5 512², SDXL 1024²); budget < 3 % (S)
+- [ ] W0.0 **Repository fix first:** `.gitignore`'s unanchored `models/` (meant for the spike's model folder) also
+  ignores `GraphicsHost.Core/models/`, so `ModelLibrary`, `ModelCard`, `Catalog`, `DownloadManager`, `HuggingFace`,
+  `ModelService`, `FitHints`, `ModelUpdates` and `Recommendation` were never committed, although nine headers are
+  included from there and `GraphicsHost.Core.vcxproj` compiles `models\**\*.cpp`. Anchor the data patterns (`/models/`,
+  `/DownloadedModels/`, `/logs/`), add the sources from the machine that has them, and check a clean clone builds
+  (CI does). The same anchoring keeps new folders of this plan from being ignored (S)
+- [ ] W0.1 Component functions appended to `gh_runtime.h` under `GH_FEATURE_COMPONENTS`; SD1.5 text encoder, UNet and VAE exposed as separate components in both DLLs (M)
+- [ ] W0.2 Host-side Euler sampler over `gh_denoise`; same seed and settings as `gh_generate` give the same image on Vulkan (M)
+- [ ] W0.3 Measure per-step overhead of the host loop vs the in-runtime loop on the RX 7900 XTX (SD1.5 512² at 0.35 s/step, SDXL 1024² at 2.89 s/step as measured); budget < 3 % (S)
 - [ ] W0.4 SDXL through the same path (dual encoders, pooled + size conditioning) (S)
-- [ ] W0.5 Naming check in CI: a script fails on the reference product's name in any tracked file (the pattern is stored as character codes so the script itself does not contain the word) (S)
+- [ ] W0.5 Naming check in CI (`.github/workflows/build.yml`): a script in `tools/` fails on the reference product's name in any tracked file (the pattern is stored as character codes so the script itself does not contain the word) (S)
 - [ ] W0.6 **Go/no-go**: host-side sampling confirmed, or fall back to runtime-side samplers with a sampler-id ABI (S)
+- [ ] W0.7 CI: install a software Vulkan driver on the Windows runner, run `[integration][vulkan]` tests; host code built with `/arch:AVX2` in `props/Core.props` (S)
 
-**Exit:** a C++ test builds an image from three ABI v2 calls plus a host sampler, identical to ABI v1.
+**Exit:** a `[model]` test builds an image from component calls plus a host sampler, identical to `gh_generate`, on
+Vulkan. A software Vulkan driver runs the fixture tests in CI (W0.7).
 
 ### W1 — Graph model (M–L)
-- [ ] W1.1 `tensor/` library and image/mask codecs (M)
+- [ ] W1.1 `tensor/` library; conversion to and from `engine::Image` and the existing `ImageCodec` (S)
 - [ ] W1.2 Types, `NodeDef` builder, registry, node catalogue JSON (M)
 - [ ] W1.3 Workflow (editor) format and job format, conversion (subgraphs, bypass, mute, reroutes, constants), migrations (M)
 - [ ] W1.4 Validator with per-node, per-input errors (S)
@@ -506,31 +622,32 @@ Prerequisites from the main plan: phases 1–3 (runtime DLLs, `GenerationRequest
 - [ ] W2.2 Fingerprints, `OutputCache` with the four policies (M)
 - [ ] W2.3 Lazy inputs, list mapping, node expansion with stable ids (M)
 - [ ] W2.4 Events bus; per-node progress; interrupt between nodes and per step (S)
-- [ ] W2.5 `JobQueue` (front/back, cancel, clear), `History` in SQLite (M)
+- [ ] W2.5 Generalise `JobQueue` (`JobWork`, front/back, clear, node progress) without changing the Generate path's behaviour (its `JobQueueTests` stay green); history tables and migration in the gallery database (M)
 - [ ] W2.6 Utility nodes: constants, reroute, note, string tools, compare/switch (lazy), preview-any (S)
+- [ ] W2.7 `GraphService` in `host/` (validate, submit, history, events) wired into `AppHost` (S)
 
 ### W3 — Models, memory, patches (L)
-- [ ] W3.1 `ModelFolders` (all types, extra roots file), `ModelIndex` with previews and hashes (M)
-- [ ] W3.2 Loader nodes: checkpoint, diffusion model, text encoders (1–4), VAE, LoRA (+ model-only), embeddings listing (M)
-- [ ] W3.3 `ComponentCache`, `MemoryManager` with modes, reserve, LRU eviction, partial residency (L)
-- [ ] W3.4 `WeightPatcher`: LoRA/LoCon/LoHa/LoKr/DoRA/full diff key mapping for SD1/SDXL; lazy apply and undo (L)
+- [ ] W3.1 Model kinds in `ModelLibrary`/`ModelCard` (header detection, kind subfolders, `model-paths.json` extra roots), previews, cached hashes (M)
+- [ ] W3.2 Loader nodes: checkpoint, diffusion model, text encoders (1–4), VAE, LoRA (+ model-only), embeddings listing; LoRA names resolve the way `<lora:name:w>` does today (M)
+- [ ] W3.3 `ComponentCache` (shared with `ModelManager`), `MemoryManager` with modes, reserve, LRU eviction, partial residency; estimates seeded from `FitEstimator` (L)
+- [ ] W3.4 `WeightPatcher`: LoRA/LoCon/LoHa/LoKr/DoRA/full diff key mapping for SD1/SDXL; lazy apply and undo; results match today's per-generation LoRA path (`LoraTests`) (L)
 - [ ] W3.5 Precision options and fp8 storage (M)
 - [ ] W3.6 "Free memory" / "unload models" actions (S)
 
 ### W4 — Text and sampling (XL)
 - [ ] W4.1 CLIP BPE tokeniser, prompt parser (weights, embeddings, choices, comments, BREAK) (M)
-- [ ] W4.2 Text encode nodes (generic, SDXL, SDXL refiner), clip-skip node (S)
-- [ ] W4.3 RNGs (cpu, philox), noise nodes, Brownian-tree SDE noise (M)
+- [ ] W4.2 Text encode nodes (generic, SDXL, SDXL refiner), clip-skip node; safety filter on graph prompts (S)
+- [ ] W4.3 RNGs (cpu-compatible, philox), noise nodes, Brownian-tree SDE noise (M)
 - [ ] W4.4 Model sampling types and their nodes (discrete, continuous EDM/V, flow shift) (M)
 - [ ] W4.5 All schedulers and sigma nodes (M)
 - [ ] W4.6 All samplers incl. CFG++ variants, toy-denoiser convergence tests (XL)
 - [ ] W4.7 Guiders: basic, CFG, dual CFG, perpendicular negative; rescale CFG, CFG-Zero*, APG (M)
 - [ ] W4.8 Sampler and Sampler (advanced) nodes, custom-sampling nodes, inpaint noise mask, start/end steps (M)
 - [ ] W4.9 Previews: linear latent-to-RGB per family, tiny preview decoders (S)
-- [ ] W4.10 Generate tab and `/v1/images/generations` re-implemented as a built-in workflow template (S)
+- [ ] W4.10 `GenerationService` builds a fixed workflow from a `GenerationRequest` (txt2img, img2img, inpaint, LoRA) instead of calling `gh_generate` on the Vulkan runtime (the CPU runtime keeps `gh_generate`), behind a setting until the `[model]` parity tests pass for every sampler/scheduler in `knownSamplers()`/`knownSchedulers()`; then it becomes the default. Graph sampler ids map to the existing names (`euler_a`, `dpm++2m`, ...) so presets, per-model defaults and API requests keep working (M)
 
-**Exit:** the default text-to-image workflow runs from a job file on CPU and Vulkan; every sampler × scheduler pair
-produces an image on SD1.5; golden tests pass.
+**Exit:** the default text-to-image workflow runs from a job file on Vulkan; every sampler × scheduler pair
+produces an image on SD1.5; the `[integration]` fixture tests and the `[model]` parity tests pass.
 
 ### W5 — Conditioning and control (L)
 - [ ] W5.1 Combine, concat, average, area (px/%), strength, mask, timestep range, zero-out; guider honours all of them (M)
@@ -545,14 +662,15 @@ produces an image on SD1.5; golden tests pass.
 - [ ] W6.1 All latent nodes in the reference document (M)
 - [ ] W6.2 All image nodes incl. model upscaler with tiling (M)
 - [ ] W6.3 All mask nodes (S)
-- [ ] W6.4 Load image/mask/latent, save/preview image (PNG/JPEG/WebP + metadata), save latent, filename tokens and counter (M)
+- [ ] W6.4 Load image/mask/latent, save/preview image (PNG/JPEG/WebP via `ImageCodec`, workflow chunks next to the existing parameter chunk, saved through `GalleryStore`), save latent, filename tokens and counter (M)
 - [ ] W6.5 Tiled VAE encode/decode (spatial + temporal) (S)
 
 ### W7 — Server API and events (M)
-- [ ] W7.1 Routes of §7, validation errors as structured JSON (M)
-- [ ] W7.2 WebSocket events and binary previews; per-client targeting (M)
-- [ ] W7.3 Uploads, views (with preview re-encoding), user data (S)
-- [ ] W7.4 API contract tests (S)
+- [ ] W7.1 `GraphRoutes`: routes of §7 with permissions, validation errors in the existing error shape (M)
+- [ ] W7.2 SSE graph events on `SseStream`, preview files in temp, `Last-Event-ID` replay, per-client filter (S)
+- [ ] W7.3 `FileRoutes`: uploads with their own size cap, views (with preview re-encoding), user data (S)
+- [ ] W7.4 API contract tests in `ApiContractTests` style; `docs/api.md` section for the graph API (S)
+- [ ] W7.5 CLI: `graph run <file> [--set node.input=value] [--json]` (prints progress on stderr like `gen`, same exit codes), `graph validate`, `graph nodes [type]` (S)
 
 ### W8 — Desktop editor (XL)
 - [ ] W8.1 Workflow document model with commands (undo/redo) independent of Qt widgets (M)
@@ -568,7 +686,8 @@ produces an image on SD1.5; golden tests pass.
 - [ ] W8.11 Copy/paste (with and without links), clone, align/distribute, selection toolbox (S)
 - [ ] W8.12 Subgraphs: convert, edit, promote widgets, save as user node, unpack (L)
 - [ ] W8.13 Templates browser with built-in templates (§13a) (S)
-- [ ] W8.14 Mask editor, crop tool, compare view (M)
+- [ ] W8.14 Extend the existing `MaskEditor`; crop tool and compare view on `ImageView` (S)
+- [ ] W8.18 Gallery integration: "open workflow" on gallery entries that carry one; Generate tab "open as workflow" (S)
 - [ ] W8.15 Settings dialog, keymap editor (M)
 - [ ] W8.16 Missing nodes / missing models dialogs with download (S)
 - [ ] W8.17 Drag-and-drop: workflow files, images/video/audio with embedded workflows, images onto Load Image nodes (S)
@@ -578,13 +697,15 @@ without touching a file; every parameter shows its tooltip.
 
 ### W9 — Browser editor (L)
 - [ ] W9.1 Spike: Qt for WebAssembly build of the canvas from MSBuild (M)
-- [ ] W9.2 `EditorBackend` over HTTP/WebSocket; uploads, views (M)
-- [ ] W9.3 Embed and serve at `/editor/`; tokens; LAN smoke test (S)
+- [ ] W9.2 `EditorBackend` over HTTP and SSE; uploads, views (M)
+- [ ] W9.3 Copy next to the exe, add to `Package.proj`, serve at `/editor/`; tokens; LAN smoke test (S)
 
 ### W10 — Model families and patches (XL, split per family)
 Each family = detection, ggml architecture (reuse from stable-diffusion.cpp when present, else new in `runtime/arch/`),
 text encoders and tokeniser, VAE, latent format and preview factors, model-sampling defaults, family-specific nodes,
-LoRA key mapping, a template, a golden test.
+LoRA key mapping, catalog entries (`data/catalog.json`) with companions and fit hints, a template, a fixture test,
+a `[model]` test, and a VRAM measurement row in `docs/vram-measurements.md`. Families that need a newer
+stable-diffusion.cpp start with the submodule upgrade step (§5).
 - [ ] W10.1 SD 2.x (v-prediction, 768) (S)
 - [ ] W10.2 SD 3/3.5 (MMDiT, three encoders, empty-padding option, 16-ch latent) (M)
 - [ ] W10.3 FLUX.1 dev/schnell, guidance node, Fill, Kontext reference latents and image scale, Redux style, depth/canny (L)
@@ -609,10 +730,11 @@ LoRA key mapping, a template, a golden test.
 - [ ] W12.4 LoRA training nodes *(stretch)* (L)
 
 ### W13 — Polish (M)
-- [ ] W13.1 Translations of all tooltips (start with English; `.ts` files) (S)
+- [ ] W13.1 Tooltips into the existing translation files (`GraphicsHost/translations/`, German first as today) (S)
 - [ ] W13.2 Accessibility: keyboard-only editing, focus order, screen-reader names for nodes and widgets (M)
 - [ ] W13.3 Performance pass: 2 000-node graph at 60 fps, executor overhead < 1 ms per cached node (S)
-- [ ] W13.4 User docs generated from the registry (node pages with tooltips and examples) (S)
+- [ ] W13.4 User docs generated from the registry (node pages with tooltips and examples); README feature table (S)
+- [ ] W13.5 Package: the WebAssembly editor, templates and the plugin SDK in the portable zip; hardware checklist rows for graph jobs (S)
 
 ### 13a. Built-in templates
 Text-to-image (SD1.5, SDXL, SDXL + refiner), image-to-image, inpaint, outpaint, hi-res fix (latent and model upscale),
@@ -646,20 +768,29 @@ W12 after W8.
 
 | Main plan | Change |
 |---|---|
-| §5 standard parameter set, Generate tab | kept as the simple UI, implemented as a fixed workflow (W4.10) |
-| §7 browser UI in HTML/CSS/JS | replaced by the WebAssembly build of the C++ editor (W9); the Generate/Gallery/Models/Settings pages become editor panels |
-| Phase 5.4 LoRA, 5.7 upscaler/ControlNet | delivered by W3.4, W6.2, W5.2 |
+| §5 standard parameter set, Generate tab, `gen`, OpenAI routes | unchanged for users; implemented on a fixed workflow once parity holds (W4.10) |
+| `ModelManager` one-model policy | stays for the Generate path; graph jobs use `ComponentCache`, which `ModelManager` consults (W3.3) |
+| `JobQueue` | generalised to graph jobs, one queue for both (W2.5) |
+| Step 5.7 upscaler / ControlNet (open, stretch) | delivered by W6.2 and W5.2; tick 5.7 with a pointer when they land |
+| §7 browser UI in HTML/CSS/JS (done, `web/`) | kept; the workflow editor in the browser is the WebAssembly build (W9). Retiring `web/` afterwards is a later decision |
 | Model families "v1: SD1/SDXL only" | still true for the first release; W10 adds families afterwards |
-| §11 vcpkg packages | add: Qt WebSockets (`qtwebsockets`), a video codec library (§15), `sentencepiece`-compatible code written by us (no package), Emscripten toolchain for W9 |
+| Hardware "CPU and Vulkan on AMD" | workflows are Vulkan only and assume AVX2; `sd-cpu-avx2.dll` and the CPU device options remain only for the existing Generate path, which keeps calling `gh_generate` when the CPU runtime is selected (also after W4.10) |
+| `.gitignore` | data-folder patterns anchored so source folders are never ignored (W0.0) |
+| §11 vcpkg packages | add: a video codec library (§15) and the Emscripten toolchain + Qt for WebAssembly for W9 (not from vcpkg); tokenisers are our own code. No WebSocket library is needed (§7) |
 
 ---
 
 ## 15. Risks
 
-- **ABI v2 depends on stable-diffusion.cpp internals.** Its model classes are not a public API; pin and wrap only in
+- **The component functions depend on stable-diffusion.cpp internals.** Its model classes are not a public API; pin and wrap only in
   `runtime/`, as for ABI v1. Upgrades are deliberate and covered by golden tests.
-- **New architectures in ggml are large work** (W10/W11), and the Vulkan backend may lack ops some models need; each
-  family has a CPU-only fallback until ops are added.
+- **New architectures in ggml are large work** (W10/W11), and the Vulkan backend may lack ops some models need. With
+  no CPU path there is no fallback: a missing op is a Vulkan shader we write (in ggml's style, in the pinned submodule's
+  shader set or a local patch) before that family ships. Each W10/W11 item starts with an op inventory against
+  `ggml-vulkan` so this shows up early.
+- **Software Vulkan in CI** may be slow, may lack features (cooperative matrices, some fp16 paths) and differs
+  numerically from the GPU; fixture models stay tiny, and GPU-only checks run on the development machine before a
+  phase is ticked.
 - **Video encoding in C++** needs a codec library: libvpx (WebM/VP9, BSD) and/or OpenH264 (BSD, Cisco binary licence) via
   vcpkg; MP4 muxing written by us or via a small muxer library. Decide in W11.1.
 - **Qt for WebAssembly from MSBuild** (W9.1 spike, fallback described in §9).

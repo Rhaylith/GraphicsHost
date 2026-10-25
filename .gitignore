@@ -1,41 +1,45 @@
+# Folder patterns for data and build output are anchored with a leading slash (or name their parent folder), so they
+# only match where that data is written. An unanchored "models/" once hid GraphicsHost.Core/models/ from git.
+
 # Build output
+/build/
 bin/
 obj/
 .vs/
 *.user
 
-# Downloaded model files (default models folder: ./DownloadedModels in the working directory)
-DownloadedModels/
+# Downloaded model files (default models folder: DownloadedModels in the working directory; the repository root from a
+# console, GraphicsHost\ when started from the Visual Studio debugger)
+/DownloadedModels/
+/GraphicsHost/DownloadedModels/
 *.gguf
 *.gguf.part
 *.ggml
 *.safetensors
 
+# Model files for the spike and the [model] tests (models\ at the repository root)
+/models/
+
 # Local app data if LLMHOST_HOME is pointed inside the repo
-.llmhost/
+/.llmhost/
 
 # GraphicsHost local logs
-logs/
+/logs/
+/GraphicsHost/logs/
 
 # GraphicsHost native runtimes (installed by GraphicsHost/tools/fetch-native.ps1)
-GraphicsHost/native/sd-cpu/
-GraphicsHost/native/sd-vulkan/
+/GraphicsHost/native/sd-cpu/
+/GraphicsHost/native/sd-vulkan/
 
 # GraphicsHost generated images
-GraphicsHost/outputs/
+/GraphicsHost/outputs/
 
 # GraphicsHost per-user runtime settings
-GraphicsHost/settings.local.json
+/GraphicsHost/settings.local.json
 
 # GraphicsHost window state and WebView2 profile
-GraphicsHost/window.json
-GraphicsHost/webview2/
-
-# MSBuild output of the native projects
-build/
-
-# Downloaded model files for the spike
-models/
+/GraphicsHost/window.json
+/GraphicsHost/webview2/
 
 # Spike outputs
-spike/out/
+/spike/out/
