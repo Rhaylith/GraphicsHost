@@ -79,6 +79,7 @@
     <ClCompile Include="TensorTests.cpp" />
     <ClCompile Include="GraphRegistryTests.cpp" />
     <ClCompile Include="WorkflowTests.cpp" />
+    <ClCompile Include="ValidatorTests.cpp" />
     <ClCompile Include="ComponentTests.cpp" />
     <ClCompile Include="TlsAndLimitsTests.cpp" />
     <ClCompile Include="ApiContractTests.cpp" />
