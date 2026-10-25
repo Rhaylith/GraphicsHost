@@ -15,7 +15,28 @@ BEGIN {
 
 /^## C\. / { section = "C"; print "// ---- C. common tooltips"; next }
 /^## O\. / { section = "O"; next }
-/^## N[0-9]/ || /^## S\./ { if (open) { print "};"; print ""; open = 0 } section = ""; next }
+/^## N[0-9]/ || /^## S\./ { if (open) { print "};"; print ""; open = 0 } section = ($0 ~ /^## S\./) ? "S" : ""; next }
+
+# settings: | `key` (or several) | values | tooltip |
+section == "S" && /^\| `/ {
+    line = $0
+    sub(/^\| /, "", line)
+    keycell = substr(line, 1, index(line, " | ") - 1)
+    rest = substr(line, index(line, " | ") + 3)
+    tip = substr(rest, index(rest, " | ") + 3)
+    sub(/ \|$/, "", tip)
+    while (match(keycell, /`[^`]+`/)) {
+        key = substr(keycell, RSTART + 1, RLENGTH - 2)
+        keycell = substr(keycell, RSTART + RLENGTH)
+        if (key ~ /^[A-Za-z][A-Za-z0-9_.*-]*$/) {
+            settingKeys[++nsettings] = key
+            settingTips[nsettings] = tip
+        }
+        # only the keys written before any words belong to the row
+        if (keycell ~ /^[^,]/) break
+    }
+    next
+}
 
 section == "C" && /^\| `C\./ {
     line = $0
@@ -65,6 +86,11 @@ END {
     if (open) { print "};"; print "" }
     print "inline constexpr OptionTable allOptionTables[] = {"
     for (i = 1; i <= ntables; i++) printf "    {\"%s\", %sOptions},\n", names[i], names[i]
+    print "};"
+    print ""
+    print "// ---- S. settings"
+    print "inline constexpr SettingTip allSettingTips[] = {"
+    for (i = 1; i <= nsettings; i++) printf "    {\"%s\", QT_TRANSLATE_NOOP(\"tips\", R\"tip(%s)tip\")},\n", settingKeys[i], settingTips[i]
     print "};"
     print ""
     print "}  // namespace gh::graph::tips"

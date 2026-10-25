@@ -12,6 +12,7 @@ namespace gh::graph {
 struct ReferenceDoc {
     std::map<std::string, std::string> common;                                          // C.<key> -> tooltip
     std::map<std::string, std::vector<std::pair<std::string, std::string>>> options;   // O.<table> -> (option, tooltip); "a / b" rows are split
+    std::map<std::string, std::string> settings;                                        // S rows: dotted key -> tooltip (a row may name several keys)
 };
 
 ReferenceDoc parseReferenceDoc(const std::string& markdown);

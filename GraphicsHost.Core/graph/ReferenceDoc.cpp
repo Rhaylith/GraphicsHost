@@ -41,7 +41,7 @@ ReferenceDoc parseReferenceDoc(const std::string& markdown) {
     std::string line, section, table;
     while (std::getline(in, line)) {
         if (starts(line, "## ")) {
-            section = starts(line, "## C.") ? "C" : starts(line, "## O.") ? "O" : "";
+            section = starts(line, "## C.") ? "C" : starts(line, "## O.") ? "O" : starts(line, "## S.") ? "S" : "";
             table.clear();
             continue;
         }
@@ -54,7 +54,18 @@ ReferenceDoc parseReferenceDoc(const std::string& markdown) {
         if (!starts(line, "| ")) continue;
         const auto c = cells(line);
         if (c.size() < 2) continue;
-        if (section == "C" && starts(c[0], "`C.") && c[0].back() == '`') {
+        if (section == "S" && c.size() >= 3 && starts(c[0], "`")) {
+            // the keys at the start of the first cell: `a`, `b` (words after them, such as "(existing)", are not keys)
+            size_t at = 0;
+            while (at < c[0].size() && c[0][at] == '`') {
+                const size_t close = c[0].find('`', at + 1);
+                if (close == std::string::npos) break;
+                doc.settings[c[0].substr(at + 1, close - at - 1)] = c[2];
+                at = close + 1;
+                if (c[0].compare(at, 2, ", ") != 0) break;
+                at += 2;
+            }
+        } else if (section == "C" && starts(c[0], "`C.") && c[0].back() == '`') {
             doc.common[c[0].substr(3, c[0].size() - 4)] = c[1];
         } else if (section == "O" && !table.empty() && c[0] != "Option") {
             size_t at = 0;

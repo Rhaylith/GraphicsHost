@@ -8,6 +8,12 @@ const char* common(std::string_view key) {
     return nullptr;
 }
 
+const char* setting(std::string_view key) {
+    for (const SettingTip& tip : allSettingTips)
+        if (key == tip.key) return tip.text;
+    return nullptr;
+}
+
 const OptionTable* optionTable(std::string_view name) {
     for (const OptionTable& table : allOptionTables)
         if (name == table.name) return &table;
@@ -32,7 +38,9 @@ nlohmann::json toJson() {
         for (const OptionTip& o : table.options) one[o.option] = o.tip;
         options[table.name] = std::move(one);
     }
-    return {{"common", common}, {"options", options}};
+    nlohmann::json settings = nlohmann::json::object();
+    for (const SettingTip& tip : allSettingTips) settings[tip.key] = tip.text;
+    return {{"common", common}, {"options", options}, {"settings", settings}};
 }
 
 std::string common(std::string_view key, std::string_view addition) {

@@ -664,10 +664,33 @@ The split pipeline: **Noise** + **Guider** + **Sampler** + **Sigmas** → Sample
 
 ## S. Settings
 
+### S.0 Settings that already exist
+
+The Settings tab shows these as tooltips (W1.6 checks that every key of `settings.json` has one with an example).
+
+| Key | Values · default | Tooltip |
+|---|---|---|
+| `backend` | auto, vulkan, cpu · **auto** | Which compute backend runs models. *auto* uses a usable Vulkan GPU and falls back to the CPU; workflows always need Vulkan. Example: *vulkan* to get an error instead of a slow CPU fallback. |
+| `gpuDevice` | index · **0** | Which Vulkan GPU runs the models when there are several. Example: 1 selects the second card in the list. |
+| `interfaceMode` | user, power, developer · **user** | How much of the Generate tab is shown. Example: *power* adds sampler, steps, CFG and device; *developer* also shows the request JSON. |
+| `theme` | system, light, dark · **system** | Window colours. Example: *dark* stays dark even when Windows is set to light. |
+| `accent` | colour · **default blue** | Colour of selections and links. Example: `#2b6cb0`; leave empty for the default. |
+| `notifications` | bool · **true** | Tray messages when a download finishes or an image is ready while the window is in the background. Example: off while screen sharing. |
+| `server.enabled` | bool · **true** | Run the API server that serves the browser UI and the OpenAI-compatible and native APIs. Example: off if you only use the desktop window. |
+| `server.port` | 1 … 65535 · **1234** | The port the server listens on. Example: 8080 when 1234 is already taken. |
+| `server.lan` | bool · **false** | Let other computers connect, not just this one; needs an access token. Example: on to open `http://192.168.1.20:1234` on your phone. |
+| `server.requireToken` | bool · **false** | Also require an access token from clients on this computer (remote clients always need one). Example: on when other people share this PC. |
+| `server.https` | bool · **false** | Serve over https; a self-signed certificate is made when no files are given. Example: on when connecting over a network you do not trust. |
+| `server.tlsCertFile`, `server.tlsKeyFile` | file · **none** | The PEM certificate chain and private key to use for https instead of the self-signed pair. Example: `C:\certs\host.pem` and `C:\certs\host.key`. |
+| `server.allowedAddresses` | list · **empty (anyone who may connect)** | Only these addresses may connect; this computer always may. Example: `192.168.1.0/24, 10.0.0.5`. |
+| `server.rateLimitPerMinute` | 0 … 100000 · **0** | Requests per client and minute before the server answers "too many requests"; 0 means no limit. Example: 120 for a shared server. |
+| `logging.level` | trace, debug, info, warn, error · **info** | How much the log records. Example: *debug* while reporting a problem, *warn* for quiet long-running servers. |
+| `safety.enabled` | bool · **false** | Check generated images with the optional safety filter. Example: on for a family computer. |
+
 ### S.1 Engine and server (`settings.json`)
 
 Settings that already exist (`backend`, `gpuDevice`, `interfaceMode`, `theme`, `accent`, `notifications`, `server.*`,
-`logging.level`, `safety.enabled`) keep the help text the Settings tab has today; W1.6 checks that each of them also
+`logging.level`, `safety.enabled`) are in S.0 above; W1.6 checks that each of them also
 has an example. Rows marked *(existing)* below get new wording because the workflow system uses them too.
 
 | Key | Values · default | Tooltip |

@@ -21,6 +21,13 @@ TEST_CASE("tips: the generated tooltip constants match the reference document", 
         CHECK(doc.common.at(tip.key) == tip.text);
     }
 
+    CHECK(std::size(tips::allSettingTips) == doc.settings.size());
+    for (const auto& tip : tips::allSettingTips) {
+        INFO(tip.key);
+        REQUIRE(doc.settings.count(tip.key) == 1);
+        CHECK(doc.settings.at(tip.key) == tip.text);
+    }
+
     REQUIRE(doc.options.size() == std::size(tips::allOptionTables));
     for (const auto& table : tips::allOptionTables) {
         INFO(table.name);

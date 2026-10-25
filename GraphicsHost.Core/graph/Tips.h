@@ -25,6 +25,11 @@ struct OptionTip {
     const char* tip;
 };
 
+struct SettingTip {
+    const char* key;   // "server.port", "memory.mode" ...
+    const char* text;
+};
+
 struct OptionTable {
     const char* name;
     std::span<const OptionTip> options;
@@ -45,8 +50,11 @@ const OptionTable* optionTable(std::string_view name);
 // The input with its choices and their tooltips taken from an option table.
 Param withOptions(Param param, std::span<const OptionTip> table);
 
-// Every shared tip and option tip as JSON: {"common": {key: text}, "options": {table: {option: text}}} (the editor and
-// the API serve it next to the node catalogue).
+// The tooltip of a setting by its dotted key ("server.port"), or nullptr.
+const char* setting(std::string_view key);
+
+// Every shared tip, option tip and setting tip as JSON: {"common": {key: text}, "options": {table: {option: text}},
+// "settings": {key: text}} (the editor and the API serve it next to the node catalogue).
 nlohmann::json toJson();
 
 // The shared tooltip followed by a node-specific sentence (the reference shows this as "→ C.key + sentence").
