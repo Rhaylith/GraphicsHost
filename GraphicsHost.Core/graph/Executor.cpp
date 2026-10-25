@@ -15,8 +15,9 @@ namespace {
 
 // A failure tied to the node it happened in. Thrown by the innermost node; outer evaluations let it pass.
 struct NodeFailure : std::runtime_error {
-    NodeFailure(std::string n, const std::string& message) : std::runtime_error(message), node(std::move(n)) {}
+    NodeFailure(std::string n, const std::string& message, std::string in = {}) : std::runtime_error(message), node(std::move(n)), input(std::move(in)) {}
     std::string node;
+    std::string input;   // the input to blame, when known
 };
 
 constexpr int kMaxExpansionDepth = 32;
@@ -49,19 +50,39 @@ public:
         ExecResult result;
         try {
             const Plan plan = makePlan(job_, registry_);
+            total_ = static_cast<int>(plan.order.size());
             cache_.beginJob();
+            Event started;
+            started.kind = Event::Kind::JobStarted;
+            started.total = total_;
+            emit(started);
             // demand-driven: a root that is in the cache keeps everything behind it from being visited
             for (const auto& root : plan.roots) result.outputs[root] = evaluate(root);
         } catch (const NodeFailure& f) {
             result.status = ExecResult::Status::Failed;
             result.errorNode = f.node;
+            result.errorInput = f.input;
             result.errorMessage = f.what();
+            Event e;
+            e.kind = Event::Kind::NodeError;
+            e.node = f.node;
+            e.input = f.input;
+            e.message = f.what();
+            if (nodes_.count(f.node)) e.type = nodes_.at(f.node).type;
+            emit(e);
         } catch (const Interrupted&) {
             result.status = ExecResult::Status::Interrupted;
         } catch (const std::exception& e) {   // PlanError, or something unexpected: the job fails, the process does not
             result.status = ExecResult::Status::Failed;
             result.errorMessage = e.what();
         }
+        Event finished;
+        finished.kind = Event::Kind::JobFinished;
+        finished.status = result.status == ExecResult::Status::Done ? "done" : result.status == ExecResult::Status::Failed ? "failed" : "interrupted";
+        finished.message = result.errorMessage;
+        finished.done = done_;
+        finished.total = total_;
+        emit(finished);
         cache_.endJob();
         result.ran = std::move(ran_);
         result.cached = std::move(cachedNodes_);
@@ -111,6 +132,10 @@ private:
         if (!key.empty()) {
             if (const Outputs hit = cache_.find(key)) {
                 cachedNodes_.push_back(id);
+                ++done_;
+                Event e = nodeEvent(Event::Kind::NodeCached, id);
+                e.summaries = summaries(*hit);
+                emit(e);
                 return *(results_[id] = hit);
             }
         }
@@ -118,14 +143,39 @@ private:
         NodeOutputs outputs = runNode(id, def);
         const Outputs stored = std::make_shared<const NodeOutputs>(std::move(outputs));
         if (!key.empty()) cache_.put(key, *stored);
+        ++done_;
+        Event e = nodeEvent(Event::Kind::NodeFinished, id);
+        e.summaries = summaries(*stored);
+        e.millis = millis_[id];
+        emit(e);
         return *(results_[id] = stored);
+    }
+
+    void emit(Event e) const {
+        if (!options_.events) return;
+        e.jobId = options_.jobId;
+        options_.events->publish(e);
+    }
+    Event nodeEvent(Event::Kind kind, const std::string& id) const {
+        Event e;
+        e.kind = kind;
+        e.node = id;
+        e.type = nodes_.at(id).type;
+        e.done = done_;
+        e.total = total_;
+        return e;
+    }
+    static std::vector<std::string> summaries(const NodeOutputs& outputs) {
+        std::vector<std::string> out;
+        for (const Value& v : outputs) out.push_back(v.summary());
+        return out;
     }
 
     // The value feeding one linked input.
     Value linked(const std::string& id, const std::string& input, const NodeRef& ref) {
         const NodeOutputs& source = evaluate(ref.node);
         if (ref.output < 0 || ref.output >= static_cast<int>(source.size()))
-            throw NodeFailure(id, "input '" + input + "' reads output " + std::to_string(ref.output) + " of node " + ref.node + ", which has " + std::to_string(source.size()));
+            throw NodeFailure(id, "input '" + input + "' reads output " + std::to_string(ref.output) + " of node " + ref.node + ", which has " + std::to_string(source.size()), input);
         return source[ref.output];
     }
 
@@ -136,6 +186,17 @@ private:
         ctx.nodeId = id;
         ctx.jobId = options_.jobId;
         ctx.stop = options_.stop;
+        ctx.progress = [this, id](int step, int steps) {
+            Event e = nodeEvent(Event::Kind::NodeProgress, id);
+            e.step = step;
+            e.steps = steps;
+            emit(e);
+        };
+        ctx.preview = [this, id](const Value& image) {
+            Event e = nodeEvent(Event::Kind::NodePreview, id);
+            e.preview = std::make_shared<const Value>(image);
+            emit(e);
+        };
 
         std::set<std::string> lazyPending;
         try {
@@ -156,9 +217,13 @@ private:
             throw;
         } catch (const Interrupted&) {
             throw;
+        } catch (const NodeError& e) {
+            throw NodeFailure(id, e.what(), e.input);
         } catch (const std::exception& e) {
             throw NodeFailure(id, e.what());
         }
+
+        emit(nodeEvent(Event::Kind::NodeStarted, id));
 
         // list mapping: run once per item; lists must have one length (a single item is repeated)
         std::size_t count = 1;
@@ -207,6 +272,8 @@ private:
                 throw;
             } catch (const NodeFailure&) {
                 throw;
+            } catch (const NodeError& e) {
+                throw NodeFailure(id, e.what(), e.input);
             } catch (const std::exception& e) {
                 throw NodeFailure(id, e.what());
             }
@@ -274,6 +341,7 @@ private:
     std::set<std::string> active_;
     std::vector<std::string> ran_, cachedNodes_;
     std::map<std::string, double, NodeIdLess> millis_;
+    int done_ = 0, total_ = 0;
 };
 
 }  // namespace

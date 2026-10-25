@@ -14,6 +14,8 @@ struct Rig {
     std::map<std::string, int> runs;   // by node type
     OutputCache cache;
     int fileVersion = 1;
+    std::stop_source stopSource;
+    std::function<void(int)> onStep;   // called inside t.steps after each step
 
     Rig() {
         auto count = [this](const char* type) { ++runs[type]; };
@@ -85,6 +87,17 @@ struct Rig {
             count("t.live");
             return NodeResult{{Value::makeInt(1)}};
         }));
+        registry.add(NodeDef("t.steps").input(Int("steps").def(5)).output(Out("v", ValueType::Int)).run([=](NodeContext& c) {
+            count("t.steps");
+            const int n = static_cast<int>(c.get("steps").asInt());
+            for (int i = 1; i <= n; ++i) {
+                if (c.stop.stop_requested()) throw Interrupted();
+                if (c.progress) c.progress(i, n);
+                if (c.preview) c.preview(Value::makeTensor(ValueType::Image, gh::tensor::Tensor({1, 2, 2, 3})));
+                if (onStep) onStep(i);
+            }
+            return NodeResult{{Value::makeInt(n)}};
+        }));
         registry.add(NodeDef("t.out").input(Int("v")).output(Out("v", ValueType::Int)).isOutput().run([=](NodeContext& c) {
             count("t.out");
             return NodeResult{{c.get("v")}};
@@ -92,6 +105,7 @@ struct Rig {
     }
 
     ExecResult run(const json& nodes, json outputs = json::array(), RunOptions options = {}) {
+        if (!options.stop.stop_possible()) options.stop = stopSource.get_token();
         const JobGraph job = jobFromJson({{"format", "graphicshost.job"}, {"version", 1}, {"nodes", nodes}, {"outputs", outputs}});
         return Executor(registry, cache).run(job, options);
     }
@@ -247,4 +261,129 @@ TEST_CASE("executor: failures end the job and name the node", "[unit][executor]"
     const auto unknown = rig.run({{"1", n("plugin.nothing")}, {"2", n("t.out", {{"v", ref("1")}})}});
     CHECK(unknown.status == ExecResult::Status::Failed);
     CHECK(unknown.errorNode == "1");
+}
+
+namespace {
+struct Recorder {
+    std::vector<json> events;
+    std::vector<Event> raw;
+    EventBus bus;
+    EventBus::Id id;
+    Recorder() {
+        id = bus.subscribe([this](const Event& e) {
+            events.push_back(e.toJson());
+            raw.push_back(e);
+        });
+    }
+    std::vector<std::string> types() const {
+        std::vector<std::string> out;
+        for (const auto& e : events) out.push_back(e["type"].get<std::string>() + (e.contains("node") ? ":" + e["node"].get<std::string>() : ""));
+        return out;
+    }
+};
+}  // namespace
+
+TEST_CASE("events: a job reports its nodes, progress, previews and summaries", "[unit][executor][events]") {
+    Rig rig;
+    Recorder rec;
+    RunOptions options;
+    options.jobId = "job-1";
+    options.events = &rec.bus;
+    const auto r = rig.run({{"1", n("t.steps", {{"steps", 3}})}, {"2", n("t.out", {{"v", ref("1")}})}}, json::array(), options);
+    REQUIRE(r.ok());
+    CHECK(rec.types() == std::vector<std::string>{"job.started", "node.started:1", "node.progress:1", "node.preview:1", "node.progress:1", "node.preview:1", "node.progress:1", "node.preview:1",
+                                                  "node.finished:1", "node.started:2", "node.finished:2", "job.finished"});
+    CHECK(rec.events.front()["total"] == 2);
+    CHECK(rec.events.front()["job"] == "job-1");
+    CHECK(rec.events[2]["step"] == 1);
+    CHECK(rec.events[2]["steps"] == 3);
+    REQUIRE(rec.raw[3].preview != nullptr);
+    CHECK(rec.raw[3].preview->type == ValueType::Image);
+    CHECK(rec.events[8]["outputs"][0] == "INT 3");
+    CHECK(rec.events[8]["done"] == 1);
+    CHECK(rec.events[8]["millis"].is_number());
+    CHECK(rec.events.back()["status"] == "done");
+    CHECK(rec.events.back()["done"] == 2);
+
+    // the next run is entirely cached: one event for the output node
+    rec.events.clear();
+    const auto again = rig.run({{"1", n("t.steps", {{"steps", 3}})}, {"2", n("t.out", {{"v", ref("1")}})}}, json::array(), options);
+    REQUIRE(again.ok());
+    CHECK(rec.types() == std::vector<std::string>{"job.started", "node.cached:2", "job.finished"});
+}
+
+TEST_CASE("events: errors name the node and the input", "[unit][executor][events]") {
+    Rig rig;
+    rig.registry.add(NodeDef("t.picky").input(Int("v").def(0)).output(Out("v", ValueType::Int)).run([](NodeContext&) -> NodeResult { throw NodeError("must not be zero", "v"); }));
+    Recorder rec;
+    RunOptions options;
+    options.events = &rec.bus;
+    const auto r = rig.run({{"1", n("t.picky")}, {"2", n("t.out", {{"v", ref("1")}})}}, json::array(), options);
+    CHECK(r.status == ExecResult::Status::Failed);
+    CHECK(r.errorNode == "1");
+    CHECK(r.errorInput == "v");
+    CHECK(rec.types() == std::vector<std::string>{"job.started", "node.started:1", "node.error:1", "job.finished"});
+    CHECK(rec.events[2]["message"] == "must not be zero");
+    CHECK(rec.events[2]["input"] == "v");
+    CHECK(rec.events[2]["nodeType"] == "t.picky");
+    CHECK(rec.events.back()["status"] == "failed");
+    CHECK(rec.events.back()["message"] == "must not be zero");
+}
+
+TEST_CASE("events: interrupting stops between nodes and inside a node's loop", "[unit][executor][events]") {
+    Rig rig;
+    // inside a node: stop after step 2 of 10
+    rig.onStep = [&](int i) {
+        if (i == 2) rig.stopSource.request_stop();
+    };
+    Recorder rec;
+    RunOptions options;
+    options.events = &rec.bus;
+    const auto r = rig.run({{"1", n("t.steps", {{"steps", 10}})}, {"2", n("t.out", {{"v", ref("1")}})}}, json::array(), options);
+    CHECK(r.status == ExecResult::Status::Interrupted);
+    CHECK(r.errorNode.empty());
+    CHECK(rig.runs["t.out"] == 0);
+    CHECK(rec.events.back()["status"] == "interrupted");
+    int progress = 0;
+    for (const auto& e : rec.events) progress += e["type"] == "node.progress";
+    CHECK(progress == 2);
+
+    // between nodes: a token that is already set runs nothing
+    Rig rig2;
+    std::stop_source stopped;
+    stopped.request_stop();
+    RunOptions pre;
+    pre.stop = stopped.get_token();
+    const auto none = rig2.run({{"1", n("t.const", {{"value", 1}})}, {"2", n("t.out", {{"v", ref("1")}})}}, json::array(), pre);
+    CHECK(none.status == ExecResult::Status::Interrupted);
+    CHECK(rig2.runs.empty());
+
+    // an interrupted job's finished nodes stay cached for the next run
+    Rig rig3;
+    rig3.onStep = [&](int) {};
+    json g = {{"1", n("t.const", {{"value", 1}})}, {"2", n("t.steps", {{"steps", 3}})}, {"3", n("t.add", {{"a", ref("1")}, {"b", ref("2")}})}, {"4", n("t.out", {{"v", ref("3")}})}};
+    rig3.onStep = [&](int i) {
+        if (i == 1) rig3.stopSource.request_stop();
+    };
+    CHECK(rig3.run(g).status == ExecResult::Status::Interrupted);
+    rig3.stopSource = std::stop_source();
+    rig3.onStep = nullptr;
+    const auto resumed = rig3.run(g);
+    REQUIRE(resumed.ok());
+    CHECK(rig3.runs["t.const"] == 1);   // finished before the interrupt, reused
+    CHECK(resumed.outputs.at("4")[0].asInt() == 4);
+}
+
+TEST_CASE("events: the bus delivers to every subscriber until they leave", "[unit][events]") {
+    EventBus bus;
+    int a = 0, b = 0;
+    const auto ia = bus.subscribe([&](const Event&) { ++a; });
+    bus.subscribe([&](const Event&) { ++b; });
+    Event e;
+    bus.publish(e);
+    bus.unsubscribe(ia);
+    bus.publish(e);
+    CHECK(a == 1);
+    CHECK(b == 2);
+    CHECK(std::string(eventName(Event::Kind::NodePreview)) == "node.preview");
 }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "graph/Events.h"
 #include "graph/NodeApi.h"
 #include "graph/OutputCache.h"
 #include "graph/Planner.h"
@@ -13,7 +14,8 @@ namespace gh::graph {
 
 struct RunOptions {
     std::string jobId;
-    std::stop_token stop;   // set to interrupt the job: checked before every node and handed to the nodes
+    std::stop_token stop;   // set to interrupt the job: checked before every node and handed to the nodes, which check it in their own loops (a sampler at every step)
+    EventBus* events = nullptr;   // optional: told about everything that happens
 };
 
 struct ExecResult {
@@ -22,6 +24,7 @@ struct ExecResult {
     // The outputs of the requested nodes (the job's `outputs`, or every output node).
     std::map<std::string, NodeOutputs, NodeIdLess> outputs;
     std::string errorNode;      // Failed: the node that failed ...
+    std::string errorInput;     // ... the input to blame, when known ...
     std::string errorMessage;   // ... and why
     std::vector<std::string> ran;      // nodes that ran, in order (expanded nodes have ids such as "7:3")
     std::vector<std::string> cached;   // nodes whose result came from the cache

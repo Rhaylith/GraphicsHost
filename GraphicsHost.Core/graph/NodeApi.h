@@ -17,7 +17,8 @@ namespace gh::graph {
 // against the node.
 class NodeError : public std::runtime_error {
 public:
-    using std::runtime_error::runtime_error;
+    explicit NodeError(const std::string& message, std::string inputName = {}) : std::runtime_error(message), input(std::move(inputName)) {}
+    std::string input;   // the input to blame, when the node knows (the editor marks that socket)
 };
 
 // Thrown by a node that noticed the job was interrupted (its stop token is set); the executor ends the job quietly.
