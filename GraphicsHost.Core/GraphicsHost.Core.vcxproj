@@ -54,6 +54,8 @@
     <ClCompile Include="gallery\**\*.cpp" />
     <ClInclude Include="gallery\**\*.h" />
     <ClCompile Include="host\**\*.cpp" />
+    <ClCompile Include="sampling\**\*.cpp" />
+    <ClInclude Include="sampling\**\*.h" />
     <ClInclude Include="host\**\*.h" />
     <ClInclude Include="core\**\*.h" />
     <ClInclude Include="engine\**\*.h" />

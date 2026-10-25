@@ -190,6 +190,41 @@ GH_API int32_t gh_denoise(gh_model* model, const gh_denoise_args* a, gh_tensor* 
         return sd->diffusion_model->compute(sd->n_threads, params);
     };
 
+    // The engine runs the prompt and the negative prompt as one batch of two when their shapes match: the same here, so the
+    // numbers agree with gh_generate (and it is one model call instead of two).
+    if (a->uncond_hidden) {
+        const sd::Tensor<float> cond_ctx = from_gh(*a->cond_hidden), uncond_ctx = from_gh(*a->uncond_hidden);
+        const bool pooled_ok = !(a->cond_pooled && a->cond_pooled->ndim > 0) ||
+                               (a->uncond_pooled && a->uncond_pooled->ndim == a->cond_pooled->ndim);
+        if (cond_ctx.dim() == uncond_ctx.dim() && cond_ctx.shape() == uncond_ctx.shape() && pooled_ok && x.dim() == 4 && x.shape()[3] == 1) {
+            const sd::Tensor<float> batched_context = sd::ops::concat(cond_ctx, uncond_ctx, static_cast<size_t>(cond_ctx.dim() - 1));
+            sd::Tensor<float> batched_y;
+            if (a->cond_pooled && a->cond_pooled->ndim > 0) {
+                const sd::Tensor<float> cy = from_gh(*a->cond_pooled), uy = from_gh(*a->uncond_pooled);
+                if (cy.dim() == 1) {
+                    batched_y = sd::ops::concat(cy, uy, 0);
+                    batched_y.reshape_({cy.shape()[0], 2});
+                } else {
+                    batched_y = sd::ops::concat(cy, uy, static_cast<size_t>(cy.dim() - 1));
+                }
+            }
+            const sd::Tensor<float> batched_x = sd::ops::concat(noised, noised, 3);
+            std::vector<sd::Tensor<float>> controls;
+            DiffusionParams params;
+            params.x = &batched_x;
+            params.timesteps = &timesteps;
+            params.context = &batched_context;
+            params.y = batched_y.empty() ? nullptr : &batched_y;
+            params.extra = UNetDiffusionExtra{1, &controls, 0.f};
+            sd::Tensor<float> both = sd->diffusion_model->compute(sd->n_threads, params);
+            if (both.empty()) return fail(GH_ERR_GENERATION_FAILED, "the diffusion model failed");
+            auto parts = sd::ops::chunk(both, 2, 3);
+            const sd::Tensor<float> guided = parts[1] + a->cfg_scale * (parts[0] - parts[1]);
+            to_gh(guided * c_out + x * c_skip, out);
+            return GH_OK;
+        }
+    }
+
     sd::Tensor<float> guided = evaluate(a->cond_hidden, a->cond_pooled);
     if (guided.empty()) return fail(GH_ERR_GENERATION_FAILED, "the diffusion model failed");
     if (a->uncond_hidden) {

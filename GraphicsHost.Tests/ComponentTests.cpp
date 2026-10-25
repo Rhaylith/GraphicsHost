@@ -2,7 +2,9 @@
 
 #include "core/Paths.h"
 #include "engine/RuntimeLoader.h"
+#include "sampling/Euler.h"
 
+#include <chrono>
 #include <cmath>
 #include <filesystem>
 
@@ -10,7 +12,7 @@ using namespace gh::engine;
 
 namespace {
 
-// A loaded SD 1.5 on the Vulkan runtime, with a component session open, or a skipped test.
+// A loaded SD 1.5 on the Vulkan runtime, or a skipped test. Component calls need gh_session_begin (not while gh_generate runs).
 struct VulkanModel {
     std::unique_ptr<Runtime> runtime;
     gh_model* model = nullptr;
@@ -39,7 +41,6 @@ std::unique_ptr<VulkanModel> loadOrSkip(const char* checkpoint = "v1-5-pruned-em
     lp.flash_attention = 1;
     m->model = m->runtime->api().load(&lp);
     if (!m->model) SKIP("the model could not be loaded: " << m->runtime->api().lastError());
-    REQUIRE(m->runtime->api().sessionBegin(m->model) == GH_OK);
     return m;
 }
 
@@ -61,6 +62,7 @@ TEST_CASE("components: the pieces of SD 1.5 produce plausible tensors on Vulkan"
     auto m = loadOrSkip();
     const auto& api = m->runtime->api();
 
+    REQUIRE(api.sessionBegin(m->model) == GH_OK);
     Tensor hidden(api), pooled(api);
     REQUIRE(api.textEncode(m->model, "a lighthouse on a cliff", -1, 512, 512, &hidden.t, &pooled.t) == GH_OK);
     CHECK(hidden.t.ndim == 3);
@@ -116,4 +118,133 @@ TEST_CASE("components: the pieces of SD 1.5 produce plausible tensors on Vulkan"
     }
     CHECK(hi > lo);   // not a flat picture
     api.floatArrayFree(sigmas);
+}
+
+namespace {
+
+struct PipelineSettings {
+    std::string prompt = "a lighthouse on a cliff at sunset";
+    std::string negative = "";
+    int64_t seed = 42;
+    int size = 512;
+    int steps = 6;
+    float cfg = 7.5f;
+    const char* sampler = "euler";
+    const char* scheduler = "discrete";
+};
+
+// The whole pipeline from component calls and the host's Euler loop: an RGB float image in 0..1, row by row.
+std::vector<float> runFromComponents(const Runtime::Api& api, gh_model* model, const PipelineSettings& s, double* secondsInLoop = nullptr) {
+    REQUIRE(api.sessionBegin(model) == GH_OK);
+    Tensor hidden(api), uncond(api);
+    REQUIRE(api.textEncode(model, s.prompt.c_str(), -1, s.size, s.size, &hidden.t, nullptr) == GH_OK);
+    REQUIRE(api.textEncode(model, s.negative.c_str(), -1, s.size, s.size, &uncond.t, nullptr) == GH_OK);
+
+    gh_generate_params gp{};
+    gp.struct_size = sizeof(gp);
+    gp.width = gp.height = s.size;
+    gp.steps = s.steps;
+    gp.sampler = s.sampler;
+    gp.scheduler = s.scheduler;
+    float* raw = nullptr;
+    int32_t count = 0;
+    REQUIRE(api.sigmaSchedule(model, &gp, &raw, &count) == GH_OK);
+    const std::vector<float> sigmas(raw, raw + count);
+    api.floatArrayFree(raw);
+
+    Tensor start(api);
+    REQUIRE(api.initialLatent(model, s.seed, s.size, s.size, sigmas[0], &start.t) == GH_OK);
+    gh_tensor shape = start.t;   // the shape of every latent in the loop
+    gh::sampling::Latent x(start.t.data, start.t.data + start.count());
+
+    const auto t0 = std::chrono::steady_clock::now();
+    const bool ok = gh::sampling::euler(x, sigmas, [&](const gh::sampling::Latent& cur, float sigma, int, gh::sampling::Latent& out) {
+        gh_tensor in = shape;
+        in.data = const_cast<float*>(cur.data());
+        gh_denoise_args args{};
+        args.struct_size = sizeof(args);
+        args.x = &in;
+        args.sigma = sigma;
+        args.cond_hidden = &hidden.t;
+        args.uncond_hidden = &uncond.t;
+        args.cfg_scale = s.cfg;
+        Tensor result(api);
+        if (api.denoise(model, &args, &result.t) != GH_OK) return false;
+        out.assign(result.t.data, result.t.data + result.count());
+        return true;
+    });
+    if (secondsInLoop) *secondsInLoop = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+    REQUIRE(ok);
+
+    gh_tensor latent = shape;
+    latent.data = x.data();
+    Tensor image(api);
+    REQUIRE(api.vaeDecode(model, &latent, &image.t) == GH_OK);
+    // ggml order {W, H, 3, 1} -> rows of RGB triples
+    const int w = static_cast<int>(image.t.shape[0]), h = static_cast<int>(image.t.shape[1]);
+    std::vector<float> rgb(static_cast<size_t>(w) * h * 3);
+    for (int y = 0; y < h; ++y)
+        for (int xx = 0; xx < w; ++xx)
+            for (int c = 0; c < 3; ++c) rgb[(static_cast<size_t>(y) * w + xx) * 3 + c] = image.t.data[(static_cast<size_t>(c) * h + y) * w + xx];
+    api.sessionEnd(model);
+    return rgb;
+}
+
+// What gh_generate makes for the same settings, as floats in 0..1.
+std::vector<float> runWithGenerate(const Runtime::Api& api, gh_model* model, const PipelineSettings& s) {
+    gh_generate_params gp{};
+    gp.struct_size = sizeof(gp);
+    gp.prompt = s.prompt.c_str();
+    gp.negative_prompt = s.negative.c_str();
+    gp.width = gp.height = s.size;
+    gp.steps = s.steps;
+    gp.cfg_scale = s.cfg;
+    gp.seed = s.seed;
+    gp.batch_count = 1;
+    gp.sampler = s.sampler;
+    gp.scheduler = s.scheduler;
+    gp.clip_skip = -1;
+    gh_result result{};
+    REQUIRE(api.generate(model, &gp, nullptr, nullptr, &result) == GH_OK);
+    REQUIRE(result.image_count == 1);
+    const gh_image& img = result.images[0];
+    std::vector<float> rgb(static_cast<size_t>(img.width) * img.height * 3);
+    for (size_t i = 0; i < rgb.size(); ++i) rgb[i] = img.data[i] / 255.0f;
+    api.freeResult(&result);
+    return rgb;
+}
+
+double meanAbsDifference255(const std::vector<float>& a, const std::vector<float>& b) {
+    REQUIRE(a.size() == b.size());
+    double sum = 0;
+    for (size_t i = 0; i < a.size(); ++i) sum += std::fabs(a[i] - b[i]) * 255.0;
+    return sum / static_cast<double>(a.size());
+}
+
+}  // namespace
+
+TEST_CASE("components: the host's Euler loop over gh_denoise makes the image gh_generate makes", "[model][vulkan][components]") {
+    auto m = loadOrSkip();
+    const auto& api = m->runtime->api();
+    PipelineSettings s;
+    const auto reference = runWithGenerate(api, m->model, s);
+    const auto fromParts = runFromComponents(api, m->model, s);
+    const double difference = meanAbsDifference255(reference, fromParts);
+    INFO("mean absolute difference per colour value (0..255): " << difference);
+    CHECK(difference < 0.5);   // the same picture (measured 0.23): GPU maths is not bit-exact, a different path would differ by tens
+
+    // a different seed is a different picture (the comparison can tell)
+    PipelineSettings other = s;
+    other.seed = 43;
+    CHECK(meanAbsDifference255(reference, runFromComponents(api, m->model, other)) > 10.0);
+}
+
+TEST_CASE("components: gh_generate repeats itself, so differences to it mean something", "[model][vulkan][components]") {
+    auto m = loadOrSkip();
+    PipelineSettings s;
+    const auto a = runWithGenerate(m->runtime->api(), m->model, s);
+    const auto b = runWithGenerate(m->runtime->api(), m->model, s);
+    const double self = meanAbsDifference255(a, b);
+    INFO("gh_generate against itself: " << self);
+    CHECK(self < 0.05);
 }
