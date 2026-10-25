@@ -629,7 +629,7 @@ Vulkan. A software Vulkan driver runs the fixture tests in CI (W0.7).
 - [x] W2.2 Fingerprints, `OutputCache` with the four policies (M)
 - [x] W2.3 Lazy inputs, list mapping, node expansion with stable ids (M)
 - [x] W2.4 Events bus; per-node progress; interrupt between nodes and per step (S)
-- [ ] W2.5 Generalise `JobQueue` (`JobWork`, front/back, clear, node progress) without changing the Generate path's behaviour (its `JobQueueTests` stay green); history tables and migration in the gallery database (M)
+- [x] W2.5 Generalise `JobQueue` (`JobWork`, front/back, clear, node progress) without changing the Generate path's behaviour (its `JobQueueTests` stay green); history tables and migration in the gallery database (M)
 - [ ] W2.6 Utility nodes: constants, reroute, note, string tools, compare/switch (lazy), preview-any (S)
 - [ ] W2.7 `GraphService` in `host/` (validate, submit, history, events) wired into `AppHost` (S)
 

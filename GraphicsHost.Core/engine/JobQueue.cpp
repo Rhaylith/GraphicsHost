@@ -10,6 +10,8 @@ namespace {
 constexpr size_t kKeepFinished = 100;
 }
 
+const char* toString(JobKind kind) { return kind == JobKind::Graph ? "graph" : "generation"; }
+
 const char* toString(JobState state) {
     switch (state) {
         case JobState::Queued: return "queued";
@@ -29,6 +31,11 @@ bool Job::finished() const {
 StepProgress Job::progress() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return progress_;
+}
+
+nlohmann::json Job::graphResult() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return graphResult_;
 }
 
 GenerationResult Job::result() const {
@@ -77,12 +84,21 @@ JobQueue::~JobQueue() {
     worker_.join();
 }
 
-std::shared_ptr<Job> JobQueue::submit(std::shared_ptr<ILoadedModel> model, GenerationRequest request) {
-    std::shared_ptr<Job> job;
+std::shared_ptr<Job> JobQueue::submit(std::shared_ptr<ILoadedModel> model, GenerationRequest request, SubmitOptions options) {
+    const bool front = options.front;
+    return enqueue(std::shared_ptr<Job>(new Job(nextId_.fetch_add(1), std::move(model), std::move(request), std::move(options))), front);
+}
+
+std::shared_ptr<Job> JobQueue::submitGraph(GraphWork work, SubmitOptions options) {
+    const bool front = options.front;
+    return enqueue(std::shared_ptr<Job>(new Job(nextId_.fetch_add(1), std::move(work), std::move(options))), front);
+}
+
+std::shared_ptr<Job> JobQueue::enqueue(std::shared_ptr<Job> job, bool front) {
     {
         std::lock_guard<std::mutex> lock(mutex_);
-        job.reset(new Job(nextId_++, std::move(model), std::move(request)));
-        queue_.push_back(job);
+        if (front) queue_.push_front(job);
+        else queue_.push_back(job);
         jobs_.push_back(job);
         trimFinished();
     }
@@ -110,6 +126,28 @@ bool JobQueue::cancel(uint64_t id) {
     job->cancel();
     wake_.notify_all();
     return true;
+}
+
+size_t JobQueue::clearPending() {
+    std::deque<std::shared_ptr<Job>> cleared;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        cleared.swap(queue_);
+    }
+    for (const auto& job : cleared) {
+        job->stop_.request_stop();
+        {
+            std::lock_guard<std::mutex> lock(job->mutex_);
+            job->error_ = "removed from the queue";
+            job->errorCode_ = EngineErrorCode::Cancelled;
+            job->model_.reset();
+            job->graphWork_ = nullptr;
+            job->state_ = JobState::Cancelled;
+        }
+        job->done_.notify_all();
+        notify(*job);
+    }
+    return cleared.size();
 }
 
 size_t JobQueue::pending() const {
@@ -170,6 +208,7 @@ void JobQueue::run() {
             {
                 std::lock_guard<std::mutex> lock(job->mutex_);
                 job->model_.reset();
+                job->graphWork_ = nullptr;
                 job->state_ = state;
             }
             job->done_.notify_all();
@@ -189,17 +228,20 @@ void JobQueue::run() {
         job->state_ = JobState::Running;
         notify(*job);
         try {
-            GenerationResult result = job->model_->generate(
-                job->request_,
-                [&](const StepProgress& p) {
-                    {
-                        std::lock_guard<std::mutex> lock(job->mutex_);
-                        job->progress_ = p;
-                    }
-                    notify(*job);
-                },
-                job->stop_.get_token());
-            {
+            const auto report = [&](const StepProgress& p) {
+                {
+                    std::lock_guard<std::mutex> lock(job->mutex_);
+                    job->progress_ = p;
+                }
+                notify(*job);
+            };
+            if (job->kind_ == JobKind::Graph) {
+                JobControl control{job->id(), job->stop_.get_token(), report};
+                nlohmann::json summary = job->graphWork_(control);
+                std::lock_guard<std::mutex> lock(job->mutex_);
+                job->graphResult_ = std::move(summary);
+            } else {
+                GenerationResult result = job->model_->generate(job->request_, report, job->stop_.get_token());
                 std::lock_guard<std::mutex> lock(job->mutex_);
                 job->result_ = std::move(result);
             }

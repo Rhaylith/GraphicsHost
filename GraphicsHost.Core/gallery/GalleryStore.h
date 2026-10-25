@@ -33,6 +33,24 @@ struct GalleryEntry {
     nlohmann::json parameters;  // the full record: request, model, runtime, seconds
 };
 
+// One finished graph job in the history (workflow plan, section 6.6). Every output file is also a normal gallery entry; `outputs`
+// lists them per node. The job and the editor workflow are kept so a past run can be reopened or repeated.
+struct HistoryEntry {
+    int64_t id = 0;
+    int64_t queueNumber = 0;     // the number the queue gave the job
+    std::string clientId;
+    std::string label;
+    std::string status;          // done | failed | interrupted | cancelled
+    std::string created;         // ISO 8601 UTC, when the job finished
+    double seconds = 0;
+    std::string error;
+    std::string errorNode;
+    nlohmann::json job;          // the job format
+    nlohmann::json workflow;     // the editor format, or null
+    nlohmann::json outputs = nlohmann::json::array();   // [{"node": "9", "gallery": 12, "path": "2026/10/25/..png"}]
+    nlohmann::json timings = nlohmann::json::object();  // node id -> milliseconds
+};
+
 struct GalleryQuery {
     std::string text;       // matches the prompt (case-insensitive substring); empty = everything
     int limit = 50;
@@ -66,6 +84,15 @@ public:
     // Deletes the image file, its sidecar and the index row. False if there is no such entry.
     bool remove(int64_t id);
 
+    // History of graph jobs. `history` lists newest first and leaves out the job and workflow (use historyItem for those).
+    int64_t addHistory(const HistoryEntry& entry);
+    std::vector<HistoryEntry> history(int limit = 50, int offset = 0) const;
+    size_t historyCount() const;
+    std::optional<HistoryEntry> historyItem(int64_t id) const;
+    bool removeHistory(int64_t id);   // the row only; output files stay in the gallery
+    // Keeps the newest `maxItems` rows (0 = keep everything); returns how many were removed. Never touches files.
+    size_t pruneHistory(size_t maxItems);
+
     // Adds index rows for sidecar files that are not indexed yet and drops rows whose image is gone.
     // Returns the number of rows added.
     size_t rescan();
@@ -74,6 +101,7 @@ private:
     GalleryEntry insert(const GalleryEntry& entry);
     GalleryEntry fromRow(void* statement) const;
     void exec(const char* sql) const;
+    void migrate();
 
     std::filesystem::path root_;
     sqlite3* db_ = nullptr;

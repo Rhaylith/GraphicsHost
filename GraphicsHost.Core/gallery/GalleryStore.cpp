@@ -119,12 +119,40 @@ GalleryStore::GalleryStore(fs::path outputsDir) : root_(std::move(outputsDir)) {
         " format TEXT NOT NULL,"
         " params TEXT NOT NULL)");
     exec("CREATE INDEX IF NOT EXISTS images_created ON images(created DESC, id DESC)");
-    exec("PRAGMA user_version=1");
+    migrate();
 }
 
 GalleryStore::~GalleryStore() {
     if (db_) {
         sqlite3_close(db_);
+    }
+}
+
+// Schema versions (PRAGMA user_version): 1 = the images table; 2 = adds graph_history.
+void GalleryStore::migrate() {
+    int version = 0;
+    {
+        Statement s(db_, "PRAGMA user_version");
+        if (sqlite3_step(s.get()) == SQLITE_ROW) version = sqlite3_column_int(s.get(), 0);
+    }
+    if (version < 2) {
+        exec(
+            "CREATE TABLE IF NOT EXISTS graph_history ("
+            " id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            " queue_number INTEGER NOT NULL,"
+            " client_id TEXT NOT NULL,"
+            " label TEXT NOT NULL,"
+            " status TEXT NOT NULL,"
+            " created TEXT NOT NULL,"
+            " seconds REAL NOT NULL,"
+            " error TEXT NOT NULL,"
+            " error_node TEXT NOT NULL,"
+            " job TEXT NOT NULL,"
+            " workflow TEXT NOT NULL,"
+            " outputs TEXT NOT NULL,"
+            " timings TEXT NOT NULL)");
+        exec("CREATE INDEX IF NOT EXISTS graph_history_created ON graph_history(created DESC, id DESC)");
+        exec("PRAGMA user_version=2");
     }
 }
 
@@ -374,6 +402,101 @@ size_t GalleryStore::rescan() {
         log::info("gallery rescan: " + std::to_string(added) + " added, " + std::to_string(missing.size()) + " dropped");
     }
     return added;
+}
+
+}  // namespace gh::gallery
+
+// ---- history of graph jobs ----------------------------------------------------------------------------------------------
+
+namespace gh::gallery {
+
+namespace {
+constexpr const char* kHistoryColumns = "id,queue_number,client_id,label,status,created,seconds,error,error_node";
+constexpr const char* kHistoryAllColumns = "id,queue_number,client_id,label,status,created,seconds,error,error_node,job,workflow,outputs,timings";
+
+HistoryEntry historyFromRow(sqlite3_stmt* s, bool full) {
+    HistoryEntry e;
+    e.id = sqlite3_column_int64(s, 0);
+    e.queueNumber = sqlite3_column_int64(s, 1);
+    e.clientId = columnText(s, 2);
+    e.label = columnText(s, 3);
+    e.status = columnText(s, 4);
+    e.created = columnText(s, 5);
+    e.seconds = sqlite3_column_double(s, 6);
+    e.error = columnText(s, 7);
+    e.errorNode = columnText(s, 8);
+    if (full) {
+        e.job = Json::parse(columnText(s, 9), nullptr, false);
+        e.workflow = Json::parse(columnText(s, 10), nullptr, false);
+        e.outputs = Json::parse(columnText(s, 11), nullptr, false);
+        e.timings = Json::parse(columnText(s, 12), nullptr, false);
+    }
+    return e;
+}
+}  // namespace
+
+int64_t GalleryStore::addHistory(const HistoryEntry& entry) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    Statement s(db_,
+                "INSERT INTO graph_history(queue_number,client_id,label,status,created,seconds,error,error_node,job,workflow,outputs,timings) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?)");
+    s.bind(1, entry.queueNumber);
+    s.bind(2, entry.clientId);
+    s.bind(3, entry.label);
+    s.bind(4, entry.status);
+    s.bind(5, entry.created.empty() ? isoUtcNow() : entry.created);
+    sqlite3_bind_double(s.get(), 6, entry.seconds);
+    s.bind(7, entry.error);
+    s.bind(8, entry.errorNode);
+    s.bind(9, entry.job.dump());
+    s.bind(10, entry.workflow.dump());
+    s.bind(11, entry.outputs.dump());
+    s.bind(12, entry.timings.dump());
+    if (sqlite3_step(s.get()) != SQLITE_DONE) throw std::runtime_error(std::string("gallery index: ") + sqlite3_errmsg(db_));
+    return sqlite3_last_insert_rowid(db_);
+}
+
+std::vector<HistoryEntry> GalleryStore::history(int limit, int offset) const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    const std::string sql = std::string("SELECT ") + kHistoryColumns + " FROM graph_history ORDER BY created DESC, id DESC LIMIT ? OFFSET ?";
+    Statement s(db_, sql.c_str());
+    s.bind(1, static_cast<int64_t>(std::max(limit, 0)));
+    s.bind(2, static_cast<int64_t>(std::max(offset, 0)));
+    std::vector<HistoryEntry> out;
+    while (sqlite3_step(s.get()) == SQLITE_ROW) out.push_back(historyFromRow(s.get(), false));
+    return out;
+}
+
+size_t GalleryStore::historyCount() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    Statement s(db_, "SELECT COUNT(*) FROM graph_history");
+    return sqlite3_step(s.get()) == SQLITE_ROW ? static_cast<size_t>(sqlite3_column_int64(s.get(), 0)) : 0;
+}
+
+std::optional<HistoryEntry> GalleryStore::historyItem(int64_t id) const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    const std::string sql = std::string("SELECT ") + kHistoryAllColumns + " FROM graph_history WHERE id=?";
+    Statement s(db_, sql.c_str());
+    s.bind(1, id);
+    if (sqlite3_step(s.get()) != SQLITE_ROW) return std::nullopt;
+    return historyFromRow(s.get(), true);
+}
+
+bool GalleryStore::removeHistory(int64_t id) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    Statement s(db_, "DELETE FROM graph_history WHERE id=?");
+    s.bind(1, id);
+    sqlite3_step(s.get());
+    return sqlite3_changes(db_) > 0;
+}
+
+size_t GalleryStore::pruneHistory(size_t maxItems) {
+    if (maxItems == 0) return 0;
+    std::lock_guard<std::mutex> lock(mutex_);
+    Statement s(db_, "DELETE FROM graph_history WHERE id NOT IN (SELECT id FROM graph_history ORDER BY created DESC, id DESC LIMIT ?)");
+    s.bind(1, static_cast<int64_t>(maxItems));
+    sqlite3_step(s.get());
+    return static_cast<size_t>(sqlite3_changes(db_));
 }
 
 }  // namespace gh::gallery
