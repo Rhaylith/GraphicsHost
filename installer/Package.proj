@@ -5,7 +5,7 @@
       msbuild installer\Package.proj
     The zip holds the exe, the vcpkg and Qt DLLs, the runtimes, the data and web folders, the translations and the Visual C++
     runtime (app-local, so no redistributable has to be installed). It is a package, not an installer: there is no
-    WiX or MSIX tooling on the build machine (see implementation-plan.md, 6.5).
+    WiX or MSIX tooling on the build machine (see work-implementation-plan.md, 6.5).
   -->
   <PropertyGroup>
     <Configuration Condition="'$(Configuration)'==''">Release</Configuration>

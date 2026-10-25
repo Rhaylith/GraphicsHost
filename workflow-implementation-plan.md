@@ -5,7 +5,7 @@ a checkpoint, encode a prompt, sample, decode, upscale, save) in a visual editor
 graph. A local engine runs only the parts that changed, keeps loaded models in memory, and streams progress and previews
 back. The same graph can be saved as a file, embedded in the images it produced, and sent to an HTTP API.
 
-It builds on [implementation-plan.md](implementation-plan.md). Where the two disagree, this plan wins for the areas it
+It builds on [work-implementation-plan.md](work-implementation-plan.md). Where the two disagree, this plan wins for the areas it
 covers (§14 lists the overrides).
 
 **Starting point (2026-10-25).** The main plan is done except the stretch items (5.7 upscaler/ControlNet, 6.6
