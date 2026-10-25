@@ -591,7 +591,7 @@ Every prerequisite in the main plan is done (phases 0–6, except its stretch it
 none of which this plan needs). Main-plan step 5.7 (upscaler, ControlNet) is delivered here by W6.2 and W5.2 instead.
 
 ### W0 — Spike: the pipeline in pieces (L)
-- [ ] W0.0 **Repository fix first:** `.gitignore`'s unanchored `models/` (meant for the spike's model folder) also
+- [x] W0.0 **Repository fix first:** (already in place when this plan started: the patterns are anchored and `GraphicsHost.Core/models/` is tracked; verified with `git status --ignored`, no source file is hidden) `.gitignore`'s unanchored `models/` (meant for the spike's model folder) also
   ignores `GraphicsHost.Core/models/`, so `ModelLibrary`, `ModelCard`, `Catalog`, `DownloadManager`, `HuggingFace`,
   `ModelService`, `FitHints`, `ModelUpdates` and `Recommendation` were never committed, although nine headers are
   included from there and `GraphicsHost.Core.vcxproj` compiles `models\**\*.cpp`. Anchor the data patterns (`/models/`,
@@ -601,9 +601,9 @@ none of which this plan needs). Main-plan step 5.7 (upscaler, ControlNet) is del
 - [ ] W0.2 Host-side Euler sampler over `gh_denoise`; same seed and settings as `gh_generate` give the same image on Vulkan (M)
 - [ ] W0.3 Measure per-step overhead of the host loop vs the in-runtime loop on the RX 7900 XTX (SD1.5 512² at 0.35 s/step, SDXL 1024² at 2.89 s/step as measured); budget < 3 % (S)
 - [ ] W0.4 SDXL through the same path (dual encoders, pooled + size conditioning) (S)
-- [ ] W0.5 Naming check in CI (`.github/workflows/build.yml`): a script in `tools/` fails on the reference product's name in any tracked file (the pattern is stored as character codes so the script itself does not contain the word) (S)
+- [x] W0.5 (done as the `[unit][naming]` test `NamingTests.cpp`, which CI runs with the other unit tests, instead of a script: PowerShell scripts are disabled on the development machine) Naming check in CI (`.github/workflows/build.yml`): a script in `tools/` fails on the reference product's name in any tracked file (the pattern is stored as character codes so the script itself does not contain the word) (S)
 - [ ] W0.6 **Go/no-go**: host-side sampling confirmed, or fall back to runtime-side samplers with a sampler-id ABI (S)
-- [ ] W0.7 CI: install a software Vulkan driver on the Windows runner, run `[integration][vulkan]` tests; host code built with `/arch:AVX2` in `props/Core.props` (S)
+- [ ] W0.7 (the `/arch:AVX2` half is done in `props/GraphicsHost.props`; the software-Vulkan CI step is still to do) CI: install a software Vulkan driver on the Windows runner, run `[integration][vulkan]` tests; host code built with `/arch:AVX2` in `props/Core.props` (S)
 
 **Exit:** a `[model]` test builds an image from component calls plus a host sampler, identical to `gh_generate`, on
 Vulkan. A software Vulkan driver runs the fixture tests in CI (W0.7).

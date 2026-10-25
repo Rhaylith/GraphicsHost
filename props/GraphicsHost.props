@@ -17,6 +17,8 @@
       <SDLCheck>true</SDLCheck>
       <!-- msbuild -p:GhAnalyze=true runs MSVC static analysis (/analyze) on the first-party code -->
       <EnablePREfast Condition="'$(GhAnalyze)'=='true'">true</EnablePREfast>
+      <!-- AVX2 and FMA are assumed on every supported computer: host code is compiled for them, with no fallback -->
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
       <TreatAngleIncludeAsExternal>true</TreatAngleIncludeAsExternal>
       <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
       <AdditionalOptions>/utf-8 /permissive- /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
