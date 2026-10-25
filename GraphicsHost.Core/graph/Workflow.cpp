@@ -221,8 +221,8 @@ struct Flat {
     std::map<std::pair<std::string, std::string>, Source> links;   // (target node, input) -> source
 };
 
-constexpr const char* kRerouteType = "utility.reroute";
-constexpr const char* kPrimitiveType = "utility.primitive";
+constexpr const char* kRerouteType = "util.reroute";
+constexpr const char* kPrimitiveType = "util.primitive";
 
 ValueType portType(const std::string& id) {
     ValueType t = ValueType::Any;

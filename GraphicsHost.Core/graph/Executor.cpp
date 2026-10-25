@@ -30,6 +30,12 @@ Value literalValue(const InputDef& in, const Json& v) {
             case ValueType::Boolean: return Value::makeBool(j.get<bool>());
             case ValueType::String:
             case ValueType::Combo: return Value::makeString(j.get<std::string>());
+            case ValueType::Any:   // the type is whatever the JSON says
+                if (j.is_boolean()) return Value::makeBool(j.get<bool>());
+                if (j.is_number_integer()) return Value::makeInt(j.get<int64_t>());
+                if (j.is_number()) return Value::makeFloat(j.get<double>());
+                if (j.is_string()) return Value::makeString(j.get<std::string>());
+                throw NodeError("'" + in.name + "' takes a number, text or true/false");
             default: throw NodeError("'" + in.name + "' takes a link, not a typed value");
         }
     };

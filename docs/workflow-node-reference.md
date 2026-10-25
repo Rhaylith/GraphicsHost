@@ -527,18 +527,36 @@ The split pipeline: **Noise** + **Guider** + **Sampler** + **Sigmas** → Sample
 
 | Node (`id`) | Parameter | Type · range · default | Tooltip |
 |---|---|---|---|
-| Integer / Float / Text / Boolean (`util.int`, `util.float`, `util.string`, `util.bool`) | value | as type | A constant that can feed several inputs at once. Example: one Integer feeding the width of three nodes. |
-| Constant (any widget) (`util.primitive`) | value | takes the type of the input it connects to | A value node that copies the widget of the first input it is linked to, including its range and options, and supports *control after run*. Example: one seed shared by two samplers. |
-| Reroute (`util.reroute`) | — | any | A pass-through point to tidy links. |
-| Note (`util.note`), Markdown Note (`util.markdown`) | text | string multiline | Text for people reading the graph; not executed. Example: "Set denoise to 0.4 for subtle changes." |
-| Join Text (`util.textJoin`) | a, b, separator | string; string · **", "** | Joins two texts. Example: style + subject with ", ". |
-| Replace Text (`util.textReplace`) | text, find, replace, regex | string ×3; bool · **false** | Replace occurrences; regex enables patterns. Example: find `cat`, replace `dog`. |
-| Substring (`util.textSlice`) | start, end | int · **0, −1** | Characters from start to end (−1 = end). Example: 0, 75. |
-| Compare (`util.compare`) | a, b, operation | any; combo =, ≠, <, ≤, >, ≥ · **=** | Outputs a boolean. Example: width > 1024. |
-| Switch (`util.switch`) | condition, onTrue, onFalse | BOOLEAN; any (lazy) | Passes one input; the other branch is not run. Example: run a hi-res pass only when a toggle is on. |
-| Math (`util.math`) | expression, a, b, c | string · **"a + b"**; numbers | Arithmetic expression on inputs (`+ − × / % ^ min max round floor ceil`). Example: `a * 1.5` to compute a hi-res width. |
-| Preview Any (`util.previewAny`) | value | any | Shows the value as text in the node. Example: inspect the seed actually used. |
-| Image Size (`util.imageSize`) | image | IMAGE | Outputs width, height and batch count. Example: feed an Empty Latent with the size of a reference photo. |
+| Boolean (`util.bool`) | value | bool · **false** | An on/off switch that can feed several inputs at once. Example: one toggle that turns on both the hi-res pass and the upscaler. |
+| Compare (`util.compare`) | a | any | The left value; numbers compare as numbers, anything else as text. Example: the width from Image Size. |
+|  | b | any | The right value. Example: 1024. |
+|  | operation | combo =, ≠, <, ≤, >, ≥ · **=** | How to compare. Example: > is true when a is larger than b. |
+| Constant (`util.primitive`) | value | any | A value node that copies the widget of the first input it is linked to, including its range and options, and supports *control after run*. Example: one seed shared by two samplers. |
+| Float (`util.float`) | value | float −1000000000 … 1000000000 · 0.01 · **0** | A decimal number that can feed several inputs at once. Example: one Float feeding the cfg of two samplers. |
+| Image Size (`util.imageSize`) | image | IMAGE | The image to measure. |
+| Integer (`util.int`) | value | int −9007199254740991 … 9007199254740991 · **0** | A whole number that can feed several inputs at once. Example: one Integer feeding the width of three nodes. |
+| Join Text (`util.textJoin`) | a | string | The first text. Example: "a red fox". |
+|  | b | string | The second text. Example: "in the snow". |
+|  | separator | string · **, ** | Placed between the two texts. Example: ", " turns "fox" and "snow" into "fox, snow". |
+| Markdown Note (`util.markdown`) | text | string | Text for people reading the graph; not executed. Example: "Set denoise to 0.4 for subtle changes." |
+| Math (`util.math`) | expression | string · **a + b** | The calculation, using a, b and c and + - * / % ^ min max round floor ceil abs sqrt. Example: a * 1.5 to compute a hi-res width. |
+|  | a | float −1000000000 … 1000000000 · **0** | The value called a in the expression. Example: 1024. |
+|  | b | float −1000000000 … 1000000000 · **0** | The value called b in the expression. Example: 8. |
+|  | c | float −1000000000 … 1000000000 · **0** | The value called c in the expression. Example: 64. |
+| Note (`util.note`) | text | string | Text for people reading the graph; not executed. Example: "Set denoise to 0.4 for subtle changes." |
+| Preview Any (`util.previewAny`) | value | any | The value to show. Example: the seed actually used by a sampler. |
+| Replace Text (`util.textReplace`) | text | string | The text to change. Example: "a cat on a sofa". |
+|  | find | string | What to look for. Example: "cat". |
+|  | replace | string | What to put instead; leave empty to delete the match. Example: "dog". |
+|  | regex | bool · **false** | Treat the search text as a regular expression; $1 in the replacement stands for the first group. Example: find "(black|white) cat" and replace "$1 dog" turns "black cat" into "black dog". |
+| Reroute (`util.reroute`) | value | any | A pass-through point to tidy links. |
+| Substring (`util.textSlice`) | text | string | The text to cut from. Example: a long prompt. |
+|  | start | int −100000 … 100000 · **0** | Position of the first character to keep; negative counts from the end. Example: 0 keeps the beginning. |
+|  | end | int −100000 … 100000 · **−1** | Position after the last character to keep; -1 means the end. Example: 75 keeps the first 75 characters. |
+| Switch (`util.switch`) | condition | bool · **false** | Which input to pass on: on passes onTrue, off passes onFalse. Example: a Boolean that turns the hi-res pass on and off. |
+|  | onTrue | any (optional) | The value passed when the condition is on; its branch only runs then. Example: the image after the hi-res pass. |
+|  | onFalse | any (optional) | The value passed when the condition is off; its branch only runs then. Example: the image straight from the first decode. |
+| Text (`util.string`) | value | string | Text that can feed several inputs at once. Example: one prompt feeding two Text Encode nodes. |
 | Subgraph node | (promoted widgets) | as promoted | Its inputs carry the tooltips of the widgets they were promoted from, editable in the subgraph's properties. |
 
 ## N13. Hooks (scheduled LoRAs)

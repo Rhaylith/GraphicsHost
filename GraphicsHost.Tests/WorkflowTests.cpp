@@ -116,14 +116,14 @@ TEST_CASE("workflow: muted nodes vanish and bypassed nodes are short-circuited",
 
 TEST_CASE("workflow: reroutes and primitive constants are folded", "[unit][workflow]") {
     const JobGraph job = convert(document(
-        json::array({node(1, "t.load"), node(5, "utility.reroute"), node(6, "utility.reroute"), node(7, "utility.primitive", {{"value", 30}}), node(3, "t.sample")}),
+        json::array({node(1, "t.load"), node(5, "util.reroute"), node(6, "util.reroute"), node(7, "util.primitive", {{"value", 30}}), node(3, "t.sample")}),
         json::array({link(1, 0, 5, "value"), link(5, 0, 6, "value"), link(6, 0, 3, "model"), link(7, 0, 3, "steps")})));
     REQUIRE(job.nodes.size() == 2);
     CHECK(std::get<NodeRef>(job.nodes.at("3").inputs.at("model")) == NodeRef{"1", 0});
     CHECK(std::get<json>(job.nodes.at("3").inputs.at("steps")) == 30);
 
     // links that loop through reroutes are an error, not a hang
-    CHECK_THROWS_AS(convert(document(json::array({node(5, "utility.reroute"), node(6, "utility.reroute"), node(3, "t.sample")}),
+    CHECK_THROWS_AS(convert(document(json::array({node(5, "util.reroute"), node(6, "util.reroute"), node(3, "t.sample")}),
                                      json::array({link(5, 0, 6, "value"), link(6, 0, 5, "value"), link(6, 0, 3, "model")}))),
                     ConvertError);
 }

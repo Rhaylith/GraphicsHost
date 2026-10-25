@@ -68,7 +68,10 @@ std::string defaultText(const InputDef& in) {
 std::string typeCell(const InputDef& in) {
     const std::string dflt = defaultText(in);
     const std::string sep = " " + kMiddot + " ";
-    if (!in.widget) return std::string(typeId(in.type)) + (in.kind == InputKind::Optional ? " (optional)" : "");
+    if (!in.widget || in.type == ValueType::Any) {
+        const std::string name = in.type == ValueType::Any ? "any" : typeId(in.type);
+        return name + (in.kind == InputKind::Optional ? " (optional)" : "");
+    }
     switch (in.type) {
         case ValueType::Int:
         case ValueType::Float: {
@@ -130,7 +133,8 @@ std::optional<std::string> resolveTip(const std::string& cell, std::string& prob
 void checkType(const std::string& cell, const InputDef& in, const std::string& where, std::vector<std::string>& problems) {
     const std::string sep = " " + kMiddot + " ";
     const auto parts = split(cell, sep);
-    const std::string head = parts.empty() ? "" : parts[0];
+    std::string head = parts.empty() ? "" : parts[0];
+    if (head.size() > 11 && head.compare(head.size() - 11, 11, " (optional)") == 0) head.erase(head.size() - 11);
     const auto bad = [&](const std::string& what) { problems.push_back(where + ": " + what); };
 
     if (head.rfind("int", 0) == 0 || head.rfind("float", 0) == 0) {
@@ -178,6 +182,8 @@ void checkType(const std::string& cell, const InputDef& in, const std::string& w
         }
     } else if (head == "string") {
         if (in.type != ValueType::String) bad("the reference says string");
+    } else if (head == "any") {
+        if (in.type != ValueType::Any) bad("the reference says any");
     } else if (!head.empty() && std::all_of(head.begin(), head.end(), [](unsigned char ch) { return std::isupper(ch) || ch == '_'; })) {
         ValueType t = ValueType::Any;
         if (parseTypeId(head, t) && t != in.type) bad("the type differs from the reference (" + head + ")");
