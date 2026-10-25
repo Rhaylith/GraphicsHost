@@ -76,6 +76,7 @@
     <ClCompile Include="LoraTests.cpp" />
     <ClCompile Include="SafetyTests.cpp" />
     <ClCompile Include="NamingTests.cpp" />
+    <ClCompile Include="ComponentTests.cpp" />
     <ClCompile Include="TlsAndLimitsTests.cpp" />
     <ClCompile Include="ApiContractTests.cpp" />
     <ClCompile Include="UiSmokeTests.cpp" />

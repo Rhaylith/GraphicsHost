@@ -169,6 +169,16 @@ std::unique_ptr<Runtime> Runtime::load(const fs::path& dll, std::string& error) 
                     resolve(a.free, "gh_free") && resolve(a.modelFamily, "gh_model_family") &&
                     resolve(a.generate, "gh_generate") && resolve(a.cancel, "gh_cancel") &&
                     resolve(a.freeResult, "gh_free_result");
+    // optional: absent in a runtime built before the component functions
+    resolve(a.sessionBegin, "gh_session_begin");
+    resolve(a.sessionEnd, "gh_session_end");
+    resolve(a.textEncode, "gh_text_encode");
+    resolve(a.sigmaSchedule, "gh_sigma_schedule");
+    resolve(a.initialLatent, "gh_initial_latent");
+    resolve(a.denoise, "gh_denoise");
+    resolve(a.vaeDecode, "gh_vae_decode");
+    resolve(a.tensorFree, "gh_tensor_free");
+    resolve(a.floatArrayFree, "gh_float_array_free");
     if (!ok) {
         error = dll.string() + " does not export the GraphicsHost runtime interface";
         return nullptr;  // ~Runtime unloads the module

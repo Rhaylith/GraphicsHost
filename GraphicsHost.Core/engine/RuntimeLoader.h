@@ -60,6 +60,16 @@ public:
         decltype(&gh_generate) generate = nullptr;
         decltype(&gh_cancel) cancel = nullptr;
         decltype(&gh_free_result) freeResult = nullptr;
+        // component functions (GH_FEATURE_COMPONENTS); null in a runtime that predates them
+        decltype(&gh_session_begin) sessionBegin = nullptr;
+        decltype(&gh_session_end) sessionEnd = nullptr;
+        decltype(&gh_text_encode) textEncode = nullptr;
+        decltype(&gh_sigma_schedule) sigmaSchedule = nullptr;
+        decltype(&gh_initial_latent) initialLatent = nullptr;
+        decltype(&gh_denoise) denoise = nullptr;
+        decltype(&gh_vae_decode) vaeDecode = nullptr;
+        decltype(&gh_tensor_free) tensorFree = nullptr;
+        decltype(&gh_float_array_free) floatArrayFree = nullptr;
     };
 
     // Returns nullptr and fills error (with a hint for Windows error 4551, Application Control) on failure.
@@ -73,6 +83,7 @@ public:
     const std::string& engineVersion() const { return engineVersion_; }
     const std::string& systemInfo() const { return systemInfo_; }
     uint32_t features() const { return features_; }   // GH_FEATURE_* bits
+    bool hasComponents() const { return (features_ & GH_FEATURE_COMPONENTS) != 0 && api_.denoise && api_.sessionBegin; }
     const Api& api() const { return api_; }
 
     // "name<TAB>description" lines of the ggml devices this runtime sees (the CPU, and GPUs for the Vulkan runtime).

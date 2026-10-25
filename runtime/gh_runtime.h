@@ -145,6 +145,50 @@ GH_API int32_t gh_generate(gh_model* model, const gh_generate_params* params, gh
 GH_API void gh_cancel(gh_model* model);
 GH_API void gh_free_result(gh_result* result);
 
+/* ---- component functions (workflow plan, step W0): the pipeline in pieces ----------------------------------------- *
+ * Spike version: the pieces of an already loaded model (gh_load). A host that wants them calls gh_session_begin once, then
+ * any of the functions below as often as it likes, then gh_session_end; the model stays loaded between sessions.
+ * Everything runs where the model runs (on the GPU for sd-vulkan). */
+#define GH_FEATURE_COMPONENTS 0x8u
+
+/* A float32 tensor. shape[0] varies fastest (ggml order): an SD 1.x latent is {W/8, H/8, 4, B}, a text encoding
+ * {768, tokens, B}, a decoded image {W, H, 3, B} with values in 0..1. data is owned by whoever allocated it: tensors
+ * filled in by the runtime are released with gh_tensor_free. */
+typedef struct gh_tensor {
+    uint32_t struct_size;
+    int32_t ndim;
+    int64_t shape[5];
+    float* data;
+} gh_tensor;
+
+typedef struct gh_denoise_args {
+    uint32_t struct_size;
+    const gh_tensor* x;              /* the noisy latent */
+    float sigma;                     /* noise level of x */
+    const gh_tensor* cond_hidden;    /* text encoding of the prompt (gh_text_encode) */
+    const gh_tensor* cond_pooled;    /* pooled vector (SDXL), NULL for SD 1.x */
+    const gh_tensor* uncond_hidden;  /* text encoding of the negative prompt; NULL = no guidance */
+    const gh_tensor* uncond_pooled;
+    float cfg_scale;                 /* classifier-free guidance scale; used when uncond_hidden is given */
+} gh_denoise_args;
+
+GH_API int32_t gh_session_begin(gh_model* model);
+GH_API void gh_session_end(gh_model* model);
+/* hidden and pooled (may be NULL) are filled in; pooled stays empty (ndim 0) for models without one. */
+GH_API int32_t gh_text_encode(gh_model* model, const char* text, int32_t clip_skip, int32_t width, int32_t height, gh_tensor* hidden,
+                              gh_tensor* pooled);
+/* The sigmas the engine would use for these generate params (steps, sampler, scheduler, size): steps + 1 values. Release the
+ * array with gh_float_array_free. */
+GH_API int32_t gh_sigma_schedule(gh_model* model, const gh_generate_params* params, float** sigmas, int32_t* count);
+/* The starting latent for a seed: noise scaled to sigma0, drawn the way gh_generate draws it for the same seed. */
+GH_API int32_t gh_initial_latent(gh_model* model, int64_t seed, int32_t width, int32_t height, float sigma0, gh_tensor* latent);
+/* One guided model evaluation: the denoised estimate of x at args->sigma. */
+GH_API int32_t gh_denoise(gh_model* model, const gh_denoise_args* args, gh_tensor* denoised);
+/* Decodes a latent to an image tensor in 0..1 ({W, H, 3, B}). */
+GH_API int32_t gh_vae_decode(gh_model* model, const gh_tensor* latent, gh_tensor* image);
+GH_API void gh_tensor_free(gh_tensor* tensor);
+GH_API void gh_float_array_free(float* values);
+
 #ifdef __cplusplus
 }
 #endif

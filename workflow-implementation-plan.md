@@ -597,7 +597,8 @@ none of which this plan needs). Main-plan step 5.7 (upscaler, ControlNet) is del
   included from there and `GraphicsHost.Core.vcxproj` compiles `models\**\*.cpp`. Anchor the data patterns (`/models/`,
   `/DownloadedModels/`, `/logs/`), add the sources from the machine that has them, and check a clean clone builds
   (CI does). The same anchoring keeps new folders of this plan from being ignored (S)
-- [ ] W0.1 Component functions appended to `gh_runtime.h` under `GH_FEATURE_COMPONENTS`; SD1.5 text encoder, UNet and VAE exposed as separate components in both DLLs (M)
+- [x] W0.1 Component functions appended to `gh_runtime.h` under `GH_FEATURE_COMPONENTS`; SD1.5 text encoder, UNet and VAE exposed as separate components in both DLLs (M)
+  - Spike shape: the pieces of an already loaded model (`gh_session_begin/end`, `gh_text_encode`, `gh_sigma_schedule`, `gh_initial_latent`, `gh_denoise`, `gh_vae_decode`, `gh_tensor`), implemented in `runtime/gh_components.cpp`, which includes the engine's internal headers (engine include paths and C++17 for that file only). The standalone `gh_component_open` per file arrives with W3. Text still goes through the engine's own tokeniser (host tokenisers are W4.1). Checked by `[model][vulkan][components]`.
 - [ ] W0.2 Host-side Euler sampler over `gh_denoise`; same seed and settings as `gh_generate` give the same image on Vulkan (M)
 - [ ] W0.3 Measure per-step overhead of the host loop vs the in-runtime loop on the RX 7900 XTX (SD1.5 512² at 0.35 s/step, SDXL 1024² at 2.89 s/step as measured); budget < 3 % (S)
 - [ ] W0.4 SDXL through the same path (dual encoders, pooled + size conditioning) (S)

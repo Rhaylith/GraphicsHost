@@ -2,6 +2,7 @@
 // This is the only first-party code that includes the engine headers.
 #define GH_RUNTIME_BUILD
 #include "gh_runtime.h"
+#include "gh_internal.h"
 
 #include <stable-diffusion.h>
 
@@ -18,10 +19,6 @@
 #  error "define GH_RUNTIME_ID (e.g. \"cpu-avx2\") and GH_RUNTIME_BACKEND (\"cpu\" or \"vulkan\")"
 #endif
 
-struct gh_model {
-    sd_ctx_t* ctx = nullptr;
-    std::string family;
-};
 
 namespace {
 
@@ -104,7 +101,7 @@ GH_API int32_t gh_runtime_get_info(gh_runtime_info* out) {
     info.engine_version = sd_version();
     info.engine_commit = sd_commit();
     info.system_info = sd_get_system_info();
-    info.features = GH_FEATURE_IMG2IMG | GH_FEATURE_INPAINT | GH_FEATURE_LORA;
+    info.features = GH_FEATURE_IMG2IMG | GH_FEATURE_INPAINT | GH_FEATURE_LORA | GH_FEATURE_COMPONENTS;
     std::memcpy(out, &info, size < sizeof(info) ? size : sizeof(info));
     return GH_OK;
 }
@@ -182,6 +179,7 @@ GH_API void gh_free(gh_model* model) {
     if (!model) {
         return;
     }
+    gh_session_end(model);
     if (model->ctx) {
         free_sd_ctx(model->ctx);
     }
