@@ -15,8 +15,8 @@ namespace {
 
 using Json = nlohmann::json;
 
-constexpr std::array<const char*, 15> kKnownKeys = {"schemaVersion", "backend", "gpuDevice", "threads", "modelsDir",
-                                                  "interfaceMode",  "server",  "logging",   "safety", "firstRunDone", "theme", "accent", "notifications", "graph", "memory"};
+constexpr std::array<const char*, 16> kKnownKeys = {"schemaVersion", "backend", "gpuDevice", "threads", "modelsDir",
+                                                  "interfaceMode",  "server",  "logging",   "safety", "firstRunDone", "theme", "accent", "notifications", "graph", "memory", "precision"};
 
 bool validAccent(const std::string& c) {
     return c.size() == 7 && c[0] == '#' && std::all_of(c.begin() + 1, c.end(), [](unsigned char ch) { return std::isxdigit(ch) != 0; });
@@ -47,6 +47,7 @@ Json toJson(const Settings& s) {
     json["safety"] = {{"enabled", s.safety.enabled}};
     json["graph"] = {{"cachePolicy", s.graph.cachePolicy}, {"cacheSize", s.graph.cacheSize}, {"historyMaxItems", s.graph.historyMaxItems}};
     json["memory"] = {{"mode", s.memory.mode}, {"reserveVramMb", s.memory.reserveVramMb}, {"asyncOffload", s.memory.asyncOffload}};
+    json["precision"] = {{"diffusion", s.precision.diffusion}, {"textEncoder", s.precision.textEncoder}, {"vae", s.precision.vae}, {"vaeFallbackFp32", s.precision.vaeFallbackFp32}};
     return json;
 }
 
@@ -92,6 +93,12 @@ Settings settingsFromJson(const Json& json) {
         s.memory.reserveVramMb = it->value("reserveVramMb", s.memory.reserveVramMb);
         s.memory.asyncOffload = it->value("asyncOffload", s.memory.asyncOffload);
     }
+    if (const auto it = json.find("precision"); it != json.end() && it->is_object()) {
+        s.precision.diffusion = it->value("diffusion", s.precision.diffusion);
+        s.precision.textEncoder = it->value("textEncoder", s.precision.textEncoder);
+        s.precision.vae = it->value("vae", s.precision.vae);
+        s.precision.vaeFallbackFp32 = it->value("vaeFallbackFp32", s.precision.vaeFallbackFp32);
+    }
     for (const auto& [key, value] : json.items()) {
         const bool known = std::any_of(kKnownKeys.begin(), kKnownKeys.end(), [&](const char* k) { return key == k; });
         if (!known) {
@@ -132,6 +139,15 @@ std::vector<FieldError> validate(const Settings& s) {
     }
     if (s.server.port < 1 || s.server.port > 65535) {
         errors.push_back({"server.port", "must be between 1 and 65535"});
+    }
+    if (!oneOf(s.precision.diffusion, {"auto", "fp32", "fp16", "bf16", "fp8 e4m3", "fp8 e5m2"})) {
+        errors.push_back({"precision.diffusion", "must be auto, fp32, fp16, bf16, fp8 e4m3 or fp8 e5m2"});
+    }
+    if (!oneOf(s.precision.textEncoder, {"auto", "fp32", "fp16", "bf16", "fp8 e4m3"})) {
+        errors.push_back({"precision.textEncoder", "must be auto, fp32, fp16, bf16 or fp8 e4m3"});
+    }
+    if (!oneOf(s.precision.vae, {"auto", "fp32", "fp16", "bf16"})) {
+        errors.push_back({"precision.vae", "must be auto, fp32, fp16 or bf16"});
     }
     if (!oneOf(s.memory.mode, {"gpu-only", "high", "normal", "low", "stream"})) {
         errors.push_back({"memory.mode", "must be gpu-only, high, normal, low or stream"});

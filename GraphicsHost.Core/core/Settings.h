@@ -45,6 +45,13 @@ struct MemorySettings {
     bool asyncOffload = true;      // move weights between RAM and VRAM in the background while the GPU works
 };
 
+struct PrecisionSettings {
+    std::string diffusion = "auto";     // auto|fp32|fp16|bf16|fp8 e4m3|fp8 e5m2: number format of diffusion models in memory
+    std::string textEncoder = "auto";   // auto|fp32|fp16|bf16|fp8 e4m3
+    std::string vae = "auto";           // auto|fp32|fp16|bf16
+    bool vaeFallbackFp32 = true;        // decode again in fp32 when the result has invalid values
+};
+
 struct Settings {
     int schemaVersion = kSettingsSchemaVersion;
     std::string backend = "auto";        // auto|vulkan|cpu
@@ -61,6 +68,7 @@ struct Settings {
     SafetySettings safety;
     GraphSettings graph;
     MemorySettings memory;
+    PrecisionSettings precision;
     nlohmann::json unknown = nlohmann::json::object();  // keys this version does not know, written back unchanged
 };
 

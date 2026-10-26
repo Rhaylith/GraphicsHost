@@ -1,5 +1,6 @@
 #include "graph/Handles.h"
 #include "graph/Tips.h"
+#include "models/Precision.h"
 #include "nodes/Builtin.h"
 
 namespace gh::nodes {
@@ -22,6 +23,13 @@ ModelFileRef modelFile(const NodeContext& c, const char* kind, const char* input
     const auto found = servicesOf(c).findModel(kind, name, &problem);
     if (!found) throw NodeError(problem.empty() ? "the model '" + name + "' was not found" : problem, input);
     return *found;
+}
+
+// The dtype a handle carries: what the node says, else what the setting says; "default" when it is the file's own format.
+std::string weightDtype(const std::string& nodeValue, const std::string& settingValue) {
+    const models::DtypeChoice choice = models::resolveDtype(nodeValue, settingValue);
+    if (choice.precision == models::Precision::Auto) return "default";
+    return std::string(models::toString(choice.precision)) + (choice.fast ? " fast" : "");
 }
 
 const std::vector<std::string> kDevices = {"auto", "vulkan0", "vulkan1", "vulkan2", "vulkan3"};
@@ -60,15 +68,20 @@ void registerCheckpointLoaders(Registry& r) {
                   load.flashAttention = c.get("flashAttention").asString();
                   load.offloadToRam = c.get("offloadToRam").asString();
                   load.idleUnloadMinutes = static_cast<int>(c.get("idleUnloadMinutes").asInt());
+                  const PrecisionPolicy policy = servicesOf(c).precisionPolicy();
                   ModelHandle model{file, load, {}};
+                  model.load.weightDtype = weightDtype("default", policy.diffusion);
                   TextEncoderHandle encoders;
                   encoders.files = {file};
                   encoders.fromCheckpoint = true;
                   encoders.load = load;
+                  encoders.load.weightDtype = weightDtype("default", policy.textEncoder);
                   VaeHandle vae;
                   vae.file = file;
                   vae.fromCheckpoint = true;
                   vae.load = load;
+                  vae.load.weightDtype = weightDtype("default", policy.vae);
+                  vae.fallbackFp32 = policy.vaeFallbackFp32;
                   return results({handleValue(ValueType::Model, std::move(model)), handleValue(ValueType::TextEncoder, std::move(encoders)), handleValue(ValueType::Vae, std::move(vae))});
               }));
 
@@ -83,7 +96,7 @@ void registerCheckpointLoaders(Registry& r) {
               .run([](NodeContext& c) {
                   ModelHandle model;
                   model.file = modelFile(c, "diffusion_model", "model");
-                  model.load.weightDtype = c.get("weightDtype").asString();
+                  model.load.weightDtype = weightDtype(c.get("weightDtype").asString(), servicesOf(c).precisionPolicy().diffusion);
                   return results({handleValue(ValueType::Model, std::move(model))});
               }));
 }
@@ -115,6 +128,7 @@ void registerEncoderAndVae(Registry& r) {
                   if (h.files.empty()) throw NodeError("choose at least one text encoder file", "encoder1");
                   h.family = c.get("family").asString();
                   h.load.device = c.get("device").asString();
+                  h.load.weightDtype = weightDtype("default", servicesOf(c).precisionPolicy().textEncoder);
                   return results({handleValue(ValueType::TextEncoder, std::move(h))});
               }));
 
@@ -127,6 +141,9 @@ void registerEncoderAndVae(Registry& r) {
               .output(Out("vae", ValueType::Vae).tip("The autoencoder."))
               .run([](NodeContext& c) {
                   VaeHandle h;
+                  const PrecisionPolicy policy = servicesOf(c).precisionPolicy();
+                  h.load.weightDtype = weightDtype("default", policy.vae);
+                  h.fallbackFp32 = policy.vaeFallbackFp32;
                   if (c.get("vae").asString() == "pixel space") {
                       h.pixelSpace = true;
                   } else {

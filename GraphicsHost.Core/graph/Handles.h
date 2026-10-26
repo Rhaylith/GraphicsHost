@@ -48,6 +48,7 @@ struct VaeHandle {
     ModelFileRef file;                 // empty path when pixelSpace
     bool fromCheckpoint = false;       // the VAE inside the checkpoint
     bool pixelSpace = false;           // the model works on pixels: encoding and decoding are the identity
+    bool fallbackFp32 = true;          // decode again in fp32 when the result has invalid values (setting precision.vaeFallbackFp32)
     LoadSettings load;
 };
 

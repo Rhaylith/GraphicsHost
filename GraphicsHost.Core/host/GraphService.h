@@ -11,6 +11,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -24,13 +25,16 @@ class AppHost;
 // names are also found loosely (see ModelLibrary::resolveLoose).
 class LibraryNodeServices final : public graph::NodeServices {
 public:
-    explicit LibraryNodeServices(models::ModelLibrary& library) : library_(library) {}
+    using PrecisionFn = std::function<graph::PrecisionPolicy()>;
+    explicit LibraryNodeServices(models::ModelLibrary& library, PrecisionFn precision = {}) : library_(library), precision_(std::move(precision)) {}
+    graph::PrecisionPolicy precisionPolicy() const override { return precision_ ? precision_() : graph::PrecisionPolicy{}; }
     std::optional<graph::ModelFileRef> findModel(const std::string& kind, const std::string& name, std::string* problem = nullptr) const override;
     std::vector<std::string> modelNames(const std::string& kind) const override;
     std::vector<std::string> embeddingNames() const override;
 
 private:
     models::ModelLibrary& library_;
+    PrecisionFn precision_;
 };
 
 // One graph job as the outside world asks for it: the HTTP API, the CLI and the editor.

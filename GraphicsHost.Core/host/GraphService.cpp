@@ -72,7 +72,10 @@ GraphService::GraphService(const graph::Registry& registry, engine::JobQueue& qu
 GraphService::GraphService(AppHost& host)
     : GraphService(graph::Registry::builtin(), host.models().queue(), host.gallery(), [&host] {
           Options o = optionsFrom(host.settings().graph);
-          o.services = std::make_shared<LibraryNodeServices>(host.library());
+          o.services = std::make_shared<LibraryNodeServices>(host.library(), [&host] {
+              const auto& p = host.settings().precision;
+              return graph::PrecisionPolicy{p.diffusion, p.textEncoder, p.vae, p.vaeFallbackFp32};
+          });
           return o;
       }()) {}
 
