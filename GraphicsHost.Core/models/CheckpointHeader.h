@@ -15,6 +15,7 @@ struct TensorInfo {
     std::string dtype;              // safetensors names (F32, F16, BF16, ...) or the GGUF type as "GGML_<n>"
     std::vector<int64_t> shape;
     uint64_t bytes = 0;             // size of the tensor data in the file
+    uint64_t offset = 0;            // safetensors: where the data starts in the file
 
     int64_t elements() const {
         int64_t n = 1;

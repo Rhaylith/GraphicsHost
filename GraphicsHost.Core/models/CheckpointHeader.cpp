@@ -146,6 +146,7 @@ std::optional<CheckpointHeader> readSafetensorsHeader(const fs::path& file, std:
         t.dtype = value["dtype"].get<std::string>();
         t.shape = value["shape"].get<std::vector<int64_t>>();
         t.bytes = end - begin;
+        t.offset = 8 + headerLength + begin;
         header.tensors.push_back(std::move(t));
     }
     return header;
