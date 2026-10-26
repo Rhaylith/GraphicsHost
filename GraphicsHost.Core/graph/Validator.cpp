@@ -144,6 +144,7 @@ private:
             add(id, in.name, "unknown_option", "'" + value + "' is not one of the choices for '" + in.name + "'.", {{"options", in.options}, {"value", value}});
             return false;
         }
+        if (value.empty() && in.kind == InputKind::Optional) return true;   // an optional model left empty
         if (!in.modelFolder.empty() && options_.modelExists && !options_.modelExists(in.modelFolder, value)) {
             add(id, in.name, "missing_model", "The model '" + value + "' was not found in the " + in.modelFolder + " folder.", {{"folder", in.modelFolder}, {"name", value}});
             return false;

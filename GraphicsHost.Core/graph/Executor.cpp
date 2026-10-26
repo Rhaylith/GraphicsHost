@@ -231,6 +231,7 @@ private:
         ctx.nodeId = id;
         ctx.jobId = options_.jobId;
         ctx.stop = options_.stop;
+        ctx.services = options_.services;
         ctx.progress = [this, id](int step, int steps) {
             Event e = nodeEvent(Event::Kind::NodeProgress, id);
             e.step = step;

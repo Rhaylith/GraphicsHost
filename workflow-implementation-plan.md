@@ -635,7 +635,7 @@ Vulkan. A software Vulkan driver runs the fixture tests in CI (W0.7).
 
 ### W3 — Models, memory, patches (L)
 - [x] W3.1 Model kinds in `ModelLibrary`/`ModelCard` (header detection, kind subfolders, `model-paths.json` extra roots), previews, cached hashes (M)
-- [ ] W3.2 Loader nodes: checkpoint, diffusion model, text encoders (1–4), VAE, LoRA (+ model-only), embeddings listing; LoRA names resolve the way `<lora:name:w>` does today (M)
+- [x] W3.2 Loader nodes: checkpoint, diffusion model, text encoders (1–4), VAE, LoRA (+ model-only), embeddings listing; LoRA names resolve the way `<lora:name:w>` does today (M)
 - [ ] W3.3 `ComponentCache` (shared with `ModelManager`), `MemoryManager` with modes, reserve, LRU eviction, partial residency; estimates seeded from `FitEstimator` (L)
 - [ ] W3.4 `WeightPatcher`: LoRA/LoCon/LoHa/LoKr/DoRA/full diff key mapping for SD1/SDXL; lazy apply and undo; results match today's per-generation LoRA path (`LoraTests`) (L)
 - [ ] W3.5 Precision options and fp8 storage (M)

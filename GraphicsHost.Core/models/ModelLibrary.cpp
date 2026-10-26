@@ -227,6 +227,39 @@ ModelLibrary::Resolution ModelLibrary::resolve(const std::string& arg) {
     return r;
 }
 
+ModelLibrary::Resolution ModelLibrary::resolveLoose(Kind kind, const std::string& name) {
+    Resolution r;
+    if (name.empty()) {
+        r.problem = "no " + std::string(toString(kind)) + " given";
+        return r;
+    }
+    const auto cards = ofKind(kind);
+    const std::string wanted = lower(name);
+    const ModelCard* exact = nullptr;
+    std::vector<const ModelCard*> prefixed;
+    for (const auto& c : cards) {
+        if (c.relative == name) {
+            exact = &c;
+            break;
+        }
+        if (!exact && (lower(c.file) == wanted || lower(c.name) == wanted || lower(c.relative) == wanted)) exact = &c;
+        if (lower(c.name).rfind(wanted, 0) == 0) prefixed.push_back(&c);
+    }
+    if (exact) {
+        r.status = Resolution::Status::Found;
+        r.card = *exact;
+    } else if (prefixed.size() == 1) {
+        r.status = Resolution::Status::Found;
+        r.card = *prefixed.front();
+    } else if (prefixed.size() > 1) {
+        r.status = Resolution::Status::Ambiguous;
+        r.problem = "'" + name + "' matches " + std::to_string(prefixed.size()) + " files; use a longer name";
+    } else {
+        r.problem = "no " + std::string(toString(kind)) + " named '" + name + "'";
+    }
+    return r;
+}
+
 void ModelLibrary::setExtraRoots(ExtraRoots roots) {
     std::lock_guard<std::mutex> lock(mutex_);
     extraRoots_ = std::move(roots);

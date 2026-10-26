@@ -131,7 +131,7 @@ TEST_CASE("utility nodes: switch runs only the chosen branch", "[unit][nodes][ut
 TEST_CASE("utility nodes: the registry holds them and can write their reference rows", "[unit][nodes][utility][reference-rows]") {
     const Registry& r = Registry::builtin();
     CHECK(r.find("util.switch") != nullptr);
-    CHECK(r.size() == 16);
+    CHECK(r.find("util.reroute") != nullptr);
 
     // writes the rows for the document: GH_WRITE_REFERENCE=<file> GraphicsHost.Tests.exe "[reference-rows]"
     if (const char* out = std::getenv("GH_WRITE_REFERENCE")) std::ofstream(out, std::ios::binary) << renderReference(r);

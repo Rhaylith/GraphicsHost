@@ -16,6 +16,7 @@ struct RunOptions {
     std::string jobId;
     std::stop_token stop;   // set to interrupt the job: checked before every node and handed to the nodes, which check it in their own loops (a sampler at every step)
     EventBus* events = nullptr;   // optional: told about everything that happens
+    const NodeServices* services = nullptr;   // handed to every node
 };
 
 struct ExecResult {

@@ -49,9 +49,13 @@ TEST_CASE("reference: the node tables of the document are read back", "[unit][re
     const auto grouped = std::find_if(doc.nodes.begin(), doc.nodes.end(), [](const DocNode& n) { return n.id == "cond.combine"; });
     REQUIRE(grouped != doc.nodes.end());
     CHECK(grouped->params[0].names == std::vector<std::string>{"a", "b"});
-    const auto loose = std::find_if(doc.nodes.begin(), doc.nodes.end(), [](const DocNode& n) { return n.id == "loader.textEncoders"; });
-    REQUIRE(loose != doc.nodes.end());
-    CHECK(loose->params[0].loose);
+    // a row that only describes its parameters ("encoder1 … encoder4") is kept as loose
+    const ReferenceDoc snippet = parseReferenceDoc("## N1. Test\n\n| Node (`id`) | Parameter | Type | Tooltip |\n|---|---|---|---|\n| A node (`a.node`) | encoder1 \xE2\x80\xA6 encoder4 | model list | One per encoder. |\n| | size | int | The size. |\n");
+    REQUIRE(snippet.nodes.size() == 1);
+    REQUIRE(snippet.nodes[0].params.size() == 2);
+    CHECK(snippet.nodes[0].params[0].loose);
+    CHECK(snippet.nodes[0].params[0].names.empty());
+    CHECK(snippet.nodes[0].params[1].names == std::vector<std::string>{"size"});
 }
 
 TEST_CASE("reference: nodes written like the document pass the diff", "[unit][reference]") {

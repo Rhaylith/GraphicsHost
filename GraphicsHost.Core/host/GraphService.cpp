@@ -5,11 +5,49 @@
 #include "host/AppHost.h"
 #include "nodes/Builtin.h"
 
+#include <algorithm>
 #include <chrono>
 
 namespace gh::host {
 
 using Json = nlohmann::json;
+
+std::optional<graph::ModelFileRef> LibraryNodeServices::findModel(const std::string& kind, const std::string& name, std::string* problem) const {
+    const auto k = models::kindFromFolder(kind);
+    if (!k) {
+        if (problem) *problem = "unknown kind of model '" + kind + "'";
+        return std::nullopt;
+    }
+    auto found = library_.resolveLoose(*k, name);
+    if (found.status != models::ModelLibrary::Resolution::Status::Found && *k == models::Kind::Vae) {
+        const auto decoder = library_.resolveLoose(models::Kind::PreviewDecoder, name);   // a VAE combo also lists the tiny preview decoders
+        if (decoder.status == models::ModelLibrary::Resolution::Status::Found) found = decoder;
+    }
+    if (found.status != models::ModelLibrary::Resolution::Status::Found) {
+        if (problem) *problem = found.problem;
+        return std::nullopt;
+    }
+    const models::ModelCard& c = *found.card;
+    return graph::ModelFileRef{models::toString(c.kind), c.relative, c.path.string(), c.familyName, c.supported};
+}
+
+std::vector<std::string> LibraryNodeServices::modelNames(const std::string& kind) const {
+    const auto k = models::kindFromFolder(kind);
+    if (!k) return {};
+    auto names = library_.names(*k);
+    if (*k == models::Kind::Vae) {
+        for (auto& n : library_.names(models::Kind::PreviewDecoder)) names.push_back(std::move(n));
+        names.push_back("pixel space");
+    }
+    return names;
+}
+
+std::vector<std::string> LibraryNodeServices::embeddingNames() const {
+    std::vector<std::string> names;
+    for (const auto& c : library_.ofKind(models::Kind::Embedding)) names.push_back(c.name);
+    std::sort(names.begin(), names.end());
+    return names;
+}
 
 GraphService::Options GraphService::optionsFrom(const core::GraphSettings& settings) {
     std::string text = settings.cachePolicy;
@@ -21,10 +59,22 @@ GraphService::Options GraphService::optionsFrom(const core::GraphSettings& setti
 }
 
 GraphService::GraphService(const graph::Registry& registry, engine::JobQueue& queue, gallery::GalleryStore& gallery, Options options, graph::ValidateOptions validateOptions)
-    : registry_(registry), queue_(queue), gallery_(gallery), validateOptions_(std::move(validateOptions)), cache_(options.cache), historyMax_(options.historyMax) {}
+    : registry_(registry), queue_(queue), gallery_(gallery), validateOptions_(std::move(validateOptions)), services_(options.services), cache_(options.cache), historyMax_(options.historyMax) {
+    if (services_ && !validateOptions_.modelExists) {
+        const auto services = services_;
+        validateOptions_.modelExists = [services](const std::string& folder, const std::string& name) {
+            if (folder == "vae" && name == "pixel space") return true;
+            return services->findModel(folder, name).has_value();
+        };
+    }
+}
 
 GraphService::GraphService(AppHost& host)
-    : GraphService(graph::Registry::builtin(), host.models().queue(), host.gallery(), optionsFrom(host.settings().graph)) {}
+    : GraphService(graph::Registry::builtin(), host.models().queue(), host.gallery(), [&host] {
+          Options o = optionsFrom(host.settings().graph);
+          o.services = std::make_shared<LibraryNodeServices>(host.library());
+          return o;
+      }()) {}
 
 GraphService::~GraphService() {
     std::vector<std::shared_ptr<engine::Job>> live;
@@ -74,6 +124,7 @@ Json GraphService::execute(engine::JobControl& control, const graph::JobGraph& j
     run.jobId = std::to_string(control.jobId);
     run.stop = control.stop;
     run.events = &events_;
+    run.services = services_.get();
     // node progress also reaches the queue's observers (the desktop UI and the older job routes watch the queue)
     const auto subscription = events_.subscribe([&](const graph::Event& e) {
         if (e.kind == graph::Event::Kind::NodeProgress && e.jobId == run.jobId && control.progress) control.progress(engine::StepProgress{e.step, e.steps, 0.0f, e.node});
@@ -131,6 +182,14 @@ void GraphService::applySettings(const core::GraphSettings& settings) {
 
 Json GraphService::nodeCatalogue() const {
     return {{"catalogue", registry_.catalogue()}, {"tips", graph::tips::toJson()}};
+}
+
+std::vector<std::string> GraphService::modelNames(const std::string& kind) const {
+    return services_ ? services_->modelNames(kind) : std::vector<std::string>{};
+}
+
+std::vector<std::string> GraphService::embeddingNames() const {
+    return services_ ? services_->embeddingNames() : std::vector<std::string>{};
 }
 
 void GraphService::freeCaches() {

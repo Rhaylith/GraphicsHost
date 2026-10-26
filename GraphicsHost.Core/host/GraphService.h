@@ -5,7 +5,9 @@
 #include "gallery/GalleryStore.h"
 #include "graph/Events.h"
 #include "graph/Executor.h"
+#include "graph/NodeServices.h"
 #include "graph/Validator.h"
+#include "models/ModelLibrary.h"
 
 #include <nlohmann/json.hpp>
 
@@ -17,6 +19,19 @@
 namespace gh::host {
 
 class AppHost;
+
+// The model lookup the loader nodes use, backed by the model library: combo values are paths below a model folder, and
+// names are also found loosely (see ModelLibrary::resolveLoose).
+class LibraryNodeServices final : public graph::NodeServices {
+public:
+    explicit LibraryNodeServices(models::ModelLibrary& library) : library_(library) {}
+    std::optional<graph::ModelFileRef> findModel(const std::string& kind, const std::string& name, std::string* problem = nullptr) const override;
+    std::vector<std::string> modelNames(const std::string& kind) const override;
+    std::vector<std::string> embeddingNames() const override;
+
+private:
+    models::ModelLibrary& library_;
+};
 
 // One graph job as the outside world asks for it: the HTTP API, the CLI and the editor.
 struct GraphJobCall {
@@ -39,6 +54,7 @@ public:
     struct Options {
         graph::CachePolicy cache;
         size_t historyMax = 10000;   // 0 = keep everything
+        std::shared_ptr<const graph::NodeServices> services;   // model lookup for the loader nodes (null: none)
     };
 
     GraphService(const graph::Registry& registry, engine::JobQueue& queue, gallery::GalleryStore& gallery, Options options, graph::ValidateOptions validateOptions = {});
@@ -59,6 +75,10 @@ public:
 
     // Node catalogue plus tooltips, as served to editors: {"catalogue": {...}, "tips": {...}}.
     nlohmann::json nodeCatalogue() const;
+
+    // What a model combo of this kind offers, for editors and the API (GET graph/models/{kind}). Empty when the kind is unknown.
+    std::vector<std::string> modelNames(const std::string& kind) const;
+    std::vector<std::string> embeddingNames() const;
 
     // Drops every cached node result (the "free memory" action).
     void freeCaches();
@@ -82,6 +102,7 @@ private:
     engine::JobQueue& queue_;
     gallery::GalleryStore& gallery_;
     graph::ValidateOptions validateOptions_;
+    std::shared_ptr<const graph::NodeServices> services_;
     graph::OutputCache cache_;
     graph::EventBus events_;
 

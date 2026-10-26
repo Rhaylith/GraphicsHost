@@ -3,8 +3,9 @@
 namespace gh::nodes {
 
 void registerBuiltinNodes(graph::Registry& registry) {
-    // the other categories register themselves here as they are written: loaders (W3.2), ...
+    // the other categories register themselves here as they are written: the rest of the node families (W4 ...)
     registerUtilityNodes(registry);
+    registerLoaderNodes(registry);
 }
 
 }  // namespace gh::nodes

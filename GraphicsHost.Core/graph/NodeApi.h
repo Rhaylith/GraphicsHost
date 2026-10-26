@@ -1,6 +1,7 @@
 #pragma once
 
 #include "graph/JobGraph.h"
+#include "graph/NodeServices.h"
 #include "graph/Value.h"
 
 #include <functional>
@@ -48,6 +49,7 @@ struct NodeContext {
     std::map<std::string, Value> inputs;   // widgets and linked inputs; lazy inputs only after they were requested
     std::map<std::string, NodeRef> links;  // where the linked inputs come from (a node that expands refers to these in its sub-graph)
     std::stop_token stop;                  // set when the job is interrupted: long loops check it
+    const NodeServices* services = nullptr;   // what the host offers (model lookup ...); null in tests that do not need it
     // Reports progress inside the node (a sampler's step); both may be empty.
     std::function<void(int step, int steps)> progress;
     // Offers a preview picture (an IMAGE value) to the clients that watch the job.

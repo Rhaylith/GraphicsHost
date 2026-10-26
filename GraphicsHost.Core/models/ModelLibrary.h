@@ -61,6 +61,11 @@ public:
     // Only checkpoints are considered for names.
     Resolution resolve(const std::string& arg);
 
+    // The loose lookup the prompt tag <lora:name:w> has always used, for any kind: the exact relative path, else a
+    // case-insensitive file name or name without extension, else a unique prefix of the name. Found, NotFound or Ambiguous.
+    Resolution resolveLoose(Kind kind, const std::string& name);
+
+
     // Calls onChange (from a background thread) when a file appears, disappears or changes below the folders.
     void startWatching(std::function<void()> onChange);
     void stopWatching();
