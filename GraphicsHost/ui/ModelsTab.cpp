@@ -194,7 +194,7 @@ void ModelsTab::unload() {
         status_->setText(tr("A generation is running or queued: cancel it first."));
         return;
     }
-    host_.models().unload();
+    host_.freeMemory({true, false});   // also closes the opened components of node graphs
     status_->setText(tr("Model unloaded."));
     refresh();
     emit modelsChanged();

@@ -12,7 +12,7 @@ browser, the command line and the HTTP API (OpenAI-compatible and native) on CPU
 SD 1.x and SDXL, with all samplers and schedulers, a job queue with cancellation, PNG/JPEG/WebP output with the
 parameters embedded, a gallery, presets, per-model defaults and a memory estimate, plus a model library, a verified catalog,
 Hugging Face search and resumable downloads, API tokens and a request log, image to image, inpainting, LoRA, a hardware monitor and an
-optional prompt safety filter. See [implementation-plan.md](implementation-plan.md) for the plan and what is ticked off, and
+optional prompt safety filter. See [work-implementation-plan.md](work-implementation-plan.md) for the plan and what is ticked off, and
 [docs/api.md](docs/api.md) for the HTTP API.
 
 ## What it does
@@ -27,7 +27,7 @@ optional prompt safety filter. See [implementation-plan.md](implementation-plan.
 | Safety | optional prompt word filter, off by default ([docs/api.md](docs/api.md#safety-filter)) |
 
 Packaging: `msbuild installer\Package.proj` makes `build\dist\GraphicsHost-<version>-win-x64.zip` (a portable package, not an
-installer; see [implementation-plan.md](implementation-plan.md) step 6.5). Hardware coverage and what is untested:
+installer; see [work-implementation-plan.md](work-implementation-plan.md) step 6.5). Hardware coverage and what is untested:
 [docs/hardware-checklist.md](docs/hardware-checklist.md).
 
 ## Build

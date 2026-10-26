@@ -5,7 +5,7 @@ a checkpoint, encode a prompt, sample, decode, upscale, save) in a visual editor
 graph. A local engine runs only the parts that changed, keeps loaded models in memory, and streams progress and previews
 back. The same graph can be saved as a file, embedded in the images it produced, and sent to an HTTP API.
 
-It builds on [implementation-plan.md](implementation-plan.md). Where the two disagree, this plan wins for the areas it
+It builds on [work-implementation-plan.md](work-implementation-plan.md). Where the two disagree, this plan wins for the areas it
 covers (§14 lists the overrides).
 
 **Starting point (2026-10-25).** The main plan is done except the stretch items (5.7 upscaler/ControlNet, 6.6
@@ -591,48 +591,59 @@ Every prerequisite in the main plan is done (phases 0–6, except its stretch it
 none of which this plan needs). Main-plan step 5.7 (upscaler, ControlNet) is delivered here by W6.2 and W5.2 instead.
 
 ### W0 — Spike: the pipeline in pieces (L)
-- [ ] W0.0 **Repository fix first:** `.gitignore`'s unanchored `models/` (meant for the spike's model folder) also
+- [x] W0.0 **Repository fix first:** (already in place when this plan started: the patterns are anchored and `GraphicsHost.Core/models/` is tracked; verified with `git status --ignored`, no source file is hidden) `.gitignore`'s unanchored `models/` (meant for the spike's model folder) also
   ignores `GraphicsHost.Core/models/`, so `ModelLibrary`, `ModelCard`, `Catalog`, `DownloadManager`, `HuggingFace`,
   `ModelService`, `FitHints`, `ModelUpdates` and `Recommendation` were never committed, although nine headers are
   included from there and `GraphicsHost.Core.vcxproj` compiles `models\**\*.cpp`. Anchor the data patterns (`/models/`,
   `/DownloadedModels/`, `/logs/`), add the sources from the machine that has them, and check a clean clone builds
   (CI does). The same anchoring keeps new folders of this plan from being ignored (S)
-- [ ] W0.1 Component functions appended to `gh_runtime.h` under `GH_FEATURE_COMPONENTS`; SD1.5 text encoder, UNet and VAE exposed as separate components in both DLLs (M)
-- [ ] W0.2 Host-side Euler sampler over `gh_denoise`; same seed and settings as `gh_generate` give the same image on Vulkan (M)
-- [ ] W0.3 Measure per-step overhead of the host loop vs the in-runtime loop on the RX 7900 XTX (SD1.5 512² at 0.35 s/step, SDXL 1024² at 2.89 s/step as measured); budget < 3 % (S)
-- [ ] W0.4 SDXL through the same path (dual encoders, pooled + size conditioning) (S)
-- [ ] W0.5 Naming check in CI (`.github/workflows/build.yml`): a script in `tools/` fails on the reference product's name in any tracked file (the pattern is stored as character codes so the script itself does not contain the word) (S)
-- [ ] W0.6 **Go/no-go**: host-side sampling confirmed, or fall back to runtime-side samplers with a sampler-id ABI (S)
-- [ ] W0.7 CI: install a software Vulkan driver on the Windows runner, run `[integration][vulkan]` tests; host code built with `/arch:AVX2` in `props/Core.props` (S)
+- [x] W0.1 Component functions appended to `gh_runtime.h` under `GH_FEATURE_COMPONENTS`; SD1.5 text encoder, UNet and VAE exposed as separate components in both DLLs (M)
+  - Spike shape: the pieces of an already loaded model (`gh_session_begin/end`, `gh_text_encode`, `gh_sigma_schedule`, `gh_initial_latent`, `gh_denoise`, `gh_vae_decode`, `gh_tensor`), implemented in `runtime/gh_components.cpp`, which includes the engine's internal headers (engine include paths and C++17 for that file only). The standalone `gh_component_open` per file arrives with W3. Text still goes through the engine's own tokeniser (host tokenisers are W4.1). Checked by `[model][vulkan][components]`.
+- [x] W0.2 Host-side Euler sampler over `gh_denoise`; same seed and settings as `gh_generate` give the same image on Vulkan (M)
+  - `sampling/Euler.h` (plain C++ over a float latent). SD 1.5, 512², 6 steps, euler/discrete, cfg 7.5, seed 42: mean difference to `gh_generate` 0.23 of 255 (the engine repeats itself to < 0.05; a different seed differs by > 10). `gh_denoise` batches the prompt and negative prompt into one UNet call like the engine does; evaluated one after the other the difference was 1.9.
+- [x] W0.3 Measure per-step overhead of the host loop vs the in-runtime loop on the RX 7900 XTX (SD1.5 512² at 0.35 s/step, SDXL 1024² at 2.89 s/step as measured); budget < 3 % (S)
+  - Measured by `[model][vulkan][components][perf]` (slope between a 6-step and a 26-step run, best of two): SD 1.5 512², flash attention on, RX 7900 XTX: 0.0915 s/step in the engine's loop, 0.0920 s/step in the host loop, **0.5 % overhead** (budget 3 %). The "0.35 s/step" quoted above is the older measurement without flash attention.
+- [x] W0.4 SDXL through the same path (dual encoders, pooled + size conditioning) (S)
+  - `[sdxl]` test: 2048-wide hidden states and a 2816-wide pooled vector (pooled CLIP-G plus the size and crop embeddings); SDXL base 1024², 6 steps, euler/discrete: mean difference to `gh_generate` 0.25 of 255. One host rule was needed: an empty negative prompt on SDXL is encoded as all zeros (`zero_out` argument of `gh_text_encode`); without it the images differed by 7.6.
+- [x] W0.5 (done as the `[unit][naming]` test `NamingTests.cpp`, which CI runs with the other unit tests, instead of a script: PowerShell scripts are disabled on the development machine) Naming check in CI (`.github/workflows/build.yml`): a script in `tools/` fails on the reference product's name in any tracked file (the pattern is stored as character codes so the script itself does not contain the word) (S)
+- [x] W0.6 **Go/no-go**: host-side sampling confirmed, or fall back to runtime-side samplers with a sampler-id ABI (S)
+  - **Go.** Evidence and the notes for later steps in [docs/workflow-w0-results.md](docs/workflow-w0-results.md).
+- [x] W0.7 (both halves written; the CI half has never run on GitHub, see below) CI: install a software Vulkan driver on the Windows runner, run `[integration][vulkan]` tests; host code built with `/arch:AVX2` in `props/Core.props` (S)
+  - `/arch:AVX2` is set for all first-party code in `props/GraphicsHost.props`. CI (`.github/workflows/build.yml`) downloads Mesa lavapipe (software Vulkan), points `VK_DRIVER_FILES` at it and runs `[integration][vulkan]` (new checkpoint-free case: `sd-vulkan.dll` announces the component functions); `continue-on-error` on the download so a failed install only makes the tests skip. **Not verified:** that step has not run on GitHub, and the fixture-model tests it is meant for (tiny SD-style weights generated with `SafetensorsFixture`) do not exist yet; they come with W1 to W4.
 
 **Exit:** a `[model]` test builds an image from component calls plus a host sampler, identical to `gh_generate`, on
 Vulkan. A software Vulkan driver runs the fixture tests in CI (W0.7).
 
 ### W1 — Graph model (M–L)
-- [ ] W1.1 `tensor/` library; conversion to and from `engine::Image` and the existing `ImageCodec` (S)
-- [ ] W1.2 Types, `NodeDef` builder, registry, node catalogue JSON (M)
-- [ ] W1.3 Workflow (editor) format and job format, conversion (subgraphs, bypass, mute, reroutes, constants), migrations (M)
-- [ ] W1.4 Validator with per-node, per-input errors (S)
-- [ ] W1.5 Tooltip infrastructure: `tips::` constants, per-option tips, `QT_TR_NOOP` extraction, catalogue export (S)
-- [ ] W1.6 Coverage test: every input has a tooltip; every widget, every option tooltip and every setting has one containing an example marker (`Example:` or `e.g.`) (S)
-- [ ] W1.7 Docs generator: renders the reference tables from the registry and diffs them with `docs/workflow-node-reference.md` (S)
+- [x] W1.1 `tensor/` library; conversion to and from `engine::Image` and the existing `ImageCodec` (S)
+  - `GraphicsHost.Core/tensor/Tensor.h`: float32, up to 5-D, element-wise ops, slerp, channel statistics, concat/slice/crop/pad (constant, replicate, reflect)/flip/rotate, resize (nearest, bilinear, bicubic, area, lanczos; antialiased when shrinking), gaussian blur, sharpen, dilate/erode, conversion to and from `engine::Image` and alpha masks. Large loops use `std::execution::par_unseq`. Not done yet: f16 storage, strided views, bislerp (latent-specific, W6.1).
+- [x] W1.2 Types, `NodeDef` builder, registry, node catalogue JSON (M)
+- [x] W1.3 Workflow (editor) format and job format, conversion (subgraphs, bypass, mute, reroutes, constants), migrations (M)
+- [x] W1.4 Validator with per-node, per-input errors (S)
+- [x] W1.5 Tooltip infrastructure: `tips::` constants, per-option tips, `QT_TR_NOOP` extraction, catalogue export (S)
+- [x] W1.6 Coverage test: every input has a tooltip; every widget, every option tooltip and every setting has one containing an example marker (`Example:` or `e.g.`) (S)
+- [x] W1.7 Docs generator: renders the reference tables from the registry and diffs them with `docs/workflow-node-reference.md` (S)
 
 ### W2 — Executor, queue, history (L)
-- [ ] W2.1 Planner (ancestors of outputs, partial run), topological order, cycle check (S)
-- [ ] W2.2 Fingerprints, `OutputCache` with the four policies (M)
-- [ ] W2.3 Lazy inputs, list mapping, node expansion with stable ids (M)
-- [ ] W2.4 Events bus; per-node progress; interrupt between nodes and per step (S)
-- [ ] W2.5 Generalise `JobQueue` (`JobWork`, front/back, clear, node progress) without changing the Generate path's behaviour (its `JobQueueTests` stay green); history tables and migration in the gallery database (M)
-- [ ] W2.6 Utility nodes: constants, reroute, note, string tools, compare/switch (lazy), preview-any (S)
-- [ ] W2.7 `GraphService` in `host/` (validate, submit, history, events) wired into `AppHost` (S)
+- [x] W2.1 Planner (ancestors of outputs, partial run), topological order, cycle check (S)
+- [x] W2.2 Fingerprints, `OutputCache` with the four policies (M)
+- [x] W2.3 Lazy inputs, list mapping, node expansion with stable ids (M)
+- [x] W2.4 Events bus; per-node progress; interrupt between nodes and per step (S)
+- [x] W2.5 Generalise `JobQueue` (`JobWork`, front/back, clear, node progress) without changing the Generate path's behaviour (its `JobQueueTests` stay green); history tables and migration in the gallery database (M)
+- [x] W2.6 Utility nodes: constants, reroute, note, string tools, compare/switch (lazy), preview-any (S)
+- [x] W2.7 `GraphService` in `host/` (validate, submit, history, events) wired into `AppHost` (S)
 
 ### W3 — Models, memory, patches (L)
-- [ ] W3.1 Model kinds in `ModelLibrary`/`ModelCard` (header detection, kind subfolders, `model-paths.json` extra roots), previews, cached hashes (M)
-- [ ] W3.2 Loader nodes: checkpoint, diffusion model, text encoders (1–4), VAE, LoRA (+ model-only), embeddings listing; LoRA names resolve the way `<lora:name:w>` does today (M)
-- [ ] W3.3 `ComponentCache` (shared with `ModelManager`), `MemoryManager` with modes, reserve, LRU eviction, partial residency; estimates seeded from `FitEstimator` (L)
-- [ ] W3.4 `WeightPatcher`: LoRA/LoCon/LoHa/LoKr/DoRA/full diff key mapping for SD1/SDXL; lazy apply and undo; results match today's per-generation LoRA path (`LoraTests`) (L)
-- [ ] W3.5 Precision options and fp8 storage (M)
-- [ ] W3.6 "Free memory" / "unload models" actions (S)
+- [x] W3.1 Model kinds in `ModelLibrary`/`ModelCard` (header detection, kind subfolders, `model-paths.json` extra roots), previews, cached hashes (M)
+- [x] W3.2 Loader nodes: checkpoint, diffusion model, text encoders (1–4), VAE, LoRA (+ model-only), embeddings listing; LoRA names resolve the way `<lora:name:w>` does today (M)
+- [x] W3.3 `ComponentCache` (shared with `ModelManager`), `MemoryManager` with modes, reserve, LRU eviction, partial residency; estimates seeded from `FitEstimator` (L)
+  - `models/ComponentCache` (leases, LRU to RAM then close, idle time to live, external registration of the Generate path's model, "never the same file twice") and `models/MemoryManager` (modes gpu-only/high/normal/low/stream, reserve, partial residency, activation estimates from `FitEstimator`) are complete and tested with test doubles; settings `memory.mode`, `memory.reserveVramMb`, `memory.asyncOffload`. The runtime-backed `ComponentObject` (weights opened through the W0 component calls) arrives with the first nodes that use the weights, in W4.
+- [x] W3.4 `WeightPatcher`: LoRA/LoCon/LoHa/LoKr/DoRA/full diff key mapping for SD1/SDXL; lazy apply and undo; results match today's per-generation LoRA path (`LoraTests`) (L)
+  - `models/WeightPatcher` + `AdapterFile` + `KeyResolver` + `SafetensorsReader`: LoRA, LoCon (plain and Tucker), LoHa, LoKr, DoRA and full/bias differences, with kohya, diffusers and PEFT key names for the UNet, the CLIP text encoders and the packed OpenCLIP attention of SDXL's second encoder; `ensure()` applies lazily and `undo()` restores the originals. The maths is checked against independent loops in `WeightPatcherTests.cpp`, and the layer names of the real SD 1.5 checkpoint are all found (`[model]`). Applying to the weights of a running runtime component (a `WeightTarget` over the W0 component calls) arrives with W4, together with the per-generation parity check against `gh_generate` with the same LoRA.
+- [x] W3.5 Precision options and fp8 storage (M)
+  - `models/Precision`: fp32/fp16/bf16 and fp8 (e4m3, e5m2) conversions with round-to-nearest-even and saturation, `pack`/`unpack` per layer, `weightsBytesAt` for memory estimates; settings `precision.diffusion`, `precision.textEncoder`, `precision.vae`, `precision.vaeFallbackFp32`; the loader nodes put the resolved dtype in the handles (a node's value wins, "default" follows the setting). Running a component in fp8 with the runtime (and the VAE retry in fp32) arrives with the sampling nodes in W4.
+- [x] W3.6 "Free memory" / "unload models" actions (S)
+  - `AppHost::freeMemory({unloadModels, freeCaches})` closes the opened components nothing uses, unloads the Generate model while no generation is queued, and drops cached node results, reporting what it kept; `POST /api/v1/graph/free`, the older `POST models/unload` and the Models tab Unload button use it.
 
 ### W4 — Text and sampling (XL)
 - [ ] W4.1 CLIP BPE tokeniser, prompt parser (weights, embeddings, choices, comments, BREAK) (M)

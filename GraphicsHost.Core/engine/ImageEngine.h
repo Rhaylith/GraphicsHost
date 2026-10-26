@@ -25,6 +25,7 @@ struct StepProgress {
     int step = 0;
     int steps = 0;
     float secondsPerStep = 0;
+    std::string node;   // graph jobs: the node this progress belongs to (empty for a plain generation)
 };
 using ProgressSink = std::function<void(const StepProgress&)>;
 

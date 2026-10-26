@@ -1,5 +1,7 @@
 #include "host/AppHost.h"
 
+#include "engine/FitEstimator.h"
+
 #include "core/Log.h"
 
 #include <utility>
@@ -18,8 +20,10 @@ AppHost::AppHost(std::optional<std::filesystem::path> home)
     settingsWarning_ = std::move(loaded.warning);
 
     library_.setFolders({modelsDir()});
+    library_.setHashCache(paths_.root() / "model-hashes.json");
     log::init(paths_.logsDir(), settings_.logging.level);
     log::info("GraphicsHost starting, data folder " + paths_.root().string());
+    reloadModelPaths();
     if (loaded.migrated) {
         log::info("settings were upgraded to schema version " + std::to_string(core::kSettingsSchemaVersion));
     }
@@ -62,6 +66,55 @@ const engine::RuntimeCandidate* AppHost::selectedRuntime() const {
     return engine::chooseRuntime(runtimes_, settings_.backend);
 }
 
+namespace {
+models::MemoryManager::Config memoryConfig(const core::MemorySettings& s) {
+    models::MemoryManager::Config c;
+    c.mode = models::parseMemoryMode(s.mode).value_or(models::MemoryMode::Normal);
+    c.reserveVramBytes = static_cast<uint64_t>(std::max(s.reserveVramMb, 0)) << 20;
+    c.asyncOffload = s.asyncOffload;
+    return c;
+}
+}  // namespace
+
+AppHost::FreeMemoryReport AppHost::freeMemory(FreeMemoryRequest request) {
+    FreeMemoryReport report;
+    if (request.unloadModels) {
+        models::ComponentCache& cache = components();
+        uint64_t bytes = 0;
+        size_t idle = 0;
+        for (const auto& c : cache.stats()) {
+            if (c.external) continue;
+            if (c.users == 0) {
+                bytes += c.bytes;
+                ++idle;
+            } else {
+                report.kept.push_back(c.key.file + " is in use by a running node");
+            }
+        }
+        report.componentsClosed = cache.closeAll();
+        report.componentBytes = report.componentsClosed == idle ? bytes : 0;
+        engine::ModelManager& manager = models();
+        if (manager.queue().active() > 0) {
+            if (manager.loaded()) report.kept.push_back("the model of the Generate path stays loaded while a generation is queued or running");
+        } else if (manager.loaded()) {
+            manager.unload();
+            report.generateModelUnloaded = true;
+        }
+    }
+    if (request.freeCaches) {
+        const GraphService::Freed freed = graph().freeCaches();
+        report.resultsDropped = freed.results;
+        report.resultBytes = freed.bytes;
+    }
+    return report;
+}
+
+void AppHost::reloadModelPaths() {
+    std::vector<std::string> warnings;
+    library_.setExtraRoots(models::loadModelPaths(paths_.root() / "model-paths.json", &warnings));
+    for (const auto& w : warnings) log::warn(w);
+}
+
 void AppHost::updateSettings(core::Settings settings) {
     store_.save(settings);  // validates first
     const engine::RuntimeCandidate* before = selectedRuntime();
@@ -70,6 +123,14 @@ void AppHost::updateSettings(core::Settings settings) {
     library_.setFolders({modelsDir()});
     log::setLevel(settings_.logging.level);
     log::info("settings saved");
+    {
+        std::lock_guard<std::mutex> lock(graphMutex_);
+        if (graph_) graph_->applySettings(settings_.graph);
+    }
+    {
+        std::lock_guard<std::mutex> lock(serviceMutex_);
+        if (memory_) memory_->setConfig(memoryConfig(settings_.memory));
+    }
 
     // another runtime (backend setting) needs another engine: drop the loaded one; it is created again on next use
     const engine::RuntimeCandidate* after = selectedRuntime();
@@ -130,10 +191,37 @@ std::shared_ptr<engine::IImageEngine> AppHost::engine(std::string* error) {
     return engine_;
 }
 
+models::MemoryManager& AppHost::memory() {
+    std::lock_guard<std::mutex> lock(serviceMutex_);
+    if (!memory_) {
+        // the device the models run on: its size, and what the system says is in use (the Generate path's model included)
+        memory_ = std::make_unique<models::MemoryManager>(memoryConfig(settings_.memory), [this] {
+            models::MemoryBudget b;
+            const int index = settings_.gpuDevice;
+            for (const auto& d : gpu_.devices)
+                if (d.index == index) b.vramTotal = d.vramBytes;
+            const auto used = monitor_.sample().vramUsedBytes;
+            b.vramFree = used && *used < b.vramTotal ? b.vramTotal - *used : b.vramTotal;
+            b.ramFree = engine::systemMemory().freeBytes;
+            return b;
+        });
+    }
+    return *memory_;
+}
+
+models::ComponentCache& AppHost::components() {
+    memory();   // takes serviceMutex_ itself
+    std::lock_guard<std::mutex> lock(serviceMutex_);
+    if (!components_) components_ = std::make_unique<models::ComponentCache>(*memory_);
+    return *components_;
+}
+
 engine::ModelManager& AppHost::models() {
+    models::ComponentCache& cache = components();   // takes serviceMutex_ itself
     std::lock_guard<std::mutex> lock(serviceMutex_);
     if (!models_) {
         models_ = std::make_unique<engine::ModelManager>([this] { return engine(); });
+        models_->setComponentCache(&cache);
     }
     return *models_;
 }
@@ -228,6 +316,18 @@ GenerationService& AppHost::generation() {
     std::lock_guard<std::mutex> lock(generationMutex_);
     if (!generation_) generation_ = std::make_unique<GenerationService>(*this);
     return *generation_;
+}
+
+}  // namespace gh::host
+
+namespace gh::host {
+
+GraphService& AppHost::graph() {
+    models();     // the graph service queues on the model manager's queue and writes to the gallery; create both first
+    gallery();
+    std::lock_guard<std::mutex> lock(graphMutex_);
+    if (!graph_) graph_ = std::make_unique<GraphService>(*this);
+    return *graph_;
 }
 
 }  // namespace gh::host

@@ -113,8 +113,30 @@ void registerModelRoutes(httplib::Server& server, RouteContext& ctx) {
             sendError(res, 409, "server_error", "a generation is running or queued: cancel it first", "busy");
             return;
         }
-        ctx.host.models().unload();
-        sendJson(res, {{"loaded", nullptr}});
+        const auto report = ctx.host.freeMemory({true, false});   // also closes the opened components of node graphs
+        sendJson(res, {{"loaded", nullptr}, {"componentsClosed", report.componentsClosed}});
+    });
+
+    // "free memory": unload models and/or drop cached node results; what is in use is left alone and listed
+    server.Post("/api/v1/graph/free", [&ctx](const httplib::Request& req, httplib::Response& res) {
+        if (!authorize(ctx, req, res, "manage")) return;
+        host::AppHost::FreeMemoryRequest request;
+        if (!req.body.empty()) {
+            const Json body = Json::parse(req.body, nullptr, false);
+            if (!body.is_object()) {
+                sendError(res, 400, "invalid_request_error", "the body must be a JSON object", "invalid_parameters");
+                return;
+            }
+            request.unloadModels = body.value("unloadModels", true);
+            request.freeCaches = body.value("freeCaches", true);
+        }
+        const auto report = ctx.host.freeMemory(request);
+        sendJson(res, {{"componentsClosed", report.componentsClosed},
+                       {"componentBytes", report.componentBytes},
+                       {"generateModelUnloaded", report.generateModelUnloaded},
+                       {"resultsDropped", report.resultsDropped},
+                       {"resultBytes", report.resultBytes},
+                       {"kept", report.kept}});
     });
 
     // ---- per model defaults --------------------------------------------------------------------------------------

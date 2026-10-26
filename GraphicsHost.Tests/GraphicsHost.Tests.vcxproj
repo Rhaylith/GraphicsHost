@@ -75,6 +75,26 @@
     <ClCompile Include="ImageToImageTests.cpp" />
     <ClCompile Include="LoraTests.cpp" />
     <ClCompile Include="SafetyTests.cpp" />
+    <ClCompile Include="NamingTests.cpp" />
+    <ClCompile Include="TensorTests.cpp" />
+    <ClCompile Include="GraphRegistryTests.cpp" />
+    <ClCompile Include="WorkflowTests.cpp" />
+    <ClCompile Include="ValidatorTests.cpp" />
+    <ClCompile Include="TipsTests.cpp" />
+    <ClCompile Include="TipCoverageTests.cpp" />
+    <ClCompile Include="ReferenceDiffTests.cpp" />
+    <ClCompile Include="PlannerTests.cpp" />
+    <ClCompile Include="OutputCacheTests.cpp" />
+    <ClCompile Include="ExecutorTests.cpp" />
+    <ClCompile Include="UtilityNodeTests.cpp" />
+    <ClCompile Include="GraphServiceTests.cpp" />
+    <ClCompile Include="ModelKindTests.cpp" />
+    <ClCompile Include="LoaderNodeTests.cpp" />
+    <ClCompile Include="MemoryTests.cpp" />
+    <ClCompile Include="WeightPatcherTests.cpp" />
+    <ClCompile Include="PrecisionTests.cpp" />
+    <ClCompile Include="FreeMemoryTests.cpp" />
+    <ClCompile Include="ComponentTests.cpp" />
     <ClCompile Include="TlsAndLimitsTests.cpp" />
     <ClCompile Include="ApiContractTests.cpp" />
     <ClCompile Include="UiSmokeTests.cpp" />
@@ -82,6 +102,7 @@
     <ClInclude Include="TestHttpServer.h" />
     <ClInclude Include="SafetensorsFixture.h" />
     <ClInclude Include="ModelFixture.h" />
+    <ClInclude Include="RepoRoot.h" />
     <ClInclude Include="TestUtil.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

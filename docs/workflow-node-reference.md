@@ -158,20 +158,27 @@ Contents: [C Common](#c-common-tooltips) · [O Options](#o-option-tooltips) · [
 | Node (`id`) | Parameter | Type · range · default | Tooltip |
 |---|---|---|---|
 | Load Checkpoint (`loader.checkpoint`) | checkpoint | model list *checkpoints* | A single file holding the diffusion model, text encoder(s) and VAE. Example: `sd_xl_base_1.0.safetensors` gives MODEL, TEXT_ENCODER and VAE outputs for SDXL. |
-| | device | combo auto, vulkan0, vulkan1 … · **auto** | Which Vulkan GPU runs the model. *auto* uses the GPU chosen in Settings (`gpuDevice`). Example: *vulkan1* to render on a second card while the first drives the desktop. |
-| | flashAttention | bool · **auto** | A faster, memory-saving attention kernel. *auto* turns it on for SD 1.x above 512² on Vulkan, where it was measured 5× faster. Example: on for SD 1.5 at 768². |
-| | offloadToRam | bool · **auto** | Keep the weights in system RAM and stream them to the GPU, for cards with little VRAM. Measured almost free on SDXL (3.04 vs 2.89 s/step). Example: on for SDXL on an 8 GB card. |
-| | idleUnloadMinutes | int 0 … 1440 · **10** | Unload the model after this many idle minutes; 0 keeps it loaded. Example: 0 on a dedicated server. |
+|  | device | combo auto, vulkan0, vulkan1, vulkan2, vulkan3 · **auto** | Which Vulkan GPU runs the model. *auto* uses the GPU chosen in Settings (`gpuDevice`). Example: *vulkan1* to render on a second card while the first drives the desktop. |
+|  | flashAttention | combo auto, on, off · **auto** | A faster, memory-saving attention kernel. *auto* turns it on for SD 1.x above 512² on Vulkan, where it was measured 5× faster. Example: on for SD 1.5 at 768². |
+|  | offloadToRam | combo auto, on, off · **auto** | Keep the weights in system RAM and stream them to the GPU, for cards with little VRAM. Measured almost free on SDXL (3.04 vs 2.89 s/step). Example: on for SDXL on an 8 GB card. |
+|  | idleUnloadMinutes | int 0 … 1440 · **10** | Unload the model after this many idle minutes; 0 keeps it loaded. Example: 0 on a dedicated server. |
 | Load Diffusion Model (`loader.diffusionModel`) | model | model list *diffusion_models* | A diffusion model without text encoder or VAE (common for FLUX, SD3.5, Wan). Load the encoders and VAE separately. Example: `flux1-dev.safetensors`. |
-| | weightDtype | combo default, fp8 e4m3, fp8 e4m3 fast, fp8 e5m2 · **default** | → C.weightDtype + *fp8 e4m3 fast* also computes in fp8 where the GPU supports it. |
-| Load Text Encoders (`loader.textEncoders`) | encoder1 … encoder4 | model list *text_encoders* (2–4 optional) | One file per encoder; the family decides how many are needed. Example: FLUX needs `clip_l.safetensors` and `t5xxl_fp16.safetensors`; SD3.5 adds `clip_g.safetensors`; HiDream uses four. |
-| | family | combo auto, sd1, sdxl, sd3, flux, hunyuan video, hidream, stable cascade, stable audio, mochi, ltxv, pixart, cosmos, lumina2, wan, chroma, ace, omnigen2, qwen image · **auto** | Which model family these encoders are for; *auto* guesses from the files. Example: set *flux* when a T5 file alone is ambiguous. |
-| | device | combo auto, GPU weights in VRAM, GPU weights in RAM · **auto** | → C.device |
-| Load VAE (`loader.vae`) | vae | model list *vae* + *preview decoders* + *pixel space* | The autoencoder to use instead of the checkpoint's. Example: `sdxl_vae_fp16fix.safetensors`; *taesdxl* decodes very fast at lower quality; *pixel space* for models that work directly on pixels. |
-| Load LoRA (`loader.lora`) | lora | model list *loras* | A small add-on that teaches a style, character or concept. Example: `watercolor_v2.safetensors`; add its trigger word to the prompt if it has one. |
-| | strengthModel | float −100 … 100 · 0.01 · **1.0** | How strongly the LoRA changes the diffusion model; negative values push away from it. Example: 0.7 for a softer style; −0.5 to suppress what the LoRA adds. |
-| | strengthText | float −100 … 100 · 0.01 · **1.0** | How strongly the LoRA changes the text encoder (how words are understood). Example: 0 to apply only the visual part; 1.0 when the trigger word matters. |
-| Load LoRA (model only) (`loader.loraModel`) | lora, strengthModel | as above | As Load LoRA, for models whose LoRAs do not touch the text encoder. Example: a FLUX style LoRA at 0.9. |
+|  | weightDtype | combo default, fp8 e4m3, fp8 e4m3 fast, fp8 e5m2 · **default** | Number format of the weights in memory. Smaller formats use less memory and may lose a little quality. Example: *fp8 e4m3* halves the VRAM of a FLUX model compared with *fp16*; *default* keeps the file's format. *fp8 e4m3 fast* also computes in fp8 where the GPU supports it. |
+| Load Text Encoders (`loader.textEncoders`) | encoder1 | model list *text_encoders* | One file per encoder; the family decides how many are needed. Example: FLUX needs `clip_l.safetensors` and `t5xxl_fp16.safetensors`; SD3.5 adds `clip_g.safetensors`; HiDream uses four. |
+|  | encoder2 | model list *text_encoders* | One file per encoder; the family decides how many are needed. Example: FLUX needs `clip_l.safetensors` and `t5xxl_fp16.safetensors`; SD3.5 adds `clip_g.safetensors`; HiDream uses four. |
+|  | encoder3 | model list *text_encoders* | One file per encoder; the family decides how many are needed. Example: FLUX needs `clip_l.safetensors` and `t5xxl_fp16.safetensors`; SD3.5 adds `clip_g.safetensors`; HiDream uses four. |
+|  | encoder4 | model list *text_encoders* | One file per encoder; the family decides how many are needed. Example: FLUX needs `clip_l.safetensors` and `t5xxl_fp16.safetensors`; SD3.5 adds `clip_g.safetensors`; HiDream uses four. |
+|  | family | combo auto, sd1, sdxl, sd3, flux, hunyuan video, hidream, stable cascade, stable audio, mochi, ltxv, pixart, cosmos, lumina2, wan, chroma, ace, omnigen2, qwen image · **auto** | Which model family these encoders are for; *auto* guesses from the files. Example: set *flux* when a T5 file alone is ambiguous. |
+|  | device | combo auto, GPU weights in VRAM, GPU weights in RAM · **auto** | → C.device |
+| Load VAE (`loader.vae`) | vae | model list *vae* | The autoencoder to use instead of the checkpoint's. Example: `sdxl_vae_fp16fix.safetensors`; *taesdxl* decodes very fast at lower quality; *pixel space* for models that work directly on pixels. |
+| Load LoRA (`loader.lora`) | model | MODEL | → C.model |
+|  | textEncoder | TEXT_ENCODER | → C.textEncoder |
+|  | lora | model list *loras* | A small add-on that teaches a style, character or concept. Example: `watercolor_v2.safetensors`; add its trigger word to the prompt if it has one. |
+|  | strengthModel | float −100 … 100 · 0.01 · **1** | How strongly the LoRA changes the diffusion model; negative values push away from it. Example: 0.7 for a softer style; −0.5 to suppress what the LoRA adds. |
+|  | strengthText | float −100 … 100 · 0.01 · **1** | How strongly the LoRA changes the text encoder (how words are understood). Example: 0 to apply only the visual part; 1.0 when the trigger word matters. |
+| Load LoRA (model only) (`loader.loraModel`) | model | MODEL | → C.model |
+|  | lora | model list *loras* | A small add-on that teaches a style, character or concept. Example: `watercolor_v2.safetensors`; add its trigger word to the prompt if it has one. |
+|  | strengthModel | float −100 … 100 · 0.01 · **1** | How strongly the LoRA changes the diffusion model; negative values push away from it. Example: 0.7 for a softer style; −0.5 to suppress what the LoRA adds. |
 | Load ControlNet (`loader.controlNet`) | controlNet | model list *controlnet* | A guide model that makes the image follow a structure image (edges, depth, pose ...). Also loads T2I-Adapters and control-LoRAs. Example: `control_v11p_sd15_canny.safetensors`. |
 | Load Diff ControlNet (`loader.diffControlNet`) | model, controlNet | MODEL; model list | A ControlNet stored as a difference to a base model; needs that model. Example: a diff-canny file with the SD 1.5 model it was made from. |
 | Load Style Model (`loader.styleModel`) | styleModel | model list *style_models* | A model that turns an image embedding into style conditioning. Example: `flux1-redux-dev.safetensors` for FLUX image variations. |
@@ -527,18 +534,36 @@ The split pipeline: **Noise** + **Guider** + **Sampler** + **Sigmas** → Sample
 
 | Node (`id`) | Parameter | Type · range · default | Tooltip |
 |---|---|---|---|
-| Integer / Float / Text / Boolean (`util.int`, `util.float`, `util.string`, `util.bool`) | value | as type | A constant that can feed several inputs at once. Example: one Integer feeding the width of three nodes. |
-| Constant (any widget) (`util.primitive`) | value | takes the type of the input it connects to | A value node that copies the widget of the first input it is linked to, including its range and options, and supports *control after run*. Example: one seed shared by two samplers. |
-| Reroute (`util.reroute`) | — | any | A pass-through point to tidy links. |
-| Note (`util.note`), Markdown Note (`util.markdown`) | text | string multiline | Text for people reading the graph; not executed. Example: "Set denoise to 0.4 for subtle changes." |
-| Join Text (`util.textJoin`) | a, b, separator | string; string · **", "** | Joins two texts. Example: style + subject with ", ". |
-| Replace Text (`util.textReplace`) | text, find, replace, regex | string ×3; bool · **false** | Replace occurrences; regex enables patterns. Example: find `cat`, replace `dog`. |
-| Substring (`util.textSlice`) | start, end | int · **0, −1** | Characters from start to end (−1 = end). Example: 0, 75. |
-| Compare (`util.compare`) | a, b, operation | any; combo =, ≠, <, ≤, >, ≥ · **=** | Outputs a boolean. Example: width > 1024. |
-| Switch (`util.switch`) | condition, onTrue, onFalse | BOOLEAN; any (lazy) | Passes one input; the other branch is not run. Example: run a hi-res pass only when a toggle is on. |
-| Math (`util.math`) | expression, a, b, c | string · **"a + b"**; numbers | Arithmetic expression on inputs (`+ − × / % ^ min max round floor ceil`). Example: `a * 1.5` to compute a hi-res width. |
-| Preview Any (`util.previewAny`) | value | any | Shows the value as text in the node. Example: inspect the seed actually used. |
-| Image Size (`util.imageSize`) | image | IMAGE | Outputs width, height and batch count. Example: feed an Empty Latent with the size of a reference photo. |
+| Boolean (`util.bool`) | value | bool · **false** | An on/off switch that can feed several inputs at once. Example: one toggle that turns on both the hi-res pass and the upscaler. |
+| Compare (`util.compare`) | a | any | The left value; numbers compare as numbers, anything else as text. Example: the width from Image Size. |
+|  | b | any | The right value. Example: 1024. |
+|  | operation | combo =, ≠, <, ≤, >, ≥ · **=** | How to compare. Example: > is true when a is larger than b. |
+| Constant (`util.primitive`) | value | any | A value node that copies the widget of the first input it is linked to, including its range and options, and supports *control after run*. Example: one seed shared by two samplers. |
+| Float (`util.float`) | value | float −1000000000 … 1000000000 · 0.01 · **0** | A decimal number that can feed several inputs at once. Example: one Float feeding the cfg of two samplers. |
+| Image Size (`util.imageSize`) | image | IMAGE | The image to measure. |
+| Integer (`util.int`) | value | int −9007199254740991 … 9007199254740991 · **0** | A whole number that can feed several inputs at once. Example: one Integer feeding the width of three nodes. |
+| Join Text (`util.textJoin`) | a | string | The first text. Example: "a red fox". |
+|  | b | string | The second text. Example: "in the snow". |
+|  | separator | string · **, ** | Placed between the two texts. Example: ", " turns "fox" and "snow" into "fox, snow". |
+| Markdown Note (`util.markdown`) | text | string | Text for people reading the graph; not executed. Example: "Set denoise to 0.4 for subtle changes." |
+| Math (`util.math`) | expression | string · **a + b** | The calculation, using a, b and c and + - * / % ^ min max round floor ceil abs sqrt. Example: a * 1.5 to compute a hi-res width. |
+|  | a | float −1000000000 … 1000000000 · **0** | The value called a in the expression. Example: 1024. |
+|  | b | float −1000000000 … 1000000000 · **0** | The value called b in the expression. Example: 8. |
+|  | c | float −1000000000 … 1000000000 · **0** | The value called c in the expression. Example: 64. |
+| Note (`util.note`) | text | string | Text for people reading the graph; not executed. Example: "Set denoise to 0.4 for subtle changes." |
+| Preview Any (`util.previewAny`) | value | any | The value to show. Example: the seed actually used by a sampler. |
+| Replace Text (`util.textReplace`) | text | string | The text to change. Example: "a cat on a sofa". |
+|  | find | string | What to look for. Example: "cat". |
+|  | replace | string | What to put instead; leave empty to delete the match. Example: "dog". |
+|  | regex | bool · **false** | Treat the search text as a regular expression; $1 in the replacement stands for the first group. Example: find "(black|white) cat" and replace "$1 dog" turns "black cat" into "black dog". |
+| Reroute (`util.reroute`) | value | any | A pass-through point to tidy links. |
+| Substring (`util.textSlice`) | text | string | The text to cut from. Example: a long prompt. |
+|  | start | int −100000 … 100000 · **0** | Position of the first character to keep; negative counts from the end. Example: 0 keeps the beginning. |
+|  | end | int −100000 … 100000 · **−1** | Position after the last character to keep; -1 means the end. Example: 75 keeps the first 75 characters. |
+| Switch (`util.switch`) | condition | bool · **false** | Which input to pass on: on passes onTrue, off passes onFalse. Example: a Boolean that turns the hi-res pass on and off. |
+|  | onTrue | any (optional) | The value passed when the condition is on; its branch only runs then. Example: the image after the hi-res pass. |
+|  | onFalse | any (optional) | The value passed when the condition is off; its branch only runs then. Example: the image straight from the first decode. |
+| Text (`util.string`) | value | string | Text that can feed several inputs at once. Example: one prompt feeding two Text Encode nodes. |
 | Subgraph node | (promoted widgets) | as promoted | Its inputs carry the tooltips of the widgets they were promoted from, editable in the subgraph's properties. |
 
 ## N13. Hooks (scheduled LoRAs)
@@ -664,10 +689,33 @@ The split pipeline: **Noise** + **Guider** + **Sampler** + **Sigmas** → Sample
 
 ## S. Settings
 
+### S.0 Settings that already exist
+
+The Settings tab shows these as tooltips (W1.6 checks that every key of `settings.json` has one with an example).
+
+| Key | Values · default | Tooltip |
+|---|---|---|
+| `backend` | auto, vulkan, cpu · **auto** | Which compute backend runs models. *auto* uses a usable Vulkan GPU and falls back to the CPU; workflows always need Vulkan. Example: *vulkan* to get an error instead of a slow CPU fallback. |
+| `gpuDevice` | index · **0** | Which Vulkan GPU runs the models when there are several. Example: 1 selects the second card in the list. |
+| `interfaceMode` | user, power, developer · **user** | How much of the Generate tab is shown. Example: *power* adds sampler, steps, CFG and device; *developer* also shows the request JSON. |
+| `theme` | system, light, dark · **system** | Window colours. Example: *dark* stays dark even when Windows is set to light. |
+| `accent` | colour · **default blue** | Colour of selections and links. Example: `#2b6cb0`; leave empty for the default. |
+| `notifications` | bool · **true** | Tray messages when a download finishes or an image is ready while the window is in the background. Example: off while screen sharing. |
+| `server.enabled` | bool · **true** | Run the API server that serves the browser UI and the OpenAI-compatible and native APIs. Example: off if you only use the desktop window. |
+| `server.port` | 1 … 65535 · **1234** | The port the server listens on. Example: 8080 when 1234 is already taken. |
+| `server.lan` | bool · **false** | Let other computers connect, not just this one; needs an access token. Example: on to open `http://192.168.1.20:1234` on your phone. |
+| `server.requireToken` | bool · **false** | Also require an access token from clients on this computer (remote clients always need one). Example: on when other people share this PC. |
+| `server.https` | bool · **false** | Serve over https; a self-signed certificate is made when no files are given. Example: on when connecting over a network you do not trust. |
+| `server.tlsCertFile`, `server.tlsKeyFile` | file · **none** | The PEM certificate chain and private key to use for https instead of the self-signed pair. Example: `C:\certs\host.pem` and `C:\certs\host.key`. |
+| `server.allowedAddresses` | list · **empty (anyone who may connect)** | Only these addresses may connect; this computer always may. Example: `192.168.1.0/24, 10.0.0.5`. |
+| `server.rateLimitPerMinute` | 0 … 100000 · **0** | Requests per client and minute before the server answers "too many requests"; 0 means no limit. Example: 120 for a shared server. |
+| `logging.level` | trace, debug, info, warn, error · **info** | How much the log records. Example: *debug* while reporting a problem, *warn* for quiet long-running servers. |
+| `safety.enabled` | bool · **false** | Check generated images with the optional safety filter. Example: on for a family computer. |
+
 ### S.1 Engine and server (`settings.json`)
 
 Settings that already exist (`backend`, `gpuDevice`, `interfaceMode`, `theme`, `accent`, `notifications`, `server.*`,
-`logging.level`, `safety.enabled`) keep the help text the Settings tab has today; W1.6 checks that each of them also
+`logging.level`, `safety.enabled`) are in S.0 above; W1.6 checks that each of them also
 has an example. Rows marked *(existing)* below get new wording because the workflow system uses them too.
 
 | Key | Values · default | Tooltip |

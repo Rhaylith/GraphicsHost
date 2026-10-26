@@ -33,6 +33,25 @@ struct SafetySettings {
     bool enabled = false;  // optional safety filter, off by default
 };
 
+struct GraphSettings {
+    std::string cachePolicy = "last";   // last|lru|ram|none: which node results are kept between runs
+    int cacheSize = 10;                 // entries for lru, free-RAM threshold in GB for ram
+    int historyMaxItems = 10000;        // finished graph jobs kept in the history (0 = unlimited); files are never deleted
+};
+
+struct MemorySettings {
+    std::string mode = "normal";   // gpu-only|high|normal|low|stream: how models use video memory
+    int reserveVramMb = 512;       // video memory left free for the desktop and other programs
+    bool asyncOffload = true;      // move weights between RAM and VRAM in the background while the GPU works
+};
+
+struct PrecisionSettings {
+    std::string diffusion = "auto";     // auto|fp32|fp16|bf16|fp8 e4m3|fp8 e5m2: number format of diffusion models in memory
+    std::string textEncoder = "auto";   // auto|fp32|fp16|bf16|fp8 e4m3
+    std::string vae = "auto";           // auto|fp32|fp16|bf16
+    bool vaeFallbackFp32 = true;        // decode again in fp32 when the result has invalid values
+};
+
 struct Settings {
     int schemaVersion = kSettingsSchemaVersion;
     std::string backend = "auto";        // auto|vulkan|cpu
@@ -47,6 +66,9 @@ struct Settings {
     ServerSettings server;
     LoggingSettings logging;
     SafetySettings safety;
+    GraphSettings graph;
+    MemorySettings memory;
+    PrecisionSettings precision;
     nlohmann::json unknown = nlohmann::json::object();  // keys this version does not know, written back unchanged
 };
 

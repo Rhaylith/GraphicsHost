@@ -19,6 +19,15 @@
       <SubSystem>Windows</SubSystem>
     </Link>
   </ItemDefinitionGroup>
+  <!-- gh_components.cpp looks inside the engine: it gets the engine's include paths, defines and language standard -->
+  <ItemGroup>
+    <ClCompile Include="$(MSBuildThisFileDirectory)gh_components.cpp">
+      <AdditionalIncludeDirectories>$(Sdcpp)src;$(Sdcpp)src\core;$(Sdcpp)thirdparty;$(Sdcpp)ggml\include;$(Sdcpp)ggml\src;$(RepoRoot)ggml\generated;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>GGML_MAX_NAME=160;GGML_SCHED_MAX_COPIES=4;GGML_USE_CPU;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/wd4244 /wd4267 /wd4305 /wd4996 /wd4068 /wd4005 /wd4018 /wd4101 /wd4146 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemGroup>
   <ItemGroup>
     <ClCompile Include="$(MSBuildThisFileDirectory)gh_runtime.cpp" />
     <ClInclude Include="$(MSBuildThisFileDirectory)gh_runtime.h" />

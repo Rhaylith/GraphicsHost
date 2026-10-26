@@ -10,10 +10,13 @@
 #include "engine/SafetyFilter.h"
 #include "gallery/GalleryStore.h"
 #include "host/GenerationService.h"
+#include "host/GraphService.h"
 #include "host/HardwareMonitor.h"
 #include "models/Catalog.h"
+#include "models/ComponentCache.h"
 #include "models/DownloadManager.h"
 #include "models/ModelLibrary.h"
+#include "models/MemoryManager.h"
 #include "models/ModelService.h"
 #include "presets/PresetStore.h"
 #include "server/TokenStore.h"
@@ -66,12 +69,33 @@ public:
 
     // Services; created on first use except the stores, which are cheap.
     engine::ModelManager& models();      // one loaded model, the job queue
+    models::MemoryManager& memory();     // decides what leaves video memory (settings memory.*)
+    models::ComponentCache& components(); // the opened parts of models, shared by graph nodes and counted for the Generate path
     // Replaces the inference engine (tests plug in a fake one). Call before models() is first used.
     void overrideEngine(std::shared_ptr<engine::IImageEngine> engine);
     gallery::GalleryStore& gallery();     // <data folder>/outputs
     presets::PresetStore& presets();      // <data folder>/presets
     presets::ModelDefaultsStore& modelDefaults();  // <data folder>/model-defaults.json
     models::ModelLibrary& library();               // the checkpoints, VAEs and LoRAs in modelsDir()
+    // The "free memory" and "unload models" actions: close the opened components that nothing is using, unload the model of the
+    // Generate path (only while no generation is queued or running), and drop the cached node results. Anything in use is left
+    // alone and reported in `kept`.
+    struct FreeMemoryRequest {
+        bool unloadModels = true;
+        bool freeCaches = true;
+    };
+    struct FreeMemoryReport {
+        size_t componentsClosed = 0;
+        uint64_t componentBytes = 0;     // the weights of the components that were closed
+        bool generateModelUnloaded = false;
+        size_t resultsDropped = 0;
+        uint64_t resultBytes = 0;
+        std::vector<std::string> kept;   // what could not be released and why
+    };
+    FreeMemoryReport freeMemory(FreeMemoryRequest request = {});
+
+    // Reads model-paths.json again (extra model folders per kind); done at start and by the Settings tab.
+    void reloadModelPaths();
     server::TokenStore& tokens();                  // API access tokens (<data folder>/tokens.json)
     HardwareMonitor& monitor();                    // CPU, RAM, GPU load and video memory readings
     // Whether the safety filter applies to this request (settings.safety.enabled or the request asks for it) and, if so,
@@ -80,6 +104,7 @@ public:
     models::DownloadManager& downloads();          // model downloads (a few at a time)
     models::ModelService& modelService();          // catalog + downloads + library: "get this model"
     GenerationService& generation();               // JIT load + queue + gallery for the API and the UIs
+    GraphService& graph();                         // node graphs: validate, queue, run, history (shares the generation queue)
     const models::Catalog& catalog();              // data/catalog.json next to the exe, overridden by <data folder>/catalog.json
 
 private:
@@ -99,12 +124,16 @@ private:
     presets::ModelDefaultsStore modelDefaults_;
     models::ModelLibrary library_;
     server::TokenStore tokens_;
+    std::unique_ptr<models::MemoryManager> memory_;
+    std::unique_ptr<models::ComponentCache> components_;
     std::unique_ptr<engine::ModelManager> models_;
     std::unique_ptr<models::DownloadManager> downloads_;
     std::unique_ptr<models::Catalog> catalog_;
     std::unique_ptr<models::ModelService> modelService_;
     std::mutex generationMutex_;
     std::unique_ptr<GenerationService> generation_;
+    std::mutex graphMutex_;
+    std::unique_ptr<GraphService> graph_;
     HardwareMonitor monitor_;
 };
 

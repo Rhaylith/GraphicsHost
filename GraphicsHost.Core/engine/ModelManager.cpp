@@ -1,8 +1,22 @@
 #include "engine/ModelManager.h"
 
 #include "core/Log.h"
+#include "engine/FitEstimator.h"
+#include "models/ComponentCache.h"
+
+#include <filesystem>
 
 namespace gh::engine {
+
+namespace {
+// What the model occupies once loaded, from its file (the same estimate the fit check uses).
+uint64_t estimatedBytes(const ModelInfo& info) {
+    std::error_code ec;
+    const uint64_t size = std::filesystem::file_size(info.modelPath, ec);
+    return ec ? 0 : estimateWeightsBytes(size, info.family);
+}
+models::ComponentKey keyOf(const ModelInfo& info) { return {info.modelPath, "model", ""}; }
+}  // namespace
 
 ModelManager::ModelManager(EngineProvider engine, Clock clock, std::chrono::seconds sweepInterval)
     : engine_(std::move(engine)), clock_(std::move(clock)) {
@@ -44,9 +58,11 @@ std::shared_ptr<ILoadedModel> ModelManager::load(const LoadOptions& options) {
     }
     if (model_) {
         log::info("unloading " + info_->info.modelPath + " to load another model");
+        if (components_) components_->forget(keyOf(info_->info));
         model_.reset();
         info_.reset();
     }
+    if (components_) components_->closeFile(options.modelPath);   // a file is never held twice
     std::shared_ptr<ILoadedModel> loaded = engine->load(options);
     model_ = loaded;
     LoadedModelInfo info;
@@ -54,6 +70,7 @@ std::shared_ptr<ILoadedModel> ModelManager::load(const LoadOptions& options) {
     info.options = options;
     info.loadedAt = info.lastUsed = now();
     info_ = std::move(info);
+    if (components_) components_->adopt(keyOf(info_->info), estimatedBytes(info_->info));
     return model_;
 }
 
@@ -61,6 +78,7 @@ void ModelManager::unload() {
     std::lock_guard<std::mutex> lock(mutex_);
     if (model_) {
         log::info("unloading " + info_->info.modelPath);
+        if (components_) components_->forget(keyOf(info_->info));
     }
     model_.reset();
     info_.reset();
@@ -101,6 +119,7 @@ bool ModelManager::sweepIdle() {
     }
     log::info("unloading " + info_->info.modelPath + " after " + std::to_string(info_->options.ttlMinutes) +
               " idle minutes");
+    if (components_) components_->forget(keyOf(info_->info));
     model_.reset();
     info_.reset();
     return true;

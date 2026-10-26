@@ -209,3 +209,104 @@ TEST_CASE("queue: only the last 100 finished jobs are kept", "[unit][queue]") {
     CHECK(queue.find(1) == nullptr);
     CHECK(queue.find(last->id()) != nullptr);
 }
+
+// ---- graph jobs share the queue (workflow plan W2.5) --------------------------------------------------------------------
+
+namespace {
+GraphWork graphWork(std::vector<std::string>& log, std::mutex& logMutex, const std::string& name, int steps = 3, int stepMs = 5) {
+    return [&log, &logMutex, name, steps, stepMs](JobControl& control) {
+        {
+            std::lock_guard<std::mutex> lock(logMutex);
+            log.push_back(name);
+        }
+        for (int i = 1; i <= steps; ++i) {
+            if (control.stop.stop_requested()) throw EngineError(EngineErrorCode::Cancelled, "interrupted");
+            std::this_thread::sleep_for(std::chrono::milliseconds(stepMs));
+            control.progress(StepProgress{i, steps, 0.0f, "node-" + name});
+        }
+        return nlohmann::json{{"name", name}};
+    };
+}
+}  // namespace
+
+TEST_CASE("queue: graph and generation jobs share one worker, in order", "[unit][queue]") {
+    auto model = std::make_shared<FakeModel>();
+    std::vector<std::string> log;
+    std::mutex logMutex;
+    JobQueue queue;
+    auto a = queue.submit(model, req("gen-a", 3));
+    SubmitOptions options;
+    options.clientId = "editor-1";
+    options.label = "my run";
+    auto g = queue.submitGraph(graphWork(log, logMutex, "graph-1"), options);
+    auto b = queue.submit(model, req("gen-b", 3));
+    for (auto* j : {a.get(), g.get(), b.get()}) REQUIRE(j->waitFor(5s));
+
+    CHECK(g->kind() == JobKind::Graph);
+    CHECK(a->kind() == JobKind::Generation);
+    CHECK(std::string(toString(g->kind())) == "graph");
+    CHECK(g->state() == JobState::Succeeded);
+    CHECK(g->graphResult()["name"] == "graph-1");
+    CHECK(g->label() == "my run");
+    CHECK(g->clientId() == "editor-1");
+    CHECK(g->number() == g->id());
+    CHECK(g->progress().node == "node-graph-1");
+    CHECK(g->progress().step == 3);
+    CHECK(model->maxRunning.load() == 1);
+    CHECK(model->order == std::vector<std::string>{"gen-a", "gen-b"});
+    CHECK(a->id() < g->id());
+    CHECK(g->id() < b->id());
+}
+
+TEST_CASE("queue: front jobs jump the queue behind the running one, clear removes the pending ones", "[unit][queue]") {
+    auto model = std::make_shared<FakeModel>();
+    model->stepMs = 20;
+    std::vector<std::string> log;
+    std::mutex logMutex;
+    JobQueue queue;
+    auto running = queue.submit(model, req("running", 10));
+    while (running->state() != JobState::Running) std::this_thread::sleep_for(1ms);
+    auto late = queue.submitGraph(graphWork(log, logMutex, "late"));
+    SubmitOptions front;
+    front.front = true;
+    auto urgent = queue.submitGraph(graphWork(log, logMutex, "urgent"), front);
+    CHECK(queue.pending() == 2);
+
+    SECTION("order") {
+        for (auto* j : {running.get(), late.get(), urgent.get()}) REQUIRE(j->waitFor(5s));
+        CHECK(log == std::vector<std::string>{"urgent", "late"});
+    }
+    SECTION("clear") {
+        CHECK(queue.clearPending() == 2);
+        CHECK(queue.pending() == 0);
+        CHECK(late->state() == JobState::Cancelled);
+        CHECK(urgent->state() == JobState::Cancelled);
+        CHECK(late->errorCode() == EngineErrorCode::Cancelled);
+        CHECK(running->state() != JobState::Cancelled);   // the running job is left alone
+        REQUIRE(running->waitFor(5s));
+        CHECK(running->state() == JobState::Succeeded);
+        CHECK(log.empty());
+        CHECK(queue.clearPending() == 0);
+    }
+}
+
+TEST_CASE("queue: graph jobs fail and cancel like generation jobs", "[unit][queue]") {
+    JobQueue queue;
+    auto failing = queue.submitGraph([](JobControl&) -> nlohmann::json { throw EngineError(EngineErrorCode::OutOfMemory, "no memory"); });
+    auto crashing = queue.submitGraph([](JobControl&) -> nlohmann::json { throw std::runtime_error("oops"); });
+    REQUIRE(failing->waitFor(5s));
+    REQUIRE(crashing->waitFor(5s));
+    CHECK(failing->state() == JobState::Failed);
+    CHECK(failing->errorCode() == EngineErrorCode::OutOfMemory);
+    CHECK(failing->error() == "no memory");
+    CHECK(crashing->state() == JobState::Failed);
+
+    std::vector<std::string> log;
+    std::mutex logMutex;
+    auto slow = queue.submitGraph(graphWork(log, logMutex, "slow", 500, 10));
+    while (slow->state() != JobState::Running) std::this_thread::sleep_for(1ms);
+    REQUIRE(queue.cancel(slow->id()));
+    REQUIRE(slow->waitFor(5s));
+    CHECK(slow->state() == JobState::Cancelled);
+    CHECK_THROWS(slow->result());   // a graph job has no generation result
+}

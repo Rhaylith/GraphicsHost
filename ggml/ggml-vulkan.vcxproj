@@ -9,6 +9,16 @@
     <GgmlVulkan>true</GgmlVulkan>
     <GgmlCpuVariant>avx2</GgmlCpuVariant>
   </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+  </ItemDefinitionGroup>
   <Import Project="ggml.vcxproj" />
   <PropertyGroup Label="Globals">
     <ProjectGuid>{7B3D1E0A-5C2F-4E7A-9A11-0F6E2D4C8A0B}</ProjectGuid>

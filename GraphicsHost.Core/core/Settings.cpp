@@ -15,8 +15,8 @@ namespace {
 
 using Json = nlohmann::json;
 
-constexpr std::array<const char*, 13> kKnownKeys = {"schemaVersion", "backend", "gpuDevice", "threads", "modelsDir",
-                                                  "interfaceMode",  "server",  "logging",   "safety", "firstRunDone", "theme", "accent", "notifications"};
+constexpr std::array<const char*, 16> kKnownKeys = {"schemaVersion", "backend", "gpuDevice", "threads", "modelsDir",
+                                                  "interfaceMode",  "server",  "logging",   "safety", "firstRunDone", "theme", "accent", "notifications", "graph", "memory", "precision"};
 
 bool validAccent(const std::string& c) {
     return c.size() == 7 && c[0] == '#' && std::all_of(c.begin() + 1, c.end(), [](unsigned char ch) { return std::isxdigit(ch) != 0; });
@@ -45,6 +45,9 @@ Json toJson(const Settings& s) {
                       {"allowedAddresses", s.server.allowedAddresses}, {"rateLimitPerMinute", s.server.rateLimitPerMinute}};
     json["logging"] = {{"level", s.logging.level}};
     json["safety"] = {{"enabled", s.safety.enabled}};
+    json["graph"] = {{"cachePolicy", s.graph.cachePolicy}, {"cacheSize", s.graph.cacheSize}, {"historyMaxItems", s.graph.historyMaxItems}};
+    json["memory"] = {{"mode", s.memory.mode}, {"reserveVramMb", s.memory.reserveVramMb}, {"asyncOffload", s.memory.asyncOffload}};
+    json["precision"] = {{"diffusion", s.precision.diffusion}, {"textEncoder", s.precision.textEncoder}, {"vae", s.precision.vae}, {"vaeFallbackFp32", s.precision.vaeFallbackFp32}};
     return json;
 }
 
@@ -79,6 +82,22 @@ Settings settingsFromJson(const Json& json) {
     }
     if (const auto it = json.find("safety"); it != json.end() && it->is_object()) {
         s.safety.enabled = it->value("enabled", s.safety.enabled);
+    }
+    if (const auto it = json.find("graph"); it != json.end() && it->is_object()) {
+        s.graph.cachePolicy = it->value("cachePolicy", s.graph.cachePolicy);
+        s.graph.cacheSize = it->value("cacheSize", s.graph.cacheSize);
+        s.graph.historyMaxItems = it->value("historyMaxItems", s.graph.historyMaxItems);
+    }
+    if (const auto it = json.find("memory"); it != json.end() && it->is_object()) {
+        s.memory.mode = it->value("mode", s.memory.mode);
+        s.memory.reserveVramMb = it->value("reserveVramMb", s.memory.reserveVramMb);
+        s.memory.asyncOffload = it->value("asyncOffload", s.memory.asyncOffload);
+    }
+    if (const auto it = json.find("precision"); it != json.end() && it->is_object()) {
+        s.precision.diffusion = it->value("diffusion", s.precision.diffusion);
+        s.precision.textEncoder = it->value("textEncoder", s.precision.textEncoder);
+        s.precision.vae = it->value("vae", s.precision.vae);
+        s.precision.vaeFallbackFp32 = it->value("vaeFallbackFp32", s.precision.vaeFallbackFp32);
     }
     for (const auto& [key, value] : json.items()) {
         const bool known = std::any_of(kKnownKeys.begin(), kKnownKeys.end(), [&](const char* k) { return key == k; });
@@ -120,6 +139,30 @@ std::vector<FieldError> validate(const Settings& s) {
     }
     if (s.server.port < 1 || s.server.port > 65535) {
         errors.push_back({"server.port", "must be between 1 and 65535"});
+    }
+    if (!oneOf(s.precision.diffusion, {"auto", "fp32", "fp16", "bf16", "fp8 e4m3", "fp8 e5m2"})) {
+        errors.push_back({"precision.diffusion", "must be auto, fp32, fp16, bf16, fp8 e4m3 or fp8 e5m2"});
+    }
+    if (!oneOf(s.precision.textEncoder, {"auto", "fp32", "fp16", "bf16", "fp8 e4m3"})) {
+        errors.push_back({"precision.textEncoder", "must be auto, fp32, fp16, bf16 or fp8 e4m3"});
+    }
+    if (!oneOf(s.precision.vae, {"auto", "fp32", "fp16", "bf16"})) {
+        errors.push_back({"precision.vae", "must be auto, fp32, fp16 or bf16"});
+    }
+    if (!oneOf(s.memory.mode, {"gpu-only", "high", "normal", "low", "stream"})) {
+        errors.push_back({"memory.mode", "must be gpu-only, high, normal, low or stream"});
+    }
+    if (s.memory.reserveVramMb < 0 || s.memory.reserveVramMb > 65536) {
+        errors.push_back({"memory.reserveVramMb", "must be between 0 and 65536"});
+    }
+    if (!oneOf(s.graph.cachePolicy, {"last", "lru", "ram", "none"})) {
+        errors.push_back({"graph.cachePolicy", "must be last, lru, ram or none"});
+    }
+    if (s.graph.cacheSize < 1 || s.graph.cacheSize > 1000) {
+        errors.push_back({"graph.cacheSize", "must be between 1 and 1000"});
+    }
+    if (s.graph.historyMaxItems < 0 || s.graph.historyMaxItems > 1000000) {
+        errors.push_back({"graph.historyMaxItems", "must be between 0 (unlimited) and 1000000"});
     }
     if (!oneOf(s.logging.level, {"trace", "debug", "info", "warn", "error"})) {
         errors.push_back({"logging.level", "must be trace, debug, info, warn or error"});

@@ -5,6 +5,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <sqlite3.h>
+
 #include <regex>
 #include <set>
 #include <thread>
@@ -224,4 +226,94 @@ TEST_CASE("gallery: several threads can add at once", "[unit][gallery]") {
     }
     for (auto& t : threads) t.join();
     CHECK(store.count() == 20);
+}
+
+// ---- history of graph jobs (workflow plan W2.5) -------------------------------------------------------------------------
+
+namespace {
+HistoryEntry historyEntry(int64_t number, const std::string& status = "done") {
+    HistoryEntry h;
+    h.queueNumber = number;
+    h.clientId = "editor";
+    h.label = "run " + std::to_string(number);
+    h.status = status;
+    h.seconds = 1.25;
+    h.job = {{"format", "graphicshost.job"}, {"nodes", nlohmann::json::object()}};
+    h.workflow = {{"format", "graphicshost.workflow"}, {"id", "wf"}};
+    h.outputs = nlohmann::json::array({{{"node", "9"}, {"gallery", 12}, {"path", "2026/10/25/a.png"}}});
+    h.timings = {{"4", 120.5}};
+    if (status == "failed") {
+        h.error = "out of memory";
+        h.errorNode = "4";
+    }
+    return h;
+}
+}  // namespace
+
+TEST_CASE("gallery: graph history stores, lists and prunes jobs", "[unit][gallery][history]") {
+    gh::test::TempDir dir;
+    GalleryStore store(dir.path());
+    CHECK(store.historyCount() == 0);
+    const int64_t first = store.addHistory(historyEntry(1));
+    store.addHistory(historyEntry(2, "failed"));
+    store.addHistory(historyEntry(3));
+    CHECK(store.historyCount() == 3);
+
+    const auto list = store.history(2, 0);   // newest first, the large fields left out
+    REQUIRE(list.size() == 2);
+    CHECK(list[0].queueNumber == 3);
+    CHECK(list[1].status == "failed");
+    CHECK(list[1].error == "out of memory");
+    CHECK(list[1].errorNode == "4");
+    CHECK(list[0].job.is_null());   // not loaded in a listing
+    CHECK(store.history(2, 2).size() == 1);
+
+    const auto item = store.historyItem(first);
+    REQUIRE(item.has_value());
+    CHECK(item->label == "run 1");
+    CHECK(item->clientId == "editor");
+    CHECK(item->seconds == 1.25);
+    CHECK(item->job["format"] == "graphicshost.job");
+    CHECK(item->workflow["id"] == "wf");
+    CHECK(item->outputs[0]["gallery"] == 12);
+    CHECK(item->timings["4"] == 120.5);
+    CHECK(!item->created.empty());
+    CHECK_FALSE(store.historyItem(9999).has_value());
+
+    CHECK(store.pruneHistory(0) == 0);   // 0 means unlimited
+    CHECK(store.pruneHistory(2) == 1);   // the oldest goes
+    CHECK(store.historyCount() == 2);
+    CHECK_FALSE(store.historyItem(first).has_value());
+    CHECK(store.removeHistory(store.history(1, 0)[0].id));
+    CHECK_FALSE(store.removeHistory(first));
+    CHECK(store.historyCount() == 1);
+}
+
+TEST_CASE("gallery: a version 1 database gains the history table and keeps its images", "[unit][gallery][history]") {
+    gh::test::TempDir dir;
+    {
+        GalleryStore store(dir.path());
+        store.add(tinyImage(), request("old image"), 1, model(), 1.0);
+    }
+    // downgrade the index by hand: drop the history table and set the old version
+    {
+        sqlite3* db = nullptr;
+        REQUIRE(sqlite3_open((dir.path() / "gallery.db").string().c_str(), &db) == SQLITE_OK);
+        REQUIRE(sqlite3_exec(db, "DROP TABLE graph_history; PRAGMA user_version=1;", nullptr, nullptr, nullptr) == SQLITE_OK);
+        sqlite3_close(db);
+    }
+    GalleryStore reopened(dir.path());
+    CHECK(reopened.count() == 1);
+    CHECK(reopened.addHistory(historyEntry(1)) > 0);
+    CHECK(reopened.historyCount() == 1);
+    {
+        sqlite3* db = nullptr;
+        REQUIRE(sqlite3_open((dir.path() / "gallery.db").string().c_str(), &db) == SQLITE_OK);
+        sqlite3_stmt* s = nullptr;
+        REQUIRE(sqlite3_prepare_v2(db, "PRAGMA user_version", -1, &s, nullptr) == SQLITE_OK);
+        REQUIRE(sqlite3_step(s) == SQLITE_ROW);
+        CHECK(sqlite3_column_int(s, 0) == 2);
+        sqlite3_finalize(s);
+        sqlite3_close(db);
+    }
 }

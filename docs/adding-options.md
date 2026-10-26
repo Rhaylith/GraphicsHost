@@ -25,7 +25,7 @@ Three kinds of option:
 | 8 | **CLI** | ✔ | ✔ | ✔ | `config set <key> <value>` works for every setting through the JSON (see [Cli.cpp](../GraphicsHost.Core/cli/Cli.cpp)): nothing to do. Dedicated flags for `gen`/`load` are manual *(later)*. |
 | 9 | **UI**: control in the Qt settings or parameter panel, and in the browser UI | ✔ | ✔ | ✔ | `GraphicsHost/ui/` and `web/` *(later)*. Give the control an interface mode (below). |
 | 10 | **Tests** | ✔ | ✔ | ✔ | [SettingsTests.cpp](../GraphicsHost.Tests/SettingsTests.cpp): default, round trip, each validation rule, and the CLI case in [CliTests.cpp](../GraphicsHost.Tests/CliTests.cpp). A model-backed `[integration]` test only if behaviour needs a real model. |
-| 11 | **Docs** | ✔ | ✔ | ✔ | README feature list, `docs/` pages, and tick the item in [implementation-plan.md](../implementation-plan.md). |
+| 11 | **Docs** | ✔ | ✔ | ✔ | README feature list, `docs/` pages, and tick the item in [work-implementation-plan.md](../work-implementation-plan.md). |
 
 ## Changing how data is stored
 

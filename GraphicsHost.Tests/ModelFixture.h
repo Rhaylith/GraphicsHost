@@ -30,6 +30,16 @@ inline std::optional<std::filesystem::path> findTestModel(const char* name = "v1
         if (std::filesystem::exists(candidate)) {
             return candidate;
         }
+        // models downloaded by GraphicsHost itself sit in models/<publisher>/<repository>/<file>
+        std::error_code ec;
+        if (std::filesystem::is_directory(dir / "models", ec)) {
+            for (std::filesystem::recursive_directory_iterator it(dir / "models", std::filesystem::directory_options::skip_permission_denied, ec), end;
+                 !ec && it != end; it.increment(ec)) {
+                if (it->is_regular_file(ec) && it->path().filename() == name) {
+                    return it->path();
+                }
+            }
+        }
         if (dir == dir.parent_path()) {
             break;
         }

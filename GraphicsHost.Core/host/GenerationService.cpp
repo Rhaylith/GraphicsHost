@@ -135,20 +135,11 @@ GenerationService::Prepared GenerationService::prepare(const GenerateCall& call)
             else request.loras.push_back(tagged);
         }
         if (!request.loras.empty()) {
-            const auto available = host_.library().ofKind(models::Kind::Lora);
             for (auto& ref : request.loras) {
-                std::string lower = ref.name;
-                std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-                const models::ModelCard* match = nullptr;
-                std::vector<const models::ModelCard*> prefixed;
-                for (const auto& c : available) {
-                    auto low = [](std::string s) { std::transform(s.begin(), s.end(), s.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); }); return s; };
-                    if (low(c.file) == lower || low(c.name) == lower) { match = &c; break; }
-                    if (low(c.name).rfind(lower, 0) == 0) prefixed.push_back(&c);
-                }
-                if (!match && prefixed.size() == 1) match = prefixed.front();
-                if (!match && prefixed.size() > 1) throw EngineError(EngineErrorCode::InvalidRequest, "the LoRA name '" + ref.name + "' matches several files: use a longer name");
-                if (!match) throw EngineError(EngineErrorCode::NotFound, "no LoRA named '" + ref.name + "' in the models folder (see GET /api/v1/models)");
+                const auto found = host_.library().resolveLoose(models::Kind::Lora, ref.name);
+                if (found.status == models::ModelLibrary::Resolution::Status::Ambiguous) throw EngineError(EngineErrorCode::InvalidRequest, "the LoRA name '" + ref.name + "' matches several files: use a longer name");
+                if (found.status == models::ModelLibrary::Resolution::Status::NotFound) throw EngineError(EngineErrorCode::NotFound, "no LoRA named '" + ref.name + "' in the models folder (see GET /api/v1/models)");
+                const models::ModelCard* match = &*found.card;
                 if (!match->familyName.empty() && !card.familyName.empty() && match->familyName != card.familyName) {
                     throw EngineError(EngineErrorCode::InvalidRequest, "the LoRA " + match->file + " is for " + match->familyName + ", this model is " + card.familyName);
                 }
