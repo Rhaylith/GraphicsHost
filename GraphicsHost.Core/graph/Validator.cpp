@@ -151,30 +151,45 @@ private:
         return true;
     }
 
-    // Depth-first search over the links; every node on a cycle is reported once.
+    // Depth-first search over the links (with an explicit stack, so long chains are fine); every node on a cycle is
+    // reported once.
     void checkCycles() {
         enum State { Unseen, Open, Done };
+        struct Frame {
+            std::string id;
+            std::map<std::string, JobInput>::const_iterator next, end;
+        };
         std::map<std::string, State> state;
         std::set<std::string> reported;
-        std::vector<std::string> stack;
-        const std::function<void(const std::string&)> visit = [&](const std::string& id) {
+        std::vector<Frame> stack;
+        const auto enter = [&](const std::string& id) {
             state[id] = Open;
-            stack.push_back(id);
-            for (const auto& [name, input] : job_.nodes.at(id).inputs) {
-                const NodeRef* ref = std::get_if<NodeRef>(&input);
+            const JobNode& node = job_.nodes.at(id);
+            stack.push_back({id, node.inputs.begin(), node.inputs.end()});
+        };
+        for (const auto& [rootId, rootNode] : job_.nodes) {
+            if (state[rootId] != Unseen) continue;
+            enter(rootId);
+            while (!stack.empty()) {
+                Frame& frame = stack.back();
+                if (frame.next == frame.end) {
+                    state[frame.id] = Done;
+                    stack.pop_back();
+                    continue;
+                }
+                const NodeRef* ref = std::get_if<NodeRef>(&(frame.next++)->second);
                 if (!ref || !job_.nodes.count(ref->node)) continue;
                 if (state[ref->node] == Open) {
-                    for (auto it = std::find(stack.begin(), stack.end(), ref->node); it != stack.end(); ++it)
-                        if (reported.insert(*it).second) add(*it, "", "cycle", "Node " + *it + " is part of a loop: its result depends on itself.");
+                    bool inLoop = false;
+                    for (const Frame& f : stack) {
+                        inLoop = inLoop || f.id == ref->node;
+                        if (inLoop && reported.insert(f.id).second) add(f.id, "", "cycle", "Node " + f.id + " is part of a loop: its result depends on itself.");
+                    }
                 } else if (state[ref->node] == Unseen) {
-                    visit(ref->node);
+                    enter(ref->node);
                 }
             }
-            stack.pop_back();
-            state[id] = Done;
-        };
-        for (const auto& [id, node] : job_.nodes)
-            if (state[id] == Unseen) visit(id);
+        }
     }
 
     const JobGraph& job_;

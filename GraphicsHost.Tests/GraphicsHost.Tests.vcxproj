@@ -87,6 +87,7 @@
     <ClCompile Include="OutputCacheTests.cpp" />
     <ClCompile Include="ExecutorTests.cpp" />
     <ClCompile Include="UtilityNodeTests.cpp" />
+    <ClCompile Include="GraphServiceTests.cpp" />
     <ClCompile Include="ComponentTests.cpp" />
     <ClCompile Include="TlsAndLimitsTests.cpp" />
     <ClCompile Include="ApiContractTests.cpp" />

@@ -15,8 +15,8 @@ namespace {
 
 using Json = nlohmann::json;
 
-constexpr std::array<const char*, 13> kKnownKeys = {"schemaVersion", "backend", "gpuDevice", "threads", "modelsDir",
-                                                  "interfaceMode",  "server",  "logging",   "safety", "firstRunDone", "theme", "accent", "notifications"};
+constexpr std::array<const char*, 14> kKnownKeys = {"schemaVersion", "backend", "gpuDevice", "threads", "modelsDir",
+                                                  "interfaceMode",  "server",  "logging",   "safety", "firstRunDone", "theme", "accent", "notifications", "graph"};
 
 bool validAccent(const std::string& c) {
     return c.size() == 7 && c[0] == '#' && std::all_of(c.begin() + 1, c.end(), [](unsigned char ch) { return std::isxdigit(ch) != 0; });
@@ -45,6 +45,7 @@ Json toJson(const Settings& s) {
                       {"allowedAddresses", s.server.allowedAddresses}, {"rateLimitPerMinute", s.server.rateLimitPerMinute}};
     json["logging"] = {{"level", s.logging.level}};
     json["safety"] = {{"enabled", s.safety.enabled}};
+    json["graph"] = {{"cachePolicy", s.graph.cachePolicy}, {"cacheSize", s.graph.cacheSize}, {"historyMaxItems", s.graph.historyMaxItems}};
     return json;
 }
 
@@ -79,6 +80,11 @@ Settings settingsFromJson(const Json& json) {
     }
     if (const auto it = json.find("safety"); it != json.end() && it->is_object()) {
         s.safety.enabled = it->value("enabled", s.safety.enabled);
+    }
+    if (const auto it = json.find("graph"); it != json.end() && it->is_object()) {
+        s.graph.cachePolicy = it->value("cachePolicy", s.graph.cachePolicy);
+        s.graph.cacheSize = it->value("cacheSize", s.graph.cacheSize);
+        s.graph.historyMaxItems = it->value("historyMaxItems", s.graph.historyMaxItems);
     }
     for (const auto& [key, value] : json.items()) {
         const bool known = std::any_of(kKnownKeys.begin(), kKnownKeys.end(), [&](const char* k) { return key == k; });
@@ -120,6 +126,15 @@ std::vector<FieldError> validate(const Settings& s) {
     }
     if (s.server.port < 1 || s.server.port > 65535) {
         errors.push_back({"server.port", "must be between 1 and 65535"});
+    }
+    if (!oneOf(s.graph.cachePolicy, {"last", "lru", "ram", "none"})) {
+        errors.push_back({"graph.cachePolicy", "must be last, lru, ram or none"});
+    }
+    if (s.graph.cacheSize < 1 || s.graph.cacheSize > 1000) {
+        errors.push_back({"graph.cacheSize", "must be between 1 and 1000"});
+    }
+    if (s.graph.historyMaxItems < 0 || s.graph.historyMaxItems > 1000000) {
+        errors.push_back({"graph.historyMaxItems", "must be between 0 (unlimited) and 1000000"});
     }
     if (!oneOf(s.logging.level, {"trace", "debug", "info", "warn", "error"})) {
         errors.push_back({"logging.level", "must be trace, debug, info, warn or error"});

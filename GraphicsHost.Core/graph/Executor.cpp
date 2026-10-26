@@ -62,8 +62,12 @@ public:
             started.kind = Event::Kind::JobStarted;
             started.total = total_;
             emit(started);
+            for (const auto& id : plan.order) keyOf(id);   // dependencies first, so no recursion is deeper than one node
             // demand-driven: a root that is in the cache keeps everything behind it from being visited
-            for (const auto& root : plan.roots) result.outputs[root] = evaluate(root);
+            for (const auto& root : plan.roots) {
+                prepare(root);
+                result.outputs[root] = evaluate(root);
+            }
         } catch (const NodeFailure& f) {
             result.status = ExecResult::Status::Failed;
             result.errorNode = f.node;
@@ -121,6 +125,41 @@ private:
                 upstream[name] = {k, ref->output};
             }
         return keys_[id] = cacheable ? nodeCacheKey(node, registry_, upstream) : std::string();
+    }
+
+    // Evaluates the not-yet-computed ancestors of a node, dependencies first, with an explicit stack: a chain of thousands of
+    // nodes must not become thousands of nested calls. Lazy inputs are left for the node to ask for. A node whose result is
+    // in the cache is taken from it without visiting what is behind it.
+    void prepare(const std::string& root) {
+        struct Frame {
+            std::string id;
+            bool expanded = false;
+        };
+        std::vector<Frame> stack{{root, false}};
+        while (!stack.empty()) {
+            Frame frame = std::move(stack.back());
+            stack.pop_back();
+            if (results_.count(frame.id)) continue;
+            if (frame.expanded) {
+                evaluate(frame.id);
+                continue;
+            }
+            const std::string& key = keyOf(frame.id);
+            if (!key.empty() && cache_.find(key)) {   // a hit: evaluate() takes the stored result and reports it
+                evaluate(frame.id);
+                continue;
+            }
+            stack.push_back({frame.id, true});
+            const NodeDef& def = definition(frame.id);
+            const JobNode& node = nodes_.at(frame.id);
+            for (auto it = node.inputs.rbegin(); it != node.inputs.rend(); ++it) {   // reversed: the first input is evaluated first
+                const NodeRef* ref = std::get_if<NodeRef>(&it->second);
+                const InputDef* in = def.findInput(it->first);
+                if (!ref || (in && in->lazy)) continue;
+                if (!nodes_.count(ref->node)) throw NodeFailure(frame.id, "input '" + it->first + "' is linked to node " + ref->node + ", which does not exist");
+                if (!results_.count(ref->node)) stack.push_back({ref->node, false});
+            }
+        }
     }
 
     const NodeOutputs& evaluate(const std::string& id) {

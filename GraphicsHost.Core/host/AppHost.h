@@ -10,6 +10,7 @@
 #include "engine/SafetyFilter.h"
 #include "gallery/GalleryStore.h"
 #include "host/GenerationService.h"
+#include "host/GraphService.h"
 #include "host/HardwareMonitor.h"
 #include "models/Catalog.h"
 #include "models/DownloadManager.h"
@@ -80,6 +81,7 @@ public:
     models::DownloadManager& downloads();          // model downloads (a few at a time)
     models::ModelService& modelService();          // catalog + downloads + library: "get this model"
     GenerationService& generation();               // JIT load + queue + gallery for the API and the UIs
+    GraphService& graph();                         // node graphs: validate, queue, run, history (shares the generation queue)
     const models::Catalog& catalog();              // data/catalog.json next to the exe, overridden by <data folder>/catalog.json
 
 private:
@@ -105,6 +107,8 @@ private:
     std::unique_ptr<models::ModelService> modelService_;
     std::mutex generationMutex_;
     std::unique_ptr<GenerationService> generation_;
+    std::mutex graphMutex_;
+    std::unique_ptr<GraphService> graph_;
     HardwareMonitor monitor_;
 };
 

@@ -137,3 +137,15 @@ TEST_CASE("validator: missing models, custom checks, cycles and outputs", "[unit
     n.erase("3");
     CHECK(has(validate(job(n), registry()), "", "", "no_outputs"));
 }
+
+TEST_CASE("validator: very long chains are checked without exhausting the stack", "[unit][validator]") {
+    json nodes = {{"0", {{"type", "t.load"}, {"inputs", {{"name", "a.safetensors"}}}}}};
+    nodes["1"] = {{"type", "t.sample"}, {"inputs", {{"model", json::array({"0", 0})}, {"seed", 1}}}};
+    // a very long run of samplers feeding each other's optional latent input
+    for (int i = 2; i <= 5000; ++i)
+        nodes[std::to_string(i)] = {{"type", "t.sample"}, {"inputs", {{"model", json::array({"0", 0})}, {"seed", 1}, {"latent", json::array({std::to_string(i - 1), 0})}}}};
+    nodes["end"] = {{"type", "t.save"}, {"inputs", {{"latent", json::array({"5000", 0})}}}};
+    CHECK(validate(job(nodes), registry()).ok());
+    nodes["1"]["inputs"]["latent"] = json::array({"5000", 0});   // close the loop
+    CHECK(has(validate(job(nodes), registry()), "2500", "", "cycle"));
+}

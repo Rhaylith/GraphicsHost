@@ -34,29 +34,45 @@ Plan makePlan(const JobGraph& job, const Registry& registry) {
 
     enum Mark { Open = 1, Done = 2 };
     std::map<std::string, int> mark;
-    std::vector<std::string> path;
-    const std::function<void(const std::string&)> visit = [&](const std::string& id) {
+    // Depth-first with an explicit stack: a chain of thousands of nodes must not become thousands of nested calls.
+    struct Frame {
+        std::string id;
+        std::map<std::string, JobInput>::const_iterator next, end;
+    };
+    std::vector<Frame> path;
+    const auto enter = [&](const std::string& id) {
         mark[id] = Open;
-        path.push_back(id);
         const JobNode& node = job.nodes.at(id);
-        for (const auto& [name, input] : node.inputs) {   // std::map: inputs in name order, so the plan is deterministic
+        path.push_back({id, node.inputs.begin(), node.inputs.end()});   // std::map: inputs in name order, so the plan is deterministic
+    };
+    for (const auto& root : plan.roots) {
+        if (mark[root] != 0) continue;
+        enter(root);
+        while (!path.empty()) {
+            Frame& frame = path.back();
+            if (frame.next == frame.end) {
+                mark[frame.id] = Done;
+                plan.order.push_back(frame.id);
+                path.pop_back();
+                continue;
+            }
+            const auto& [name, input] = *frame.next++;
             const NodeRef* ref = std::get_if<NodeRef>(&input);
             if (!ref) continue;
-            if (!job.nodes.count(ref->node)) throw PlanError("node " + id + ", input '" + name + "' is linked to node " + ref->node + ", which does not exist");
+            if (!job.nodes.count(ref->node)) throw PlanError("node " + frame.id + ", input '" + name + "' is linked to node " + ref->node + ", which does not exist");
             const int state = mark[ref->node];
             if (state == Open) {
                 std::string loop;
-                for (auto it = std::find(path.begin(), path.end(), ref->node); it != path.end(); ++it) loop += *it + " -> ";
+                bool inLoop = false;
+                for (const Frame& f : path) {
+                    inLoop = inLoop || f.id == ref->node;
+                    if (inLoop) loop += f.id + " -> ";
+                }
                 throw PlanError("the graph has a loop: " + loop + ref->node);
             }
-            if (state == 0) visit(ref->node);
+            if (state == 0) enter(ref->node);
         }
-        path.pop_back();
-        mark[id] = Done;
-        plan.order.push_back(id);
-    };
-    for (const auto& root : plan.roots)
-        if (mark[root] == 0) visit(root);
+    }
 
     // eager = reachable from the roots over non-lazy links
     std::vector<std::string> work(plan.roots.begin(), plan.roots.end());

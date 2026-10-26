@@ -387,3 +387,16 @@ TEST_CASE("events: the bus delivers to every subscriber until they leave", "[uni
     CHECK(b == 2);
     CHECK(std::string(eventName(Event::Kind::NodePreview)) == "node.preview");
 }
+
+TEST_CASE("executor: very long chains of nodes do not exhaust the stack", "[unit][executor]") {
+    Rig rig;
+    json nodes = json::object();
+    nodes["0"] = n("t.const", {{"value", 1}});
+    const int length = 4000;
+    for (int i = 1; i <= length; ++i) nodes[std::to_string(i)] = n("t.add", {{"a", ref(std::to_string(i - 1).c_str())}, {"b", 1}});
+    nodes["out"] = n("t.out", {{"v", ref(std::to_string(length).c_str())}});
+    const auto r = rig.run(nodes);
+    REQUIRE(r.ok());
+    CHECK(r.outputs.at("out")[0].asInt() == length + 1);
+    CHECK(r.ran.size() == static_cast<size_t>(length) + 2);
+}

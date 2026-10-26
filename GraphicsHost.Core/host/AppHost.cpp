@@ -70,6 +70,10 @@ void AppHost::updateSettings(core::Settings settings) {
     library_.setFolders({modelsDir()});
     log::setLevel(settings_.logging.level);
     log::info("settings saved");
+    {
+        std::lock_guard<std::mutex> lock(graphMutex_);
+        if (graph_) graph_->applySettings(settings_.graph);
+    }
 
     // another runtime (backend setting) needs another engine: drop the loaded one; it is created again on next use
     const engine::RuntimeCandidate* after = selectedRuntime();
@@ -228,6 +232,18 @@ GenerationService& AppHost::generation() {
     std::lock_guard<std::mutex> lock(generationMutex_);
     if (!generation_) generation_ = std::make_unique<GenerationService>(*this);
     return *generation_;
+}
+
+}  // namespace gh::host
+
+namespace gh::host {
+
+GraphService& AppHost::graph() {
+    models();     // the graph service queues on the model manager's queue and writes to the gallery; create both first
+    gallery();
+    std::lock_guard<std::mutex> lock(graphMutex_);
+    if (!graph_) graph_ = std::make_unique<GraphService>(*this);
+    return *graph_;
 }
 
 }  // namespace gh::host
