@@ -73,6 +73,8 @@ public:
     presets::PresetStore& presets();      // <data folder>/presets
     presets::ModelDefaultsStore& modelDefaults();  // <data folder>/model-defaults.json
     models::ModelLibrary& library();               // the checkpoints, VAEs and LoRAs in modelsDir()
+    // Reads model-paths.json again (extra model folders per kind); done at start and by the Settings tab.
+    void reloadModelPaths();
     server::TokenStore& tokens();                  // API access tokens (<data folder>/tokens.json)
     HardwareMonitor& monitor();                    // CPU, RAM, GPU load and video memory readings
     // Whether the safety filter applies to this request (settings.safety.enabled or the request asks for it) and, if so,

@@ -2,6 +2,9 @@
 
 #include "engine/FitEstimator.h"
 
+#include <algorithm>
+#include <cctype>
+
 namespace gh::models {
 
 namespace fs = std::filesystem;
@@ -37,8 +40,54 @@ const char* toString(Kind kind) {
         case Kind::Lora: return "lora";
         case Kind::Embedding: return "embedding";
         case Kind::Other: return "other";
+        case Kind::DiffusionModel: return "diffusion_model";
+        case Kind::TextEncoder: return "text_encoder";
+        case Kind::ControlNet: return "controlnet";
+        case Kind::ClipVision: return "clip_vision";
+        case Kind::StyleModel: return "style_model";
+        case Kind::UpscaleModel: return "upscale_model";
+        case Kind::Hypernetwork: return "hypernetwork";
+        case Kind::Gligen: return "gligen";
+        case Kind::PhotoMaker: return "photomaker";
+        case Kind::PreviewDecoder: return "preview_decoder";
     }
     return "other";
+}
+
+const char* folderName(Kind kind) {
+    switch (kind) {
+        case Kind::Checkpoint: return "checkpoints";
+        case Kind::DiffusionModel: return "diffusion_models";
+        case Kind::TextEncoder: return "text_encoders";
+        case Kind::Vae: return "vae";
+        case Kind::Lora: return "loras";
+        case Kind::ControlNet: return "controlnet";
+        case Kind::ClipVision: return "clip_vision";
+        case Kind::StyleModel: return "style_models";
+        case Kind::UpscaleModel: return "upscale_models";
+        case Kind::Embedding: return "embeddings";
+        case Kind::Hypernetwork: return "hypernetworks";
+        case Kind::Gligen: return "gligen";
+        case Kind::PhotoMaker: return "photomaker";
+        case Kind::PreviewDecoder: return "vae_approx";
+        case Kind::Other: return "";
+    }
+    return "";
+}
+
+const std::vector<Kind>& libraryKinds() {
+    static const std::vector<Kind> kinds = {Kind::Checkpoint, Kind::DiffusionModel, Kind::TextEncoder, Kind::Vae,        Kind::Lora,
+                                            Kind::ControlNet, Kind::ClipVision,     Kind::StyleModel,  Kind::UpscaleModel, Kind::Embedding,
+                                            Kind::Hypernetwork, Kind::Gligen,       Kind::PhotoMaker,  Kind::PreviewDecoder};
+    return kinds;
+}
+
+std::optional<Kind> kindFromFolder(const std::string& name) {
+    std::string lowered = name;
+    std::transform(lowered.begin(), lowered.end(), lowered.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    for (const Kind kind : libraryKinds())
+        if (lowered == folderName(kind) || lowered == toString(kind)) return kind;
+    return std::nullopt;
 }
 
 FamilyInfo detectFamily(const CheckpointHeader& h) {
@@ -58,17 +107,47 @@ FamilyInfo detectFamily(const CheckpointHeader& h) {
         info.supported = true;
         return info;
     }
-    // newer families, detected so they can be reported as not supported
+    const bool hasUnet = h.hasSubstring("diffusion_model.input_blocks.") || h.hasSubstring("diffusion_model.output_blocks.") ||
+                         h.hasSubstring("down_blocks.");
+    const auto other = [&](Kind kind, const char* note = "") {
+        FamilyInfo i;
+        i.kind = kind;
+        i.supported = true;
+        i.note = note;
+        return i;
+    };
+    // guides and adapters (a ControlNet has UNet-like blocks, so these come before the UNet rules)
+    if (h.hasSubstring("control_model.") || h.hasSubstring("zero_convs.") || h.hasSubstring("input_hint_block") ||
+        h.hasSubstring("controlnet_cond_embedding") || h.hasSubstring("controlnet_down_blocks") || h.hasPrefix("adapter.")) {
+        return other(Kind::ControlNet);
+    }
+    if (h.hasSubstring("position_net") && h.hasSubstring("fuser")) return other(Kind::Gligen);
+    if (h.hasSubstring("id_encoder.")) return other(Kind::PhotoMaker);
+    if (h.find("redux_down.weight") || h.hasPrefix("redux_")) return other(Kind::StyleModel);
+    // tiny preview decoders (TAESD and friends) look like a VAE with "layers" instead of named blocks
+    if (h.hasPrefix("decoder.layers.") || h.hasPrefix("encoder.layers.")) return other(Kind::PreviewDecoder);
+    // image encoders and text encoders without a UNet or VAE
+    if (!hasUnet && !h.hasSubstring("double_blocks.") && !h.hasSubstring("joint_blocks.") && !h.hasPrefix("first_stage_model.") && !h.hasPrefix("vae.")) {
+        if (h.hasSubstring("vision_model.encoder.layers") && !h.hasSubstring("text_model.")) return other(Kind::ClipVision);
+        if (h.hasPrefix("visual.transformer.resblocks")) return other(Kind::ClipVision);
+        if (h.hasPrefix("text_model.") || h.hasPrefix("encoder.block.") || h.hasPrefix("transformer.text_model.") ||
+            (h.hasPrefix("transformer.resblocks.") && h.find("text_projection")) || h.hasPrefix("model.embed_tokens.") ||
+            (h.hasPrefix("text_model.") && h.find("text_projection"))) {
+            return other(Kind::TextEncoder);
+        }
+        // super-resolution networks (ESRGAN family)
+        if (h.hasSubstring("RRDB") || h.hasSubstring(".RDB1.") || (h.find("conv_first.weight") && h.hasPrefix("body."))) return other(Kind::UpscaleModel);
+    }
+    // newer families, detected so they can be reported as not supported; without text encoder and VAE they are diffusion models
+    const bool allInOne = h.hasPrefix("text_encoders.") || h.hasPrefix("vae.") || h.hasPrefix("first_stage_model.") || h.hasPrefix("conditioner.");
     if (h.hasSubstring("double_blocks.") && h.hasSubstring("single_blocks.")) {
-        info = {Kind::Checkpoint, Family::Flux, false, false, "FLUX models are not supported in this version (SD 1.x and SDXL only)"};
+        info = {allInOne ? Kind::Checkpoint : Kind::DiffusionModel, Family::Flux, false, false, "FLUX models are not supported in this version (SD 1.x and SDXL only)"};
         return info;
     }
     if (h.hasSubstring("joint_blocks.")) {
-        info = {Kind::Checkpoint, Family::Sd3, false, false, "SD3 models are not supported in this version (SD 1.x and SDXL only)"};
+        info = {allInOne ? Kind::Checkpoint : Kind::DiffusionModel, Family::Sd3, false, false, "SD3 models are not supported in this version (SD 1.x and SDXL only)"};
         return info;
     }
-    const bool hasUnet = h.hasSubstring("diffusion_model.input_blocks.") || h.hasSubstring("diffusion_model.output_blocks.") ||
-                         h.hasSubstring("down_blocks.");
     if (hasUnet) {
         info.kind = Kind::Checkpoint;
         info.inpainting = shapeIs(h, "model.diffusion_model.input_blocks.0.0.weight", 1, 9);
@@ -119,7 +198,7 @@ uint64_t estimateWeightsBytes(const CheckpointHeader& h) {
     return static_cast<uint64_t>(total);
 }
 
-ModelCard describeFile(const fs::path& file) {
+ModelCard describeFile(const fs::path& file, std::optional<Kind> forced) {
     ModelCard card;
     card.path = file;
     card.file = file.filename().string();
@@ -137,6 +216,20 @@ ModelCard describeFile(const fs::path& file) {
         card.inpainting = info.inpainting;
         card.note = info.note;
         card.weightsBytes = estimateWeightsBytes(*header);
+        if (forced && *forced != info.kind) {   // where the file lives decides
+            card.kind = *forced;
+            card.kindSource = "folder";
+            if (*forced != Kind::Checkpoint) card.supported = true, card.note.clear();
+        }
+    } else if (forced) {
+        // a .pth/.pt/.bin/.ckpt file in a kind folder: nothing to read, the folder says what it is
+        card.problem = error;
+        card.kind = *forced;
+        card.kindSource = "folder";
+        card.supported = true;
+        card.family = *forced == Kind::Checkpoint ? (card.sizeBytes > 5500ull * 1024 * 1024 ? Family::SdXl : Family::Sd1) : Family::Unknown;
+        card.weightsBytes = card.sizeBytes;
+        if (*forced == Kind::Checkpoint) card.weightsBytes = engine::estimateWeightsBytes(card.sizeBytes, toString(card.family));
     } else {
         // .ckpt and unreadable files: assume a checkpoint and guess the family from the size
         card.problem = error;
@@ -165,6 +258,10 @@ Json toJson(const ModelCard& c) {
             {"headerRead", c.headerRead},
             {"vae", c.vae},
             {"source", c.source},
+            {"relative", c.relative},
+            {"kindSource", c.kindSource},
+            {"preview", c.preview.empty() ? std::string() : c.preview.string()},
+            {"sha256", c.sha256},
             {"companions", c.companions},
             {"defaults", {{"width", c.defaults.width}, {"height", c.defaults.height}, {"steps", c.defaults.steps}, {"cfgScale", c.defaults.cfgScale}}}};
 }

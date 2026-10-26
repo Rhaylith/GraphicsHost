@@ -18,8 +18,10 @@ AppHost::AppHost(std::optional<std::filesystem::path> home)
     settingsWarning_ = std::move(loaded.warning);
 
     library_.setFolders({modelsDir()});
+    library_.setHashCache(paths_.root() / "model-hashes.json");
     log::init(paths_.logsDir(), settings_.logging.level);
     log::info("GraphicsHost starting, data folder " + paths_.root().string());
+    reloadModelPaths();
     if (loaded.migrated) {
         log::info("settings were upgraded to schema version " + std::to_string(core::kSettingsSchemaVersion));
     }
@@ -60,6 +62,12 @@ AppHost::~AppHost() {
 
 const engine::RuntimeCandidate* AppHost::selectedRuntime() const {
     return engine::chooseRuntime(runtimes_, settings_.backend);
+}
+
+void AppHost::reloadModelPaths() {
+    std::vector<std::string> warnings;
+    library_.setExtraRoots(models::loadModelPaths(paths_.root() / "model-paths.json", &warnings));
+    for (const auto& w : warnings) log::warn(w);
 }
 
 void AppHost::updateSettings(core::Settings settings) {

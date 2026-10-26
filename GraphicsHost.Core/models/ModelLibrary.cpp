@@ -1,6 +1,7 @@
 #include "models/ModelLibrary.h"
 
 #include "core/AtomicFile.h"
+#include "core/Sha256.h"
 
 #include <windows.h>
 
@@ -13,9 +14,37 @@ using Json = nlohmann::json;
 
 namespace {
 
-bool isModelFile(const fs::path& p) {
-    const std::string ext = p.extension().string();
-    return ext == ".safetensors" || ext == ".sft" || ext == ".gguf" || ext == ".ckpt";
+std::string lowerExt(const fs::path& p) {
+    std::string e = p.extension().string();
+    std::transform(e.begin(), e.end(), e.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return e;
+}
+
+bool isModelFile(const fs::path& p, bool kindKnown) {
+    const std::string ext = lowerExt(p);
+    if (ext == ".safetensors" || ext == ".sft" || ext == ".gguf" || ext == ".ckpt") return true;
+    // pickled files cannot be inspected, so they only count where a folder says what they are
+    return kindKnown && (ext == ".pth" || ext == ".pt" || ext == ".bin");
+}
+
+// The kind a kind folder in the path (loras/, vae/, text_encoder/ ...) asks for; the outermost one wins.
+std::optional<Kind> kindFromRelative(const fs::path& relative) {
+    for (const auto& part : relative.parent_path())
+        if (const auto kind = kindFromFolder(part.string())) return kind;
+    return std::nullopt;
+}
+
+fs::path previewFor(const fs::path& file) {
+    for (const char* ext : {".png", ".jpg", ".jpeg", ".webp"}) {
+        fs::path stemmed = file;
+        stemmed.replace_extension(std::string(".preview") + ext);
+        std::error_code ec;
+        if (fs::exists(stemmed, ec)) return stemmed;
+        fs::path full = file;
+        full += std::string(".preview") + ext;
+        if (fs::exists(full, ec)) return full;
+    }
+    return {};
 }
 
 std::string lower(std::string s) {
@@ -49,37 +78,70 @@ std::vector<fs::path> ModelLibrary::folders() const {
 
 std::vector<ModelCard> ModelLibrary::scan() {
     std::lock_guard<std::mutex> lock(mutex_);
-    std::vector<fs::path> files;
-    for (const auto& folder : folders_) {
+
+    // every folder to look in: the plain ones (the kind comes from the header, or from a kind subfolder) and the extra
+    // ones from model-paths.json (everything below is of that kind)
+    struct Source {
+        fs::path root;
+        std::optional<Kind> forced;
+        bool fromRoot = false;
+    };
+    std::vector<Source> sources;
+    for (const auto& folder : folders_) sources.push_back({folder, std::nullopt, false});
+    for (const auto& [kind, list] : extraRoots_)
+        for (const auto& folder : list) sources.push_back({folder, kind, true});
+
+    struct Found {
+        fs::path root;
+        std::string relative;
+        std::optional<Kind> forced;
+        bool fromRoot = false;
+    };
+    std::map<fs::path, Found> found;
+    for (const auto& source : sources) {
         std::error_code ec;
-        for (fs::recursive_directory_iterator it(folder, fs::directory_options::skip_permission_denied, ec), end; !ec && it != end; it.increment(ec)) {
-            if (it->is_regular_file(ec) && isModelFile(it->path())) {
-                files.push_back(it->path());
-            }
+        for (fs::recursive_directory_iterator it(source.root, fs::directory_options::skip_permission_denied, ec), end; !ec && it != end; it.increment(ec)) {
+            if (!it->is_regular_file(ec)) continue;
+            const fs::path& file = it->path();
+            const fs::path relative = file.lexically_relative(source.root);
+            const std::optional<Kind> forced = source.forced ? source.forced : kindFromRelative(relative);
+            if (!isModelFile(file, forced.has_value())) continue;
+            const auto existing = found.find(file);
+            if (existing != found.end() && (existing->second.fromRoot || !source.fromRoot)) continue;   // an extra root's say wins
+            found[file] = Found{source.root, relative.generic_string(), forced, source.fromRoot};
         }
     }
-    std::sort(files.begin(), files.end());
-    files.erase(std::unique(files.begin(), files.end()), files.end());
 
     std::vector<ModelCard> cards;
     std::map<fs::path, CacheEntry> fresh;
-    for (const auto& file : files) {
+    for (const auto& [file, where] : found) {
         std::error_code ec;
         const uint64_t size = fs::file_size(file, ec);
         const auto time = fs::last_write_time(file, ec);
         ModelCard card;
-        if (const auto hit = cache_.find(file); hit != cache_.end() && hit->second.size == size && hit->second.time == time) {
+        if (const auto hit = cache_.find(file); hit != cache_.end() && hit->second.size == size && hit->second.time == time && hit->second.forced == where.forced) {
             card = hit->second.card;
         } else {
-            card = describeFile(file);
+            card = describeFile(file, where.forced);
         }
+        card.root = where.root;
+        card.relative = where.relative;
+        card.kindSource = !where.forced ? "header" : where.fromRoot ? "root" : "folder";
+        card.preview = previewFor(file);
         // the sidecar may change without the model changing: always read it
         card.source = nullptr;
+        card.sha256.clear();
         if (const auto text = core::readFile(sourceSidecarFor(file))) {
             const Json doc = Json::parse(*text, nullptr, false);
-            if (doc.is_object()) card.source = doc;
+            if (doc.is_object()) {
+                card.source = doc;
+                if (doc.contains("sha256") && doc["sha256"].is_string()) card.sha256 = doc["sha256"].get<std::string>();
+            }
         }
-        fresh[file] = CacheEntry{size, time, card};
+        if (card.sha256.empty()) {
+            if (const auto known = hashes_.find(file); known != hashes_.end() && known->second.size == size && known->second.time == time) card.sha256 = known->second.sha256;
+        }
+        fresh[file] = CacheEntry{size, time, where.forced, card};
         cards.push_back(std::move(card));
     }
     cache_ = std::move(fresh);
@@ -145,7 +207,7 @@ ModelLibrary::Resolution ModelLibrary::resolve(const std::string& arg) {
     const auto checkpoints = ofKind(Kind::Checkpoint);
     std::vector<const ModelCard*> prefix;
     for (const auto& c : checkpoints) {
-        if (c.file == arg || c.name == arg) {
+        if (c.file == arg || c.name == arg || c.relative == arg) {
             r.status = Resolution::Status::Found;
             r.card = c;
             return r;
@@ -163,6 +225,80 @@ ModelLibrary::Resolution ModelLibrary::resolve(const std::string& arg) {
         r.problem = "'" + arg + "' matches " + std::to_string(prefix.size()) + " models; be more specific";
     }
     return r;
+}
+
+void ModelLibrary::setExtraRoots(ExtraRoots roots) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    extraRoots_ = std::move(roots);
+}
+
+ExtraRoots ModelLibrary::extraRoots() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return extraRoots_;
+}
+
+std::vector<std::string> ModelLibrary::names(Kind kind) {
+    std::vector<std::string> out;
+    for (const auto& card : ofKind(kind)) out.push_back(card.relative);
+    std::sort(out.begin(), out.end());
+    return out;
+}
+
+std::optional<ModelCard> ModelLibrary::find(Kind kind, const std::string& name) {
+    const auto cards = ofKind(kind);
+    for (const auto& c : cards)
+        if (c.relative == name) return c;
+    // a file name or a name without extension, when that is unambiguous; then a unique prefix of the file name
+    for (const int match : {0, 1, 2}) {
+        std::vector<const ModelCard*> hits;
+        for (const auto& c : cards) {
+            const bool ok = match == 0 ? c.file == name : match == 1 ? c.name == name : c.file.rfind(name, 0) == 0;
+            if (ok) hits.push_back(&c);
+        }
+        if (hits.size() == 1) return *hits[0];
+        if (hits.size() > 1) return std::nullopt;
+    }
+    return std::nullopt;
+}
+
+void ModelLibrary::setHashCache(fs::path file) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    hashFile_ = std::move(file);
+    hashes_.clear();
+    const auto text = core::readFile(hashFile_);
+    if (!text) return;
+    const Json doc = Json::parse(*text, nullptr, false);
+    if (!doc.is_object()) return;
+    for (const auto& [path, entry] : doc.items()) {
+        if (!entry.is_object() || !entry.contains("sha256")) continue;
+        HashEntry h;
+        h.size = entry.value("size", uint64_t{0});
+        h.time = fs::file_time_type(fs::file_time_type::duration(entry.value("time", int64_t{0})));
+        h.sha256 = entry.value("sha256", std::string());
+        hashes_[fs::path(path)] = h;
+    }
+}
+
+std::string ModelLibrary::sha256(const ModelCard& card) {
+    if (!card.sha256.empty()) return card.sha256;
+    std::error_code ec;
+    const uint64_t size = fs::file_size(card.path, ec);
+    const auto time = fs::last_write_time(card.path, ec);
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (const auto known = hashes_.find(card.path); known != hashes_.end() && known->second.size == size && known->second.time == time) return known->second.sha256;
+    }
+    const auto hash = core::sha256File(card.path);   // reads the whole file: not under the lock
+    if (!hash) return {};
+    std::lock_guard<std::mutex> lock(mutex_);
+    hashes_[card.path] = HashEntry{size, time, *hash};
+    if (!hashFile_.empty()) {
+        Json doc = Json::object();
+        for (const auto& [path, h] : hashes_)
+            doc[path.generic_string()] = {{"size", h.size}, {"time", static_cast<int64_t>(h.time.time_since_epoch().count())}, {"sha256", h.sha256}};
+        core::writeFileAtomic(hashFile_, doc.dump(1));
+    }
+    return *hash;
 }
 
 void ModelLibrary::startWatching(std::function<void()> onChange) {
@@ -186,7 +322,9 @@ void ModelLibrary::stopWatching() {
 
 void ModelLibrary::watchLoop(std::function<void()> onChange) {
     std::vector<HANDLE> handles;
-    for (const auto& folder : folders()) {
+    std::vector<fs::path> watched = folders();
+    for (const auto& [kind, list] : extraRoots()) watched.insert(watched.end(), list.begin(), list.end());
+    for (const auto& folder : watched) {
         std::error_code ec;
         if (!fs::is_directory(folder, ec)) continue;
         HANDLE h = FindFirstChangeNotificationW(folder.c_str(), TRUE,
