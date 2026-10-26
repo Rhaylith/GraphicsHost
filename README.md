@@ -1,3 +1,5 @@
+## NOTE: This is a playground where I'm using AI to create a project. It is currently 100% written by AI, and that is by design to see how far I can push the models until I have to make personal changes to get what I really want.
+
 # GraphicsHost
 
 A local host for AI image-generation models (Stable Diffusion 1.x and SDXL in v1): discovers and downloads models,
