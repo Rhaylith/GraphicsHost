@@ -76,6 +76,39 @@ models::MemoryManager::Config memoryConfig(const core::MemorySettings& s) {
 }
 }  // namespace
 
+AppHost::FreeMemoryReport AppHost::freeMemory(FreeMemoryRequest request) {
+    FreeMemoryReport report;
+    if (request.unloadModels) {
+        models::ComponentCache& cache = components();
+        uint64_t bytes = 0;
+        size_t idle = 0;
+        for (const auto& c : cache.stats()) {
+            if (c.external) continue;
+            if (c.users == 0) {
+                bytes += c.bytes;
+                ++idle;
+            } else {
+                report.kept.push_back(c.key.file + " is in use by a running node");
+            }
+        }
+        report.componentsClosed = cache.closeAll();
+        report.componentBytes = report.componentsClosed == idle ? bytes : 0;
+        engine::ModelManager& manager = models();
+        if (manager.queue().active() > 0) {
+            if (manager.loaded()) report.kept.push_back("the model of the Generate path stays loaded while a generation is queued or running");
+        } else if (manager.loaded()) {
+            manager.unload();
+            report.generateModelUnloaded = true;
+        }
+    }
+    if (request.freeCaches) {
+        const GraphService::Freed freed = graph().freeCaches();
+        report.resultsDropped = freed.results;
+        report.resultBytes = freed.bytes;
+    }
+    return report;
+}
+
 void AppHost::reloadModelPaths() {
     std::vector<std::string> warnings;
     library_.setExtraRoots(models::loadModelPaths(paths_.root() / "model-paths.json", &warnings));

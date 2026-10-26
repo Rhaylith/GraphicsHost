@@ -642,7 +642,8 @@ Vulkan. A software Vulkan driver runs the fixture tests in CI (W0.7).
   - `models/WeightPatcher` + `AdapterFile` + `KeyResolver` + `SafetensorsReader`: LoRA, LoCon (plain and Tucker), LoHa, LoKr, DoRA and full/bias differences, with kohya, diffusers and PEFT key names for the UNet, the CLIP text encoders and the packed OpenCLIP attention of SDXL's second encoder; `ensure()` applies lazily and `undo()` restores the originals. The maths is checked against independent loops in `WeightPatcherTests.cpp`, and the layer names of the real SD 1.5 checkpoint are all found (`[model]`). Applying to the weights of a running runtime component (a `WeightTarget` over the W0 component calls) arrives with W4, together with the per-generation parity check against `gh_generate` with the same LoRA.
 - [x] W3.5 Precision options and fp8 storage (M)
   - `models/Precision`: fp32/fp16/bf16 and fp8 (e4m3, e5m2) conversions with round-to-nearest-even and saturation, `pack`/`unpack` per layer, `weightsBytesAt` for memory estimates; settings `precision.diffusion`, `precision.textEncoder`, `precision.vae`, `precision.vaeFallbackFp32`; the loader nodes put the resolved dtype in the handles (a node's value wins, "default" follows the setting). Running a component in fp8 with the runtime (and the VAE retry in fp32) arrives with the sampling nodes in W4.
-- [ ] W3.6 "Free memory" / "unload models" actions (S)
+- [x] W3.6 "Free memory" / "unload models" actions (S)
+  - `AppHost::freeMemory({unloadModels, freeCaches})` closes the opened components nothing uses, unloads the Generate model while no generation is queued, and drops cached node results, reporting what it kept; `POST /api/v1/graph/free`, the older `POST models/unload` and the Models tab Unload button use it.
 
 ### W4 — Text and sampling (XL)
 - [ ] W4.1 CLIP BPE tokeniser, prompt parser (weights, embeddings, choices, comments, BREAK) (M)

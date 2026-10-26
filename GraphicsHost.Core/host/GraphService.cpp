@@ -195,8 +195,10 @@ std::vector<std::string> GraphService::embeddingNames() const {
     return services_ ? services_->embeddingNames() : std::vector<std::string>{};
 }
 
-void GraphService::freeCaches() {
+GraphService::Freed GraphService::freeCaches() {
+    Freed freed{cache_.size(), cache_.bytes()};
     cache_.clear();
+    return freed;
 }
 
 std::vector<gallery::HistoryEntry> GraphService::history(int limit, int offset) const {

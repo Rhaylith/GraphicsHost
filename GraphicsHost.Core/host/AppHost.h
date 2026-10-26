@@ -77,6 +77,23 @@ public:
     presets::PresetStore& presets();      // <data folder>/presets
     presets::ModelDefaultsStore& modelDefaults();  // <data folder>/model-defaults.json
     models::ModelLibrary& library();               // the checkpoints, VAEs and LoRAs in modelsDir()
+    // The "free memory" and "unload models" actions: close the opened components that nothing is using, unload the model of the
+    // Generate path (only while no generation is queued or running), and drop the cached node results. Anything in use is left
+    // alone and reported in `kept`.
+    struct FreeMemoryRequest {
+        bool unloadModels = true;
+        bool freeCaches = true;
+    };
+    struct FreeMemoryReport {
+        size_t componentsClosed = 0;
+        uint64_t componentBytes = 0;     // the weights of the components that were closed
+        bool generateModelUnloaded = false;
+        size_t resultsDropped = 0;
+        uint64_t resultBytes = 0;
+        std::vector<std::string> kept;   // what could not be released and why
+    };
+    FreeMemoryReport freeMemory(FreeMemoryRequest request = {});
+
     // Reads model-paths.json again (extra model folders per kind); done at start and by the Settings tab.
     void reloadModelPaths();
     server::TokenStore& tokens();                  // API access tokens (<data folder>/tokens.json)

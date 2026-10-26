@@ -84,8 +84,12 @@ public:
     std::vector<std::string> modelNames(const std::string& kind) const;
     std::vector<std::string> embeddingNames() const;
 
-    // Drops every cached node result (the "free memory" action).
-    void freeCaches();
+    // Drops every cached node result (part of the "free memory" action). Returns how many results and how many bytes.
+    struct Freed {
+        size_t results = 0;
+        uint64_t bytes = 0;
+    };
+    Freed freeCaches();
 
     // History of finished graph jobs.
     std::vector<gallery::HistoryEntry> history(int limit = 50, int offset = 0) const;

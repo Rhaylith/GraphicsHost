@@ -108,6 +108,7 @@ Settings (`server.*`, in Settings or `PUT /api/v1/settings`; the server picks th
 | `GET logs?limit=&level=` | read | newest last |
 | `GET requests?limit=`, `GET /metrics` | admin, read | request log (no query strings kept); Prometheus text |
 | `GET models`, `POST models/load`, `POST models/unload` | read, manage | the folder with cards; load takes `{model, load, preset}` |
+| `POST graph/free` | manage | "free memory": `{unloadModels, freeCaches}` (both default true) closes the opened components nothing uses, unloads the Generate model while no generation is queued, and drops cached node results; answers with what was released and what was kept |
 | `POST models/get` | manage | `{target: <catalog key or publisher/repo>, file?, companions?, dryRun?}` |
 | `GET catalog?text=&family=&kind=`, `GET hub/search?q=`, `GET hub/files?repo=` | read | discovery, with a fit hint for this computer |
 | `GET downloads`, `POST downloads/{id}/pause\|resume\|cancel`, `GET updates` | read, manage | |

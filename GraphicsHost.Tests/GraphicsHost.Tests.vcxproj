@@ -93,6 +93,7 @@
     <ClCompile Include="MemoryTests.cpp" />
     <ClCompile Include="WeightPatcherTests.cpp" />
     <ClCompile Include="PrecisionTests.cpp" />
+    <ClCompile Include="FreeMemoryTests.cpp" />
     <ClCompile Include="ComponentTests.cpp" />
     <ClCompile Include="TlsAndLimitsTests.cpp" />
     <ClCompile Include="ApiContractTests.cpp" />
