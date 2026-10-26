@@ -13,8 +13,10 @@
 #include "host/GraphService.h"
 #include "host/HardwareMonitor.h"
 #include "models/Catalog.h"
+#include "models/ComponentCache.h"
 #include "models/DownloadManager.h"
 #include "models/ModelLibrary.h"
+#include "models/MemoryManager.h"
 #include "models/ModelService.h"
 #include "presets/PresetStore.h"
 #include "server/TokenStore.h"
@@ -67,6 +69,8 @@ public:
 
     // Services; created on first use except the stores, which are cheap.
     engine::ModelManager& models();      // one loaded model, the job queue
+    models::MemoryManager& memory();     // decides what leaves video memory (settings memory.*)
+    models::ComponentCache& components(); // the opened parts of models, shared by graph nodes and counted for the Generate path
     // Replaces the inference engine (tests plug in a fake one). Call before models() is first used.
     void overrideEngine(std::shared_ptr<engine::IImageEngine> engine);
     gallery::GalleryStore& gallery();     // <data folder>/outputs
@@ -103,6 +107,8 @@ private:
     presets::ModelDefaultsStore modelDefaults_;
     models::ModelLibrary library_;
     server::TokenStore tokens_;
+    std::unique_ptr<models::MemoryManager> memory_;
+    std::unique_ptr<models::ComponentCache> components_;
     std::unique_ptr<engine::ModelManager> models_;
     std::unique_ptr<models::DownloadManager> downloads_;
     std::unique_ptr<models::Catalog> catalog_;

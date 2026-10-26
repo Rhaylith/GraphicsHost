@@ -1,5 +1,7 @@
 #include "host/AppHost.h"
 
+#include "engine/FitEstimator.h"
+
 #include "core/Log.h"
 
 #include <utility>
@@ -64,6 +66,16 @@ const engine::RuntimeCandidate* AppHost::selectedRuntime() const {
     return engine::chooseRuntime(runtimes_, settings_.backend);
 }
 
+namespace {
+models::MemoryManager::Config memoryConfig(const core::MemorySettings& s) {
+    models::MemoryManager::Config c;
+    c.mode = models::parseMemoryMode(s.mode).value_or(models::MemoryMode::Normal);
+    c.reserveVramBytes = static_cast<uint64_t>(std::max(s.reserveVramMb, 0)) << 20;
+    c.asyncOffload = s.asyncOffload;
+    return c;
+}
+}  // namespace
+
 void AppHost::reloadModelPaths() {
     std::vector<std::string> warnings;
     library_.setExtraRoots(models::loadModelPaths(paths_.root() / "model-paths.json", &warnings));
@@ -81,6 +93,10 @@ void AppHost::updateSettings(core::Settings settings) {
     {
         std::lock_guard<std::mutex> lock(graphMutex_);
         if (graph_) graph_->applySettings(settings_.graph);
+    }
+    {
+        std::lock_guard<std::mutex> lock(serviceMutex_);
+        if (memory_) memory_->setConfig(memoryConfig(settings_.memory));
     }
 
     // another runtime (backend setting) needs another engine: drop the loaded one; it is created again on next use
@@ -142,10 +158,37 @@ std::shared_ptr<engine::IImageEngine> AppHost::engine(std::string* error) {
     return engine_;
 }
 
+models::MemoryManager& AppHost::memory() {
+    std::lock_guard<std::mutex> lock(serviceMutex_);
+    if (!memory_) {
+        // the device the models run on: its size, and what the system says is in use (the Generate path's model included)
+        memory_ = std::make_unique<models::MemoryManager>(memoryConfig(settings_.memory), [this] {
+            models::MemoryBudget b;
+            const int index = settings_.gpuDevice;
+            for (const auto& d : gpu_.devices)
+                if (d.index == index) b.vramTotal = d.vramBytes;
+            const auto used = monitor_.sample().vramUsedBytes;
+            b.vramFree = used && *used < b.vramTotal ? b.vramTotal - *used : b.vramTotal;
+            b.ramFree = engine::systemMemory().freeBytes;
+            return b;
+        });
+    }
+    return *memory_;
+}
+
+models::ComponentCache& AppHost::components() {
+    memory();   // takes serviceMutex_ itself
+    std::lock_guard<std::mutex> lock(serviceMutex_);
+    if (!components_) components_ = std::make_unique<models::ComponentCache>(*memory_);
+    return *components_;
+}
+
 engine::ModelManager& AppHost::models() {
+    models::ComponentCache& cache = components();   // takes serviceMutex_ itself
     std::lock_guard<std::mutex> lock(serviceMutex_);
     if (!models_) {
         models_ = std::make_unique<engine::ModelManager>([this] { return engine(); });
+        models_->setComponentCache(&cache);
     }
     return *models_;
 }

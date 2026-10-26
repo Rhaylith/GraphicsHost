@@ -11,6 +11,10 @@
 #include <optional>
 #include <thread>
 
+namespace gh::models {
+class ComponentCache;
+}
+
 namespace gh::engine {
 
 struct LoadedModelInfo {
@@ -37,6 +41,10 @@ public:
     ModelManager(const ModelManager&) = delete;
     ModelManager& operator=(const ModelManager&) = delete;
 
+    // The cache of opened components: the loaded model is registered there so the memory plan counts it, and a file the cache
+    // holds is closed there before this manager opens it, so a file is never held twice. Call before the first load.
+    void setComponentCache(models::ComponentCache* cache) { components_ = cache; }
+
     // Loads the model, or returns the loaded one when the options are identical. A different model replaces the
     // loaded one, but only while no job is queued or running (EngineError(Failed) otherwise).
     std::shared_ptr<ILoadedModel> load(const LoadOptions& options);
@@ -58,6 +66,7 @@ private:
     std::chrono::steady_clock::time_point now() const;
 
     EngineProvider engine_;
+    models::ComponentCache* components_ = nullptr;
     Clock clock_;
     JobQueue queue_;
 

@@ -39,6 +39,12 @@ struct GraphSettings {
     int historyMaxItems = 10000;        // finished graph jobs kept in the history (0 = unlimited); files are never deleted
 };
 
+struct MemorySettings {
+    std::string mode = "normal";   // gpu-only|high|normal|low|stream: how models use video memory
+    int reserveVramMb = 512;       // video memory left free for the desktop and other programs
+    bool asyncOffload = true;      // move weights between RAM and VRAM in the background while the GPU works
+};
+
 struct Settings {
     int schemaVersion = kSettingsSchemaVersion;
     std::string backend = "auto";        // auto|vulkan|cpu
@@ -54,6 +60,7 @@ struct Settings {
     LoggingSettings logging;
     SafetySettings safety;
     GraphSettings graph;
+    MemorySettings memory;
     nlohmann::json unknown = nlohmann::json::object();  // keys this version does not know, written back unchanged
 };
 

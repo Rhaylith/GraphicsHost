@@ -15,8 +15,8 @@ namespace {
 
 using Json = nlohmann::json;
 
-constexpr std::array<const char*, 14> kKnownKeys = {"schemaVersion", "backend", "gpuDevice", "threads", "modelsDir",
-                                                  "interfaceMode",  "server",  "logging",   "safety", "firstRunDone", "theme", "accent", "notifications", "graph"};
+constexpr std::array<const char*, 15> kKnownKeys = {"schemaVersion", "backend", "gpuDevice", "threads", "modelsDir",
+                                                  "interfaceMode",  "server",  "logging",   "safety", "firstRunDone", "theme", "accent", "notifications", "graph", "memory"};
 
 bool validAccent(const std::string& c) {
     return c.size() == 7 && c[0] == '#' && std::all_of(c.begin() + 1, c.end(), [](unsigned char ch) { return std::isxdigit(ch) != 0; });
@@ -46,6 +46,7 @@ Json toJson(const Settings& s) {
     json["logging"] = {{"level", s.logging.level}};
     json["safety"] = {{"enabled", s.safety.enabled}};
     json["graph"] = {{"cachePolicy", s.graph.cachePolicy}, {"cacheSize", s.graph.cacheSize}, {"historyMaxItems", s.graph.historyMaxItems}};
+    json["memory"] = {{"mode", s.memory.mode}, {"reserveVramMb", s.memory.reserveVramMb}, {"asyncOffload", s.memory.asyncOffload}};
     return json;
 }
 
@@ -85,6 +86,11 @@ Settings settingsFromJson(const Json& json) {
         s.graph.cachePolicy = it->value("cachePolicy", s.graph.cachePolicy);
         s.graph.cacheSize = it->value("cacheSize", s.graph.cacheSize);
         s.graph.historyMaxItems = it->value("historyMaxItems", s.graph.historyMaxItems);
+    }
+    if (const auto it = json.find("memory"); it != json.end() && it->is_object()) {
+        s.memory.mode = it->value("mode", s.memory.mode);
+        s.memory.reserveVramMb = it->value("reserveVramMb", s.memory.reserveVramMb);
+        s.memory.asyncOffload = it->value("asyncOffload", s.memory.asyncOffload);
     }
     for (const auto& [key, value] : json.items()) {
         const bool known = std::any_of(kKnownKeys.begin(), kKnownKeys.end(), [&](const char* k) { return key == k; });
@@ -126,6 +132,12 @@ std::vector<FieldError> validate(const Settings& s) {
     }
     if (s.server.port < 1 || s.server.port > 65535) {
         errors.push_back({"server.port", "must be between 1 and 65535"});
+    }
+    if (!oneOf(s.memory.mode, {"gpu-only", "high", "normal", "low", "stream"})) {
+        errors.push_back({"memory.mode", "must be gpu-only, high, normal, low or stream"});
+    }
+    if (s.memory.reserveVramMb < 0 || s.memory.reserveVramMb > 65536) {
+        errors.push_back({"memory.reserveVramMb", "must be between 0 and 65536"});
     }
     if (!oneOf(s.graph.cachePolicy, {"last", "lru", "ram", "none"})) {
         errors.push_back({"graph.cachePolicy", "must be last, lru, ram or none"});
