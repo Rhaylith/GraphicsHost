@@ -58,6 +58,8 @@
     <ClInclude Include="sampling\**\*.h" />
     <ClCompile Include="tensor\**\*.cpp" />
     <ClInclude Include="tensor\**\*.h" />
+    <ClCompile Include="text\**\*.cpp" />
+    <ClInclude Include="text\**\*.h" />
     <ClCompile Include="graph\**\*.cpp" />
     <ClInclude Include="graph\**\*.h" />
     <ClCompile Include="nodes\**\*.cpp" />

@@ -646,7 +646,8 @@ Vulkan. A software Vulkan driver runs the fixture tests in CI (W0.7).
   - `AppHost::freeMemory({unloadModels, freeCaches})` closes the opened components nothing uses, unloads the Generate model while no generation is queued, and drops cached node results, reporting what it kept; `POST /api/v1/graph/free`, the older `POST models/unload` and the Models tab Unload button use it.
 
 ### W4 — Text and sampling (XL)
-- [ ] W4.1 CLIP BPE tokeniser, prompt parser (weights, embeddings, choices, comments, BREAK) (M)
+- [x] W4.1 CLIP BPE tokeniser, prompt parser (weights, embeddings, choices, comments, BREAK) (M)
+  - Written and compiled but **not run**: Windows Code Integrity blocked the test executable (unsigned libcrypto-3-x64.dll) from the day this was written. Run `[unit][text]` once that is fixed.
 - [ ] W4.2 Text encode nodes (generic, SDXL, SDXL refiner), clip-skip node; safety filter on graph prompts (S)
 - [ ] W4.3 RNGs (cpu-compatible, philox), noise nodes, Brownian-tree SDE noise (M)
 - [ ] W4.4 Model sampling types and their nodes (discrete, continuous EDM/V, flow shift) (M)
