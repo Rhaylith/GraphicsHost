@@ -45,7 +45,7 @@ Json toJson(const Settings& s) {
                       {"allowedAddresses", s.server.allowedAddresses}, {"rateLimitPerMinute", s.server.rateLimitPerMinute}};
     json["logging"] = {{"level", s.logging.level}};
     json["safety"] = {{"enabled", s.safety.enabled}};
-    json["graph"] = {{"cachePolicy", s.graph.cachePolicy}, {"cacheSize", s.graph.cacheSize}, {"historyMaxItems", s.graph.historyMaxItems}, {"rng", s.graph.rng}};
+    json["graph"] = {{"cachePolicy", s.graph.cachePolicy}, {"cacheSize", s.graph.cacheSize}, {"historyMaxItems", s.graph.historyMaxItems}, {"rng", s.graph.rng}, {"previewMethod", s.graph.previewMethod}, {"previewEveryNSteps", s.graph.previewEveryNSteps}, {"previewMaxSize", s.graph.previewMaxSize}};
     json["memory"] = {{"mode", s.memory.mode}, {"reserveVramMb", s.memory.reserveVramMb}, {"asyncOffload", s.memory.asyncOffload}};
     json["precision"] = {{"diffusion", s.precision.diffusion}, {"textEncoder", s.precision.textEncoder}, {"vae", s.precision.vae}, {"vaeFallbackFp32", s.precision.vaeFallbackFp32}};
     return json;
@@ -88,6 +88,9 @@ Settings settingsFromJson(const Json& json) {
         s.graph.cacheSize = it->value("cacheSize", s.graph.cacheSize);
         s.graph.historyMaxItems = it->value("historyMaxItems", s.graph.historyMaxItems);
         s.graph.rng = it->value("rng", s.graph.rng);
+        s.graph.previewMethod = it->value("previewMethod", s.graph.previewMethod);
+        s.graph.previewEveryNSteps = it->value("previewEveryNSteps", s.graph.previewEveryNSteps);
+        s.graph.previewMaxSize = it->value("previewMaxSize", s.graph.previewMaxSize);
     }
     if (const auto it = json.find("memory"); it != json.end() && it->is_object()) {
         s.memory.mode = it->value("mode", s.memory.mode);
@@ -158,6 +161,15 @@ std::vector<FieldError> validate(const Settings& s) {
     }
     if (!oneOf(s.graph.cachePolicy, {"last", "lru", "ram", "none"})) {
         errors.push_back({"graph.cachePolicy", "must be last, lru, ram or none"});
+    }
+    if (!oneOf(s.graph.previewMethod, {"none", "fast", "decoder"})) {
+        errors.push_back({"graph.previewMethod", "must be none, fast or decoder"});
+    }
+    if (s.graph.previewEveryNSteps < 1 || s.graph.previewEveryNSteps > 100) {
+        errors.push_back({"graph.previewEveryNSteps", "must be between 1 and 100"});
+    }
+    if (s.graph.previewMaxSize < 64 || s.graph.previewMaxSize > 2048) {
+        errors.push_back({"graph.previewMaxSize", "must be between 64 and 2048"});
     }
     if (!oneOf(s.graph.rng, {"cpu-compatible", "philox"})) {
         errors.push_back({"graph.rng", "must be cpu-compatible or philox"});

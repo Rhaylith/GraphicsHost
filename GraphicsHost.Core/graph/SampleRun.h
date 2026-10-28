@@ -24,6 +24,11 @@ struct SampleRequest {
     InferenceService* inference = nullptr;
     std::string defaultRng = "cpu-compatible";
     std::function<void(int step, int steps)> progress;
+    // live previews: every `previewEvery` steps the estimate of the clean latent is turned into a picture of at most previewMaxSize pixels
+    std::string previewMethod = "none";      // none | fast (decoder is treated as fast until preview decoders exist)
+    int previewEvery = 1;
+    int previewMaxSize = 512;
+    std::function<void(const tensor::Tensor& image)> emitPreview;
     std::stop_token stop;
 };
 

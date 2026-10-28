@@ -25,6 +25,13 @@ struct PrecisionPolicy {
     bool vaeFallbackFp32 = true;   // decode again in fp32 when the result has NaN or infinite values
 };
 
+// Live previews while sampling (settings graph.preview*).
+struct PreviewPolicy {
+    std::string method = "fast";   // none | fast | decoder
+    int everyNSteps = 1;
+    int maxSize = 512;
+};
+
 // What the host offers to nodes while a job runs. The executor hands it to every node through NodeContext::services; the
 // built-in implementation (host/GraphService.cpp) is backed by the model library.
 class NodeServices {
@@ -39,6 +46,7 @@ public:
     virtual std::vector<std::string> modelNames(const std::string& kind) const = 0;
     virtual PrecisionPolicy precisionPolicy() const { return {}; }
     // The random generator the settings ask for when a node says "setting default": "cpu-compatible" or "philox".
+    virtual PreviewPolicy previewPolicy() const { return {}; }
     virtual std::string defaultRng() const { return "cpu-compatible"; }
     // The model side of the sampling nodes (text encoding, guided model calls, VAE decoding); null where no runtime is available.
     virtual InferenceService* inference() const { return nullptr; }

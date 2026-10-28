@@ -38,6 +38,9 @@ struct GraphSettings {
     int cacheSize = 10;                 // entries for lru, free-RAM threshold in GB for ram
     int historyMaxItems = 10000;        // finished graph jobs kept in the history (0 = unlimited); files are never deleted
     std::string rng = "cpu-compatible"; // cpu-compatible|philox: the generator for noise (made on the host)
+    std::string previewMethod = "fast";   // none|fast|decoder: live preview while sampling
+    int previewEveryNSteps = 1;           // how often a preview is made
+    int previewMaxSize = 512;             // longest side of previews in pixels
 };
 
 struct MemorySettings {

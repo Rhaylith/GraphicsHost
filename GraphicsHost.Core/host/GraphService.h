@@ -27,7 +27,9 @@ class LibraryNodeServices final : public graph::NodeServices {
 public:
     using PrecisionFn = std::function<graph::PrecisionPolicy()>;
     using RngFn = std::function<std::string()>;
-    explicit LibraryNodeServices(models::ModelLibrary& library, PrecisionFn precision = {}, RngFn rng = {}) : library_(library), precision_(std::move(precision)), rng_(std::move(rng)) {}
+    using PreviewFn = std::function<graph::PreviewPolicy()>;
+    explicit LibraryNodeServices(models::ModelLibrary& library, PrecisionFn precision = {}, RngFn rng = {}, PreviewFn preview = {}) : library_(library), precision_(std::move(precision)), rng_(std::move(rng)), preview_(std::move(preview)) {}
+    graph::PreviewPolicy previewPolicy() const override { return preview_ ? preview_() : graph::PreviewPolicy{}; }
     std::string defaultRng() const override { return rng_ ? rng_() : "cpu-compatible"; }
     graph::PrecisionPolicy precisionPolicy() const override { return precision_ ? precision_() : graph::PrecisionPolicy{}; }
     std::optional<graph::ModelFileRef> findModel(const std::string& kind, const std::string& name, std::string* problem = nullptr) const override;
@@ -38,6 +40,7 @@ private:
     models::ModelLibrary& library_;
     PrecisionFn precision_;
     RngFn rng_;
+    PreviewFn preview_;
 };
 
 // One graph job as the outside world asks for it: the HTTP API, the CLI and the editor.

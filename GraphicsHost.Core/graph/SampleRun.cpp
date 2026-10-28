@@ -2,6 +2,7 @@
 
 #include "sampling/BrownianTree.h"
 #include "sampling/Guidance.h"
+#include "sampling/Preview.h"
 #include "sampling/Rng.h"
 
 #include <algorithm>
@@ -138,6 +139,8 @@ SampleResult runSampling(const SampleRequest& req) {
     const int steps = static_cast<int>(sigmas.size()) - 1;
     env.onStep = [&](int step, int) {
         if (req.progress) req.progress(step, steps);
+        if (req.emitPreview && req.previewMethod != "none" && req.previewEvery > 0 && step % req.previewEvery == 0)
+            req.emitPreview(sampling::previewImage(tensor::Tensor(latent.shape(), lastDenoised), model->file.family, req.previewMaxSize));
     };
 
     const bool ran = sampling::runSampler(req.sampler.name, x, sigmas, env, req.sampler.options);

@@ -25,6 +25,11 @@ SampleRequest requestFor(const NodeContext& c) {
     if (!r.inference) throw NodeError("sampling needs a model runtime: this job runs without one");
     r.defaultRng = c.services->defaultRng();
     r.progress = c.progress;
+    const PreviewPolicy preview = c.services->previewPolicy();
+    r.previewMethod = preview.method;
+    r.previewEvery = preview.everyNSteps;
+    r.previewMaxSize = preview.maxSize;
+    if (c.preview) r.emitPreview = [preview = c.preview](const tensor::Tensor& image) { preview(Value::makeTensor(ValueType::Image, image)); };
     r.stop = c.stop;
     return r;
 }
