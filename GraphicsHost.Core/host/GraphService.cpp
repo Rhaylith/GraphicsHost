@@ -3,6 +3,7 @@
 #include "core/Log.h"
 #include "graph/Tips.h"
 #include "host/AppHost.h"
+#include "host/RuntimeInference.h"
 #include "nodes/Builtin.h"
 
 #include <algorithm>
@@ -80,7 +81,18 @@ GraphService::GraphService(AppHost& host)
               return graph::PreviewPolicy{g.previewMethod, g.previewEveryNSteps, g.previewMaxSize};
           });
           return o;
-      }()) {}
+      }()) {
+    // the model side: the Vulkan runtime through its component calls, and the safety filter of the host
+    ownedInference_ = std::make_unique<RuntimeInference>([&host](std::string& error) -> std::shared_ptr<engine::Runtime> { return std::shared_ptr<engine::Runtime>(host.loadSelectedRuntime(error)); });
+    auto library = std::const_pointer_cast<LibraryNodeServices>(std::static_pointer_cast<const LibraryNodeServices>(services_));
+    library->setInference(ownedInference_.get());
+    library->setRefuse([&host](const std::string& prompt) {
+        engine::GenerationRequest request;
+        request.prompt = prompt;
+        const auto verdict = host.checkSafety(request);
+        return verdict.allowed ? std::string() : verdict.reason;
+    });
+}
 
 GraphService::~GraphService() {
     std::vector<std::shared_ptr<engine::Job>> live;
@@ -196,6 +208,10 @@ std::vector<std::string> GraphService::modelNames(const std::string& kind) const
 
 std::vector<std::string> GraphService::embeddingNames() const {
     return services_ ? services_->embeddingNames() : std::vector<std::string>{};
+}
+
+void GraphService::releaseModels() {
+    if (auto* runtime = dynamic_cast<RuntimeInference*>(ownedInference_.get())) runtime->release();
 }
 
 GraphService::Freed GraphService::freeCaches() {

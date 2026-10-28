@@ -5,6 +5,7 @@
 #include "gallery/GalleryStore.h"
 #include "graph/Events.h"
 #include "graph/Executor.h"
+#include "graph/Inference.h"
 #include "graph/NodeServices.h"
 #include "graph/Validator.h"
 #include "models/ModelLibrary.h"
@@ -30,6 +31,10 @@ public:
     using PreviewFn = std::function<graph::PreviewPolicy()>;
     explicit LibraryNodeServices(models::ModelLibrary& library, PrecisionFn precision = {}, RngFn rng = {}, PreviewFn preview = {}) : library_(library), precision_(std::move(precision)), rng_(std::move(rng)), preview_(std::move(preview)) {}
     graph::PreviewPolicy previewPolicy() const override { return preview_ ? preview_() : graph::PreviewPolicy{}; }
+    void setInference(graph::InferenceService* inference) { inference_ = inference; }
+    void setRefuse(std::function<std::string(const std::string&)> refuse) { refuse_ = std::move(refuse); }
+    graph::InferenceService* inference() const override { return inference_; }
+    std::string refusePrompt(const std::string& prompt) const override { return refuse_ ? refuse_(prompt) : std::string(); }
     std::string defaultRng() const override { return rng_ ? rng_() : "cpu-compatible"; }
     graph::PrecisionPolicy precisionPolicy() const override { return precision_ ? precision_() : graph::PrecisionPolicy{}; }
     std::optional<graph::ModelFileRef> findModel(const std::string& kind, const std::string& name, std::string* problem = nullptr) const override;
@@ -41,6 +46,8 @@ private:
     PrecisionFn precision_;
     RngFn rng_;
     PreviewFn preview_;
+    graph::InferenceService* inference_ = nullptr;
+    std::function<std::string(const std::string&)> refuse_;
 };
 
 // One graph job as the outside world asks for it: the HTTP API, the CLI and the editor.
@@ -90,6 +97,9 @@ public:
     std::vector<std::string> modelNames(const std::string& kind) const;
     std::vector<std::string> embeddingNames() const;
 
+    // Closes the checkpoint the graph nodes have open on the runtime (part of the "free memory" action).
+    void releaseModels();
+
     // Drops every cached node result (part of the "free memory" action). Returns how many results and how many bytes.
     struct Freed {
         size_t results = 0;
@@ -123,6 +133,7 @@ private:
     mutable std::mutex mutex_;
     size_t historyMax_;
     std::vector<std::weak_ptr<engine::Job>> jobs_;
+    std::unique_ptr<graph::InferenceService> ownedInference_;   // the runtime-backed one, when built from the host
 };
 
 }  // namespace gh::host

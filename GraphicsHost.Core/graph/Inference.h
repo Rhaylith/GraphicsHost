@@ -40,6 +40,15 @@ public:
         denoise(model, second, x, sigma, outSecond);
     }
 
+    // The guided estimate uncond + cfg * (cond - uncond), in one batched call where the backend can. Used when nothing needs the two
+    // estimates apart (no CFG++ sampler, no guidance tweaks).
+    virtual void denoiseGuided(const ModelHandle& model, const Value& cond, const Value& uncond, float cfg, const LatentView& x, float sigma, std::vector<float>& out) {
+        std::vector<float> c, u;
+        denoisePair(model, cond, uncond, x, sigma, c, u);
+        out.resize(c.size());
+        for (size_t i = 0; i < c.size(); ++i) out[i] = u[i] + cfg * (c[i] - u[i]);
+    }
+
     // Image from latent.
     virtual tensor::Tensor decode(const VaeHandle& vae, const ModelHandle& model, const LatentView& latent) = 0;
 };

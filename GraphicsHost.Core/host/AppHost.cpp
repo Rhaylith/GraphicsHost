@@ -93,6 +93,7 @@ AppHost::FreeMemoryReport AppHost::freeMemory(FreeMemoryRequest request) {
         }
         report.componentsClosed = cache.closeAll();
         report.componentBytes = report.componentsClosed == idle ? bytes : 0;
+        graph().releaseModels();
         engine::ModelManager& manager = models();
         if (manager.queue().active() > 0) {
             if (manager.loaded()) report.kept.push_back("the model of the Generate path stays loaded while a generation is queued or running");

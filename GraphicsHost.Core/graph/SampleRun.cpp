@@ -92,7 +92,12 @@ SampleResult runSampling(const SampleRequest& req) {
             case GuiderHandle::Kind::Basic: call(g.conditioning.at(0), at, sigma, out); break;
             case GuiderHandle::Kind::Cfg: {
                 const bool needUncond = g.cfg != 1.0 || model->guidance.apg || model->guidance.zeroStar || model->guidance.zeroInitSteps > 0;
-                if (!needUncond) {
+                const bool plainCfg = !model->guidance.rescale && !model->guidance.apg && !model->guidance.zeroStar && model->guidance.zeroInitSteps == 0 && req.sampler.name.find("cfg++") == std::string::npos;
+                if (needUncond && plainCfg) {
+                    req.inference->denoiseGuided(*model, g.conditioning.at(0), g.conditioning.at(1), static_cast<float>(g.cfg), v, sigma, out);
+                    if (out.size() != n) throw NodeError("the model returned a latent of the wrong size");
+                    ++guidanceState.step;
+                } else if (!needUncond) {
                     call(g.conditioning.at(0), at, sigma, out);
                     uncond = out;
                     ++guidanceState.step;

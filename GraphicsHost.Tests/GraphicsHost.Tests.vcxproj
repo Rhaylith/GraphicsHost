@@ -104,6 +104,7 @@
     <ClCompile Include="SampleRunTests.cpp" />
     <ClCompile Include="TextNodeTests.cpp" />
     <ClCompile Include="PreviewTests.cpp" />
+    <ClCompile Include="RuntimeInferenceTests.cpp" />
     <ClCompile Include="ComponentTests.cpp" />
     <ClCompile Include="TlsAndLimitsTests.cpp" />
     <ClCompile Include="ApiContractTests.cpp" />
