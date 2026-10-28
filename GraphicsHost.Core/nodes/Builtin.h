@@ -9,5 +9,6 @@ void registerBuiltinNodes(graph::Registry& registry);
 
 void registerUtilityNodes(graph::Registry& registry);   // Utility.cpp
 void registerLoaderNodes(graph::Registry& registry);    // Loaders.cpp
+void registerSamplingNodes(graph::Registry& registry);  // Sampling.cpp
 
 }  // namespace gh::nodes

@@ -649,7 +649,8 @@ Vulkan. A software Vulkan driver runs the fixture tests in CI (W0.7).
 - [x] W4.1 CLIP BPE tokeniser, prompt parser (weights, embeddings, choices, comments, BREAK) (M)
   - Written and compiled but **not run**: Windows Code Integrity blocked the test executable (unsigned libcrypto-3-x64.dll) from the day this was written. Run `[unit][text]` once that is fixed.
 - [ ] W4.2 Text encode nodes (generic, SDXL, SDXL refiner), clip-skip node; safety filter on graph prompts (S)
-- [ ] W4.3 RNGs (cpu-compatible, philox), noise nodes, Brownian-tree SDE noise (M)
+- [x] W4.3 RNGs (cpu-compatible, philox), noise nodes, Brownian-tree SDE noise (M)
+  - Written and compiled, **tests not run** (Code Integrity blocks the test executable, see W4.1): `sampling/Rng` (cpu-compatible mt19937 + Box-Muller as the CPU tensor generators do it, not compared against another tool here; Philox-4x32-10 with the Random123 known answers), `sampling/BrownianTree`, nodes `sampling.noiseRandom` and `sampling.noiseNone`, setting `graph.rng`.
 - [ ] W4.4 Model sampling types and their nodes (discrete, continuous EDM/V, flow shift) (M)
 - [ ] W4.5 All schedulers and sigma nodes (M)
 - [ ] W4.6 All samplers incl. CFG++ variants, toy-denoiser convergence tests (XL)

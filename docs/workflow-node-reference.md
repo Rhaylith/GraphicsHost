@@ -292,7 +292,8 @@ The split pipeline: **Noise** + **Guider** + **Sampler** + **Sigmas** → Sample
 | Node (`id`) | Parameter | Type · range · default | Tooltip |
 |---|---|---|---|
 | Sample (custom) (`sampling.custom`) | noise, guider, sampler, sigmas, latent | NOISE, GUIDER, SAMPLER, SIGMAS, LATENT | Runs any sampler with any schedule and any guidance method. Outputs the result and the denoised estimate. Example: Random Noise + CFG Guider + dpm++ 2M + Karras Schedule. |
-| Random Noise (`sampling.noiseRandom`) | seed, seedControl | as Sampler | → C.seed, C.seedControl |
+| Random Noise (`sampling.noiseRandom`) | seed | int 0 … 9007199254740991 · **0** | → C.seed |
+|  | generator | combo setting default, cpu-compatible, philox · **setting default** | Random generator for the SDE noise (made on the host, so it is identical on every GPU). *cpu-compatible* matches the generator most tools use for seeds. Example: *cpu-compatible* to reproduce a seed shared from another tool. |
 | No Noise (`sampling.noiseNone`) | — | — | Supplies zero noise, for continuing from a latent that already has noise. |
 | Basic Guider (`sampling.guiderBasic`) | model, conditioning | MODEL, CONDITIONING | Uses only the positive prompt (no CFG). Example: FLUX dev with Flux Guidance. |
 | CFG Guider (`sampling.guiderCfg`) | model, positive, negative | MODEL, CONDITIONING ×2 | Standard classifier-free guidance. |

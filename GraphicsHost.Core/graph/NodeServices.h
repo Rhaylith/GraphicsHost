@@ -36,6 +36,8 @@ public:
     // The values a combo of this kind offers, sorted.
     virtual std::vector<std::string> modelNames(const std::string& kind) const = 0;
     virtual PrecisionPolicy precisionPolicy() const { return {}; }
+    // The random generator the settings ask for when a node says "setting default": "cpu-compatible" or "philox".
+    virtual std::string defaultRng() const { return "cpu-compatible"; }
     // Names of textual-inversion embeddings, as written after "embedding:" in a prompt.
     virtual std::vector<std::string> embeddingNames() const = 0;
 };

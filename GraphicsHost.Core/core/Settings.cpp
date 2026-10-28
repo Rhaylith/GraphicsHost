@@ -45,7 +45,7 @@ Json toJson(const Settings& s) {
                       {"allowedAddresses", s.server.allowedAddresses}, {"rateLimitPerMinute", s.server.rateLimitPerMinute}};
     json["logging"] = {{"level", s.logging.level}};
     json["safety"] = {{"enabled", s.safety.enabled}};
-    json["graph"] = {{"cachePolicy", s.graph.cachePolicy}, {"cacheSize", s.graph.cacheSize}, {"historyMaxItems", s.graph.historyMaxItems}};
+    json["graph"] = {{"cachePolicy", s.graph.cachePolicy}, {"cacheSize", s.graph.cacheSize}, {"historyMaxItems", s.graph.historyMaxItems}, {"rng", s.graph.rng}};
     json["memory"] = {{"mode", s.memory.mode}, {"reserveVramMb", s.memory.reserveVramMb}, {"asyncOffload", s.memory.asyncOffload}};
     json["precision"] = {{"diffusion", s.precision.diffusion}, {"textEncoder", s.precision.textEncoder}, {"vae", s.precision.vae}, {"vaeFallbackFp32", s.precision.vaeFallbackFp32}};
     return json;
@@ -87,6 +87,7 @@ Settings settingsFromJson(const Json& json) {
         s.graph.cachePolicy = it->value("cachePolicy", s.graph.cachePolicy);
         s.graph.cacheSize = it->value("cacheSize", s.graph.cacheSize);
         s.graph.historyMaxItems = it->value("historyMaxItems", s.graph.historyMaxItems);
+        s.graph.rng = it->value("rng", s.graph.rng);
     }
     if (const auto it = json.find("memory"); it != json.end() && it->is_object()) {
         s.memory.mode = it->value("mode", s.memory.mode);
@@ -157,6 +158,9 @@ std::vector<FieldError> validate(const Settings& s) {
     }
     if (!oneOf(s.graph.cachePolicy, {"last", "lru", "ram", "none"})) {
         errors.push_back({"graph.cachePolicy", "must be last, lru, ram or none"});
+    }
+    if (!oneOf(s.graph.rng, {"cpu-compatible", "philox"})) {
+        errors.push_back({"graph.rng", "must be cpu-compatible or philox"});
     }
     if (s.graph.cacheSize < 1 || s.graph.cacheSize > 1000) {
         errors.push_back({"graph.cacheSize", "must be between 1 and 1000"});

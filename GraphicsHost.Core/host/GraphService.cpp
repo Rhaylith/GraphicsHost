@@ -75,7 +75,7 @@ GraphService::GraphService(AppHost& host)
           o.services = std::make_shared<LibraryNodeServices>(host.library(), [&host] {
               const auto& p = host.settings().precision;
               return graph::PrecisionPolicy{p.diffusion, p.textEncoder, p.vae, p.vaeFallbackFp32};
-          });
+          }, [&host] { return host.settings().graph.rng; });
           return o;
       }()) {}
 

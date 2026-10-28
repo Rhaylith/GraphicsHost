@@ -37,6 +37,7 @@ struct GraphSettings {
     std::string cachePolicy = "last";   // last|lru|ram|none: which node results are kept between runs
     int cacheSize = 10;                 // entries for lru, free-RAM threshold in GB for ram
     int historyMaxItems = 10000;        // finished graph jobs kept in the history (0 = unlimited); files are never deleted
+    std::string rng = "cpu-compatible"; // cpu-compatible|philox: the generator for noise (made on the host)
 };
 
 struct MemorySettings {

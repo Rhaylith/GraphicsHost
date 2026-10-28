@@ -26,7 +26,9 @@ class AppHost;
 class LibraryNodeServices final : public graph::NodeServices {
 public:
     using PrecisionFn = std::function<graph::PrecisionPolicy()>;
-    explicit LibraryNodeServices(models::ModelLibrary& library, PrecisionFn precision = {}) : library_(library), precision_(std::move(precision)) {}
+    using RngFn = std::function<std::string()>;
+    explicit LibraryNodeServices(models::ModelLibrary& library, PrecisionFn precision = {}, RngFn rng = {}) : library_(library), precision_(std::move(precision)), rng_(std::move(rng)) {}
+    std::string defaultRng() const override { return rng_ ? rng_() : "cpu-compatible"; }
     graph::PrecisionPolicy precisionPolicy() const override { return precision_ ? precision_() : graph::PrecisionPolicy{}; }
     std::optional<graph::ModelFileRef> findModel(const std::string& kind, const std::string& name, std::string* problem = nullptr) const override;
     std::vector<std::string> modelNames(const std::string& kind) const override;
@@ -35,6 +37,7 @@ public:
 private:
     models::ModelLibrary& library_;
     PrecisionFn precision_;
+    RngFn rng_;
 };
 
 // One graph job as the outside world asks for it: the HTTP API, the CLI and the editor.

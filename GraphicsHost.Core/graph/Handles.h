@@ -52,6 +52,13 @@ struct VaeHandle {
     LoadSettings load;
 };
 
+// A NOISE link: where the starting noise of a sampler comes from.
+struct NoiseHandle {
+    bool none = false;          // no noise at all
+    uint64_t seed = 0;
+    std::string rng = "cpu-compatible";   // resolved: cpu-compatible | philox
+};
+
 template <typename Handle>
 Value handleValue(ValueType type, Handle handle) {
     return Value::makeOpaque(type, std::make_shared<const Handle>(std::move(handle)));
