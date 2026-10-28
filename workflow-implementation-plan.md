@@ -651,7 +651,8 @@ Vulkan. A software Vulkan driver runs the fixture tests in CI (W0.7).
 - [ ] W4.2 Text encode nodes (generic, SDXL, SDXL refiner), clip-skip node; safety filter on graph prompts (S)
 - [x] W4.3 RNGs (cpu-compatible, philox), noise nodes, Brownian-tree SDE noise (M)
   - Written and compiled, **tests not run** (Code Integrity blocks the test executable, see W4.1): `sampling/Rng` (cpu-compatible mt19937 + Box-Muller as the CPU tensor generators do it, not compared against another tool here; Philox-4x32-10 with the Random123 known answers), `sampling/BrownianTree`, nodes `sampling.noiseRandom` and `sampling.noiseNone`, setting `graph.rng`.
-- [ ] W4.4 Model sampling types and their nodes (discrete, continuous EDM/V, flow shift) (M)
+- [x] W4.4 Model sampling types and their nodes (discrete, continuous EDM/V, flow shift) (M)
+  - Compiled, **tests not run** (Code Integrity). `sampling/ModelSampling`: SD beta schedule, zero-SNR rescale, eps/v/x0/lcm/img-to-img/EDM/playground predictions, flow shift and FLUX shift; nodes `model.samplingDiscrete/Edm/V/Shift/Flux`. "cosmos rflow" is not offered yet.
 - [ ] W4.5 All schedulers and sigma nodes (M)
 - [ ] W4.6 All samplers incl. CFG++ variants, toy-denoiser convergence tests (XL)
 - [ ] W4.7 Guiders: basic, CFG, dual CFG, perpendicular negative; rescale CFG, CFG-Zero*, APG (M)

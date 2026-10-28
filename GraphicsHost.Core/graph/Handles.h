@@ -2,8 +2,10 @@
 
 #include "graph/NodeServices.h"
 #include "graph/Value.h"
+#include "sampling/ModelSampling.h"
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -34,6 +36,7 @@ struct ModelHandle {
     ModelFileRef file;             // a checkpoint (its diffusion part) or a diffusion model file
     LoadSettings load;
     std::vector<PatchRef> patches;
+    std::optional<sampling::SamplingParams> sampling;   // set by the model sampling nodes; otherwise the family default
 };
 
 struct TextEncoderHandle {

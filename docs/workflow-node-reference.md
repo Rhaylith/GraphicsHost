@@ -360,14 +360,23 @@ The split pipeline: **Noise** + **Guider** + **Sampler** + **Sigmas** → Sample
 
 | Node (`id`) | Parameter | Type · range · default | Tooltip |
 |---|---|---|---|
-| Model Sampling (discrete) (`model.samplingDiscrete`) | prediction | combo (O.predictionType) · **eps** | Overrides what the model predicts when the file does not say. Example: *v prediction* for an SD 2.1 768 checkpoint that renders grey. |
-| | zeroSnr | bool · **false** | Rescale the schedule to reach true zero signal at the end; for models trained with zero terminal SNR. Example: on for zero-SNR v-prediction SDXL fine-tunes; gives real blacks. |
-| Model Sampling (continuous EDM) (`model.samplingEdm`) | prediction | combo v prediction, edm, eps, playground v2.5, cosmos rflow · **v prediction** | Prediction type for continuous-noise models. Example: *playground v2.5* for that model. |
-| | sigmaMax, sigmaMin | float · **120, 0.002** | Noise range of the model. Example: use the values from the model card. |
-| Model Sampling (continuous V) (`model.samplingV`) | sigmaMax, sigmaMin | float · **500, 0.03** | Noise range for continuous v-prediction models. Example: model card values. |
-| Model Sampling (flow shift) (`model.samplingShift`) | shift | float 0 … 100 · 0.01 · **3.0** | For flow models (SD3, AuraFlow, Wan, HiDream ...): higher shift spends more steps at high noise, which helps composition at high resolution. Example: 3.0 for SD3.5 at 1024²; 5–8 for Wan video. |
-| Model Sampling (FLUX) (`model.samplingFlux`) | maxShift, baseShift | float 0 … 100 · **1.15, 0.5** | Shift range that FLUX scales with image size. Example: raise maxShift to 1.5 for very large images. |
-| | width, height | int 16 … 16384 · 8 · **1024** | The image size the shift is computed for. Example: set to the render size. |
+| Model Sampling (discrete) (`model.samplingDiscrete`) | model | MODEL | → C.model |
+|  | prediction | combo eps, v prediction, lcm, x0, img to img · **eps** | Overrides what the model predicts when the file does not say. Example: *v prediction* for an SD 2.1 768 checkpoint that renders grey. |
+|  | zeroSnr | bool · **false** | Rescale the schedule to reach true zero signal at the end; for models trained with zero terminal SNR. Example: on for zero-SNR v-prediction SDXL fine-tunes; gives real blacks. |
+| Model Sampling (continuous EDM) (`model.samplingEdm`) | model | MODEL | → C.model |
+|  | prediction | combo v prediction, edm, eps, playground v2.5 · **v prediction** | Prediction type for continuous-noise models. Example: *playground v2.5* for that model. |
+|  | sigmaMax | float 0.001 … 100000 · 0.001 · **120** | Highest noise level of the model. Example: use the value from the model card. |
+|  | sigmaMin | float 0.0001 … 1000 · 0.0001 · **0.002** | Lowest noise level of the model. Example: use the value from the model card. |
+| Model Sampling (continuous V) (`model.samplingV`) | model | MODEL | → C.model |
+|  | sigmaMax | float 0.001 … 100000 · 0.001 · **500** | Highest noise level of the model. Example: use the value from the model card. |
+|  | sigmaMin | float 0.0001 … 1000 · 0.0001 · **0.03** | Lowest noise level of the model. Example: use the value from the model card. |
+| Model Sampling (flow shift) (`model.samplingShift`) | model | MODEL | → C.model |
+|  | shift | float 0 … 100 · 0.01 · **3** | For flow models (SD3, AuraFlow, Wan, HiDream ...): higher shift spends more steps at high noise, which helps composition at high resolution. Example: 3.0 for SD3.5 at 1024²; 5–8 for Wan video. |
+| Model Sampling (FLUX) (`model.samplingFlux`) | model | MODEL | → C.model |
+|  | maxShift | float 0 … 100 · 0.01 · **1.15** | Largest shift: used for images of 4096 tokens (1024² and up). Example: raise to 1.5 for very large images. |
+|  | baseShift | float 0 … 100 · 0.01 · **0.5** | Shift for the smallest images (256 tokens, 256²). Example: 0.5. |
+|  | width | int 16 … 16384 · 8 · **1024** | The image size the shift is computed for. Example: set to the render size. |
+|  | height | int 16 … 16384 · 8 · **1024** | Height of that image size. Example: 768 for a landscape render. |
 | Rescale CFG (`model.rescaleCfg`) | multiplier | float 0 … 1 · 0.01 · **0.7** | Pulls the guided prediction back toward the un-guided brightness, fixing over-saturation at high CFG and with zero-SNR models. Example: 0.7. |
 | CFG-Zero* (`model.cfgZeroStar`) | zeroInitSteps | int 0 … 10 · **0** | Steps at the start where the prediction is zeroed (skips unreliable early guidance). Example: 1 for FLUX/Wan. |
 | Adaptive Projected Guidance (`model.apg`) | eta | float −10 … 10 · **1.0** | How much of the guidance parallel to the prediction is kept; lower reduces over-saturation. Example: 0 removes the parallel part completely. |

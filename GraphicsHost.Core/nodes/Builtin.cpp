@@ -7,6 +7,7 @@ void registerBuiltinNodes(graph::Registry& registry) {
     registerUtilityNodes(registry);
     registerLoaderNodes(registry);
     registerSamplingNodes(registry);
+    registerModelSamplingNodes(registry);
 }
 
 }  // namespace gh::nodes
