@@ -3,6 +3,7 @@
 #include "graph/NodeServices.h"
 #include "graph/Value.h"
 #include "sampling/ModelSampling.h"
+#include "sampling/Samplers.h"
 
 #include <memory>
 #include <optional>
@@ -60,6 +61,13 @@ struct NoiseHandle {
     bool none = false;          // no noise at all
     uint64_t seed = 0;
     std::string rng = "cpu-compatible";   // resolved: cpu-compatible | philox
+};
+
+// A SAMPLER link: which sampler to run and with what settings.
+struct SamplerHandle {
+    std::string name;
+    sampling::SamplerOptions options;
+    std::string generator = "setting default";   // for the SDE noise: setting default | cpu-compatible | philox
 };
 
 // A SIGMAS link: the noise levels of a run, high to low, as a 1-D tensor.

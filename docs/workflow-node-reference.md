@@ -305,14 +305,20 @@ The split pipeline: **Noise** + **Guider** + **Sampler** + **Sigmas** → Sample
 | Perpendicular Negative Guider (`sampling.guiderPerpNeg`) | model, positive, negative, emptyConditioning | MODEL, CONDITIONING ×3 | CFG where the negative only removes what does not overlap with the positive, so "no glasses" does not erase the face. |
 | | cfg | float 0 … 100 · **8.0** | → C.cfg |
 | | negativeScale | float 0 … 100 · 0.01 · **1.0** | Strength of the perpendicular negative. Example: 1.5 to push harder away from the negative. |
-| Choose Sampler (`sampling.samplerSelect`) | sampler | combo (O.sampler) · **euler** | → C.sampler |
-| Euler Ancestral Sampler (`sampling.samplerEulerA`) | eta | float 0 … 100 · 0.01 · **1.0** | Amount of fresh noise per step; 0 turns it into plain euler. Example: 0.5 for a middle ground. |
-| | noiseScale | float 0 … 100 · 0.01 · **1.0** | Multiplier on that fresh noise. Example: 1.02 slightly increases texture. |
+| Choose Sampler (`sampling.samplerSelect`) | sampler | combo euler, euler cfg++, euler ancestral, euler ancestral cfg++, heun, heun++, dpm2, dpm2 ancestral, lms, dpm fast, dpm adaptive, dpm++ 2S ancestral, dpm++ 2S ancestral cfg++, dpm++ SDE, dpm++ 2M, dpm++ 2M cfg++, dpm++ 2M SDE, dpm++ 3M SDE, ddpm, ddim, lcm, ipndm, ipndm v, deis, uni pc, uni pc bh2, res multistep, res multistep ancestral, res multistep cfg++, gradient estimation, er sde, seeds 2, seeds 3, sa solver · **euler** | → C.sampler |
+| Euler Ancestral Sampler (`sampling.samplerEulerA`) | eta | float 0 … 100 · 0.01 · **1** | Amount of fresh noise per step; 0 turns it into the plain deterministic sampler. Example: 0.5 for a middle ground. |
+|  | noiseScale | float 0 … 100 · 0.01 · **1** | Multiplier on that fresh noise. Example: 1.02 slightly increases texture. |
 | DPM++ 2M SDE Sampler (`sampling.samplerDpmpp2mSde`) | solver | combo midpoint, heun · **midpoint** | Second-order correction method. Example: *heun* is a little sharper. |
-| | eta, noiseScale | float · **1.0, 1.0** | As Euler Ancestral. Example: eta 0.7 for calmer textures. |
-| | noiseGenerator | combo setting default, cpu-compatible, philox · **setting default** | Random generator for the SDE noise (made on the host, so it is identical on every GPU). *cpu-compatible* matches the generator most tools use for seeds. Example: *cpu-compatible* to reproduce a seed shared from another tool. |
-| DPM++ 3M SDE / DPM++ SDE Sampler (`sampling.samplerDpmpp3mSde`, `sampling.samplerDpmppSde`) | eta, noiseScale, noiseDevice | as above | As DPM++ 2M SDE. |
-| | r (SDE only) | float 0 … 100 · 0.01 · **0.5** | Position of the intermediate step. Example: 0.5 (midpoint). |
+|  | eta | float 0 … 100 · 0.01 · **1** | Amount of fresh noise per step; 0 turns it into the plain deterministic sampler. Example: 0.5 for a middle ground. |
+|  | noiseScale | float 0 … 100 · 0.01 · **1** | Multiplier on that fresh noise. Example: 1.02 slightly increases texture. |
+|  | noiseGenerator | combo setting default, cpu-compatible, philox · **setting default** | Random generator for the SDE noise (made on the host, so it is identical on every GPU). *cpu-compatible* matches the generator most tools use for seeds. Example: *cpu-compatible* to reproduce a seed shared from another tool. |
+| DPM++ 3M SDE Sampler (`sampling.samplerDpmpp3mSde`) | eta | float 0 … 100 · 0.01 · **1** | Amount of fresh noise per step; 0 turns it into the plain deterministic sampler. Example: 0.5 for a middle ground. |
+|  | noiseScale | float 0 … 100 · 0.01 · **1** | Multiplier on that fresh noise. Example: 1.02 slightly increases texture. |
+|  | noiseGenerator | combo setting default, cpu-compatible, philox · **setting default** | Random generator for the SDE noise (made on the host, so it is identical on every GPU). *cpu-compatible* matches the generator most tools use for seeds. Example: *cpu-compatible* to reproduce a seed shared from another tool. |
+| DPM++ SDE Sampler (`sampling.samplerDpmppSde`) | eta | float 0 … 100 · 0.01 · **1** | Amount of fresh noise per step; 0 turns it into the plain deterministic sampler. Example: 0.5 for a middle ground. |
+|  | noiseScale | float 0 … 100 · 0.01 · **1** | Multiplier on that fresh noise. Example: 1.02 slightly increases texture. |
+|  | noiseGenerator | combo setting default, cpu-compatible, philox · **setting default** | Random generator for the SDE noise (made on the host, so it is identical on every GPU). *cpu-compatible* matches the generator most tools use for seeds. Example: *cpu-compatible* to reproduce a seed shared from another tool. |
+|  | r | float 0 … 100 · 0.01 · **0.5** | Position of the intermediate step. Example: 0.5 (midpoint). |
 | DPM Adaptive Sampler (`sampling.samplerDpmAdaptive`) | order | int 2 … 3 · **3** | Solver order. Example: 2 for speed. |
 | | rtol, atol | float · **0.05, 0.0078** | Relative and absolute error targets; smaller is more accurate and slower. Example: rtol 0.02 for a final render. |
 | | hInit | float · **0.05** | First step size. Example: 0.05. |

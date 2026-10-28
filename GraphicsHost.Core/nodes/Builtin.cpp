@@ -9,6 +9,7 @@ void registerBuiltinNodes(graph::Registry& registry) {
     registerSamplingNodes(registry);
     registerModelSamplingNodes(registry);
     registerSigmaNodes(registry);
+    registerSamplerListNodes(registry);
 }
 
 }  // namespace gh::nodes

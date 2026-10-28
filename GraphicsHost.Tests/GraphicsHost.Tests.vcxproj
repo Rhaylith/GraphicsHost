@@ -98,6 +98,8 @@
     <ClCompile Include="SamplingTests.cpp" />
     <ClCompile Include="ModelSamplingTests.cpp" />
     <ClCompile Include="SchedulerTests.cpp" />
+    <ClCompile Include="SamplerTests.cpp" />
+    <ClCompile Include="SamplerNodeTests.cpp" />
     <ClCompile Include="ComponentTests.cpp" />
     <ClCompile Include="TlsAndLimitsTests.cpp" />
     <ClCompile Include="ApiContractTests.cpp" />
