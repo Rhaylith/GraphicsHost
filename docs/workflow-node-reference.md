@@ -295,16 +295,25 @@ The split pipeline: **Noise** + **Guider** + **Sampler** + **Sigmas** → Sample
 | Random Noise (`sampling.noiseRandom`) | seed | int 0 … 9007199254740991 · **0** | → C.seed |
 |  | generator | combo setting default, cpu-compatible, philox · **setting default** | Random generator for the SDE noise (made on the host, so it is identical on every GPU). *cpu-compatible* matches the generator most tools use for seeds. Example: *cpu-compatible* to reproduce a seed shared from another tool. |
 | No Noise (`sampling.noiseNone`) | — | — | Supplies zero noise, for continuing from a latent that already has noise. |
-| Basic Guider (`sampling.guiderBasic`) | model, conditioning | MODEL, CONDITIONING | Uses only the positive prompt (no CFG). Example: FLUX dev with Flux Guidance. |
-| CFG Guider (`sampling.guiderCfg`) | model, positive, negative | MODEL, CONDITIONING ×2 | Standard classifier-free guidance. |
-| | cfg | float 0 … 100 · 0.1 · **8.0** | → C.cfg |
-| Dual CFG Guider (`sampling.guiderDualCfg`) | condA, condB, negative | CONDITIONING ×3 | Guides with two positive prompts at separate strengths (e.g. an edit instruction and an image). |
-| | cfgA | float 0 … 100 · 0.1 · **8.0** | Guidance from the first prompt against the second. Example: 6 for the text instruction. |
-| | cfgB | float 0 … 100 · 0.1 · **8.0** | Guidance from the second prompt against the negative. Example: 1.5 for the reference image. |
-| | style | combo regular, nested · **regular** | *nested* applies cfgA on top of the result of cfgB, which some edit models expect. Example: *nested* for instruct-edit SDXL models. |
-| Perpendicular Negative Guider (`sampling.guiderPerpNeg`) | model, positive, negative, emptyConditioning | MODEL, CONDITIONING ×3 | CFG where the negative only removes what does not overlap with the positive, so "no glasses" does not erase the face. |
-| | cfg | float 0 … 100 · **8.0** | → C.cfg |
-| | negativeScale | float 0 … 100 · 0.01 · **1.0** | Strength of the perpendicular negative. Example: 1.5 to push harder away from the negative. |
+| Basic Guider (`sampling.guiderBasic`) | model | MODEL | → C.model |
+|  | conditioning | CONDITIONING | Uses only the positive prompt (no CFG). Example: FLUX dev with Flux Guidance. |
+| CFG Guider (`sampling.guiderCfg`) | model | MODEL | → C.model |
+|  | positive | CONDITIONING | → C.positive |
+|  | negative | CONDITIONING | → C.negative |
+|  | cfg | float 0 … 100 · 0.1 · **8** | → C.cfg |
+| Dual CFG Guider (`sampling.guiderDualCfg`) | model | MODEL | → C.model |
+|  | condA | CONDITIONING | The first positive prompt, for example the edit instruction. |
+|  | condB | CONDITIONING | The second positive prompt, for example the reference image. |
+|  | negative | CONDITIONING | → C.negative |
+|  | cfgA | float 0 … 100 · 0.1 · **8** | Guidance from the first prompt against the second. Example: 6 for the text instruction. |
+|  | cfgB | float 0 … 100 · 0.1 · **8** | Guidance from the second prompt against the negative. Example: 1.5 for the reference image. |
+|  | style | combo regular, nested · **regular** | *nested* applies cfgA on top of the result of cfgB, which some edit models expect. Example: *nested* for instruct-edit SDXL models. |
+| Perpendicular Negative Guider (`sampling.guiderPerpNeg`) | model | MODEL | → C.model |
+|  | positive | CONDITIONING | → C.positive |
+|  | negative | CONDITIONING | → C.negative |
+|  | emptyConditioning | CONDITIONING | The conditioning of an empty prompt: the reference the perpendicular part is measured from. Example: a Text Encode node with empty text. |
+|  | cfg | float 0 … 100 · 0.1 · **8** | → C.cfg |
+|  | negativeScale | float 0 … 100 · 0.01 · **1** | Strength of the perpendicular negative. Example: 1.5 to push harder away from the negative. |
 | Choose Sampler (`sampling.samplerSelect`) | sampler | combo euler, euler cfg++, euler ancestral, euler ancestral cfg++, heun, heun++, dpm2, dpm2 ancestral, lms, dpm fast, dpm adaptive, dpm++ 2S ancestral, dpm++ 2S ancestral cfg++, dpm++ SDE, dpm++ 2M, dpm++ 2M cfg++, dpm++ 2M SDE, dpm++ 3M SDE, ddpm, ddim, lcm, ipndm, ipndm v, deis, uni pc, uni pc bh2, res multistep, res multistep ancestral, res multistep cfg++, gradient estimation, er sde, seeds 2, seeds 3, sa solver · **euler** | → C.sampler |
 | Euler Ancestral Sampler (`sampling.samplerEulerA`) | eta | float 0 … 100 · 0.01 · **1** | Amount of fresh noise per step; 0 turns it into the plain deterministic sampler. Example: 0.5 for a middle ground. |
 |  | noiseScale | float 0 … 100 · 0.01 · **1** | Multiplier on that fresh noise. Example: 1.02 slightly increases texture. |
@@ -402,11 +411,14 @@ The split pipeline: **Noise** + **Guider** + **Sampler** + **Sigmas** → Sample
 |  | baseShift | float 0 … 100 · 0.01 · **0.5** | Shift for the smallest images (256 tokens, 256²). Example: 0.5. |
 |  | width | int 16 … 16384 · 8 · **1024** | The image size the shift is computed for. Example: set to the render size. |
 |  | height | int 16 … 16384 · 8 · **1024** | Height of that image size. Example: 768 for a landscape render. |
-| Rescale CFG (`model.rescaleCfg`) | multiplier | float 0 … 1 · 0.01 · **0.7** | Pulls the guided prediction back toward the un-guided brightness, fixing over-saturation at high CFG and with zero-SNR models. Example: 0.7. |
-| CFG-Zero* (`model.cfgZeroStar`) | zeroInitSteps | int 0 … 10 · **0** | Steps at the start where the prediction is zeroed (skips unreliable early guidance). Example: 1 for FLUX/Wan. |
-| Adaptive Projected Guidance (`model.apg`) | eta | float −10 … 10 · **1.0** | How much of the guidance parallel to the prediction is kept; lower reduces over-saturation. Example: 0 removes the parallel part completely. |
-| | normThreshold | float 0 … 50 · **5.0** | Caps the size of the guidance update. Example: 5; lower for gentler colours. |
-| | momentum | float −5 … 1 · **0** | Averages guidance over steps; negative values sharpen. Example: −0.5. |
+| Rescale CFG (`model.rescaleCfg`) | model | MODEL | → C.model |
+|  | multiplier | float 0 … 1 · 0.01 · **0.7** | Pulls the guided prediction back toward the un-guided brightness, fixing over-saturation at high CFG and with zero-SNR models. Example: 0.7. |
+| CFG-Zero* (`model.cfgZeroStar`) | model | MODEL | → C.model |
+|  | zeroInitSteps | int 0 … 10 · **0** | Steps at the start where the prediction is zeroed (skips unreliable early guidance). Example: 1 for FLUX/Wan. |
+| Adaptive Projected Guidance (`model.apg`) | model | MODEL | → C.model |
+|  | eta | float −10 … 10 · 0.01 · **1** | How much of the guidance parallel to the prediction is kept; lower reduces over-saturation. Example: 0 removes the parallel part completely. |
+|  | normThreshold | float 0 … 50 · 0.1 · **5** | Caps the size of the guidance update. Example: 5; lower for gentler colours. |
+|  | momentum | float −5 … 1 · 0.01 · **0** | Averages guidance over steps; negative values sharpen. Example: -0.5. |
 | FreeU (`model.freeu`) | b1, b2 | float 0 … 10 · 0.01 · **1.1, 1.2** (v2: **1.3, 1.4**) | Boost of the UNet backbone features in two depths: stronger structure and contrast. Example: 1.3 / 1.4 on SD 1.5. |
 | | s1, s2 | float 0 … 10 · 0.01 · **0.9, 0.2** | Damping of skip-connection features: less high-frequency noise. Example: 0.9 / 0.2. |
 | | version | combo v1, v2 · **v2** | v2 scales the boost by feature strength, which is safer. Example: *v2*. |

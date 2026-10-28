@@ -2,6 +2,7 @@
 
 #include "graph/NodeServices.h"
 #include "graph/Value.h"
+#include "sampling/Guidance.h"
 #include "sampling/ModelSampling.h"
 #include "sampling/Samplers.h"
 
@@ -38,6 +39,7 @@ struct ModelHandle {
     LoadSettings load;
     std::vector<PatchRef> patches;
     std::optional<sampling::SamplingParams> sampling;   // set by the model sampling nodes; otherwise the family default
+    sampling::GuidanceTweaks guidance;                    // set by Rescale CFG, CFG-Zero* and APG
 };
 
 struct TextEncoderHandle {
@@ -61,6 +63,18 @@ struct NoiseHandle {
     bool none = false;          // no noise at all
     uint64_t seed = 0;
     std::string rng = "cpu-compatible";   // resolved: cpu-compatible | philox
+};
+
+// A GUIDER link: how the model is called for a step and how its predictions are combined.
+struct GuiderHandle {
+    enum class Kind { Basic, Cfg, DualCfg, PerpNeg };
+    Kind kind = Kind::Cfg;
+    Value model;
+    std::vector<Value> conditioning;   // basic: [cond]; cfg: [positive, negative]; dual: [A, B, negative]; perp-neg: [positive, negative, empty]
+    double cfg = 8.0;
+    double cfgA = 8.0, cfgB = 8.0;
+    bool nested = false;
+    double negativeScale = 1.0;
 };
 
 // A SAMPLER link: which sampler to run and with what settings.
