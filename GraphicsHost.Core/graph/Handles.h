@@ -48,6 +48,7 @@ struct TextEncoderHandle {
     LoadSettings load;
     std::vector<PatchRef> patches;
     bool fromCheckpoint = false;
+    int clipSkip = 1;                  // 1 = the last layer, 2 = the one before ...
 };
 
 struct VaeHandle {

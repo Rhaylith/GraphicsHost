@@ -648,7 +648,8 @@ Vulkan. A software Vulkan driver runs the fixture tests in CI (W0.7).
 ### W4 — Text and sampling (XL)
 - [x] W4.1 CLIP BPE tokeniser, prompt parser (weights, embeddings, choices, comments, BREAK) (M)
   - Written and compiled but **not run**: Windows Code Integrity blocked the test executable (unsigned libcrypto-3-x64.dll) from the day this was written. Run `[unit][text]` once that is fixed.
-- [ ] W4.2 Text encode nodes (generic, SDXL, SDXL refiner), clip-skip node; safety filter on graph prompts (S)
+- [x] W4.2 (partly) Text encode nodes (generic, SDXL, SDXL refiner), clip-skip node; safety filter on graph prompts (S)
+  - Compiled, **tests not run** (Code Integrity). Nodes `text.encode` (comments, choices by seed, weights and embeddings parsed on the host; safety filter check; SDXL empty-negative zero-out) and `text.clipSkip`. **Not done:** the SDXL (two prompts), SDXL refiner, SD3, FLUX and weighting-options encoders — the W0 runtime call takes one plain text, so separate prompts, token weights and chunks reach the model only once the runtime accepts token ids. Reference cells now accept `\|` for a bar.
 - [x] W4.3 RNGs (cpu-compatible, philox), noise nodes, Brownian-tree SDE noise (M)
   - Written and compiled, **tests not run** (Code Integrity blocks the test executable, see W4.1): `sampling/Rng` (cpu-compatible mt19937 + Box-Muller as the CPU tensor generators do it, not compared against another tool here; Philox-4x32-10 with the Random123 known answers), `sampling/BrownianTree`, nodes `sampling.noiseRandom` and `sampling.noiseNone`, setting `graph.rng`.
 - [x] W4.4 Model sampling types and their nodes (discrete, continuous EDM/V, flow shift) (M)

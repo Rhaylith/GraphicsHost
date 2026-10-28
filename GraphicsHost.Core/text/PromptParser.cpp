@@ -213,6 +213,18 @@ ParsedPrompt parsePrompt(const std::string& prompt, uint64_t seed) {
     return parsed;
 }
 
+std::string plainText(const ParsedPrompt& prompt) {
+    std::string out;
+    for (const PromptPiece& piece : prompt.pieces) {
+        switch (piece.kind) {
+            case PromptPiece::Kind::Text: out += piece.text; break;
+            case PromptPiece::Kind::Embedding: out += "embedding:" + piece.text; break;
+            case PromptPiece::Kind::Break: out += "\n"; break;
+        }
+    }
+    return out;
+}
+
 ChunkedPrompt buildChunks(const ClipTokenizer& tokenizer, const ParsedPrompt& prompt, int padId, const EmbeddingLookup& lookup) {
     ChunkedPrompt result;
     std::vector<int> ids;

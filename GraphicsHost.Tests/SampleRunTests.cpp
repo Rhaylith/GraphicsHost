@@ -19,7 +19,7 @@ class FakeInference final : public InferenceService {
 public:
     int calls = 0, pairCalls = 0;
     std::vector<float> sigmasSeen;
-    Value encodeText(const TextEncoderHandle&, const ModelHandle&, const std::string&, int, int, int, bool) override { return Value::makeInt(0); }
+    Value encodeText(const TextEncoderHandle&, const gh::text::ParsedPrompt&, int, int, int, bool) override { return Value::makeInt(0); }
     void denoise(const ModelHandle&, const Value& cond, const LatentView& x, float sigma, std::vector<float>& out) override {
         ++calls;
         sigmasSeen.push_back(sigma);

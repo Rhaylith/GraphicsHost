@@ -12,6 +12,7 @@ void registerBuiltinNodes(graph::Registry& registry) {
     registerSamplerListNodes(registry);
     registerGuiderNodes(registry);
     registerSampleNodes2(registry);
+    registerTextNodes(registry);
 }
 
 }  // namespace gh::nodes

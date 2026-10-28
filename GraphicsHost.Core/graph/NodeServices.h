@@ -42,6 +42,8 @@ public:
     virtual std::string defaultRng() const { return "cpu-compatible"; }
     // The model side of the sampling nodes (text encoding, guided model calls, VAE decoding); null where no runtime is available.
     virtual InferenceService* inference() const { return nullptr; }
+    // Empty when the prompt may be used; otherwise why the safety filter refuses it.
+    virtual std::string refusePrompt(const std::string& prompt) const { (void)prompt; return {}; }
     // Names of textual-inversion embeddings, as written after "embedding:" in a prompt.
     virtual std::vector<std::string> embeddingNames() const = 0;
 };

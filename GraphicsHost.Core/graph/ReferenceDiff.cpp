@@ -103,9 +103,15 @@ std::string sharedKeyOf(const std::string& tip) {
     return "";
 }
 
+// a bar inside a cell would end it
+std::string escapeBars(std::string s) {
+    for (size_t at = 0; (at = s.find('|', at)) != std::string::npos; at += 2) s.insert(at, "\\");
+    return s;
+}
+
 std::string tipCell(const InputDef& in) {
     const std::string key = sharedKeyOf(in.tip);
-    return key.empty() ? in.tip : kArrow + " C." + key;
+    return key.empty() ? escapeBars(in.tip) : kArrow + " C." + key;
 }
 
 // What the document's tooltip cell says the tooltip is; nullopt when the cell points somewhere this checker cannot follow.

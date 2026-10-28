@@ -195,8 +195,9 @@ Contents: [C Common](#c-common-tooltips) · [O Options](#o-option-tooltips) · [
 
 | Node (`id`) | Parameter | Type · range · default | Tooltip |
 |---|---|---|---|
-| Text Encode (`text.encode`) | text | string, multiline, dynamic prompts | The prompt. `(word:1.3)` weights a word, `((word))` is ×1.21, `\(` types a bracket, `embedding:name` uses a textual inversion, `{a\|b}` picks one option per seed, `//` starts a comment, `BREAK` starts a new 75-token chunk. Example: `a (red:1.2) fox, {winter\|autumn} forest, embedding:goodhands`. |
-| | textEncoder | TEXT_ENCODER | → C.textEncoder |
+| Text Encode (`text.encode`) | text | string | The prompt. `(word:1.3)` weights a word, `((word))` is ×1.21, `\(` types a bracket, `embedding:name` uses a textual inversion, `{a\|b}` picks one option per seed, `//` starts a comment, `BREAK` starts a new 75-token chunk. Example: `a (red:1.2) fox, {winter\|autumn} forest, embedding:goodhands`. |
+|  | textEncoder | TEXT_ENCODER | → C.textEncoder |
+|  | seed | int 0 … 9007199254740991 · **0** | Picks which option of each `{a\|b}` choice in the prompt is used. Example: the seed of the sampler, so every run draws another option. |
 | Text Encode SDXL (`text.encodeSdxl`) | textG | string multiline | Prompt for SDXL's large encoder (overall content and composition). Example: `a lighthouse on a cliff at dusk`. |
 | | textL | string multiline | Prompt for SDXL's small encoder (style and details); often the same as textG. Example: `oil painting, thick brush strokes`. |
 | | width, height | int 0 … 16384 · 8 · **1024** | The image size the model is told it was trained at. Larger values suggest higher-resolution training images. Example: 4096 × 4096 can sharpen detail even when rendering 1024². |
@@ -210,7 +211,7 @@ Contents: [C Common](#c-common-tooltips) · [O Options](#o-option-tooltips) · [
 | Text Encode FLUX (`text.encodeFlux`) | clipL, t5 | string multiline | Prompts for FLUX's two encoders; T5 carries most of the meaning. Example: t5 = `a red bicycle leaning on a blue door, morning light`; clipL can repeat it. |
 | | guidance | float 0 … 100 · 0.1 · **3.5** | Distilled guidance strength baked into FLUX dev (not CFG). Higher follows the prompt more literally. Example: 3.5 for photos, 2.0 for softer, more natural images. |
 | Set Text Encoder Last Layer (`text.clipSkip`) | stopAtLayer | int −24 … −1 · 1 · **−1** | Use an earlier layer of the text encoder ("clip skip"). −1 is the last layer. Example: −2 for many anime SD 1.5 models trained that way. |
-| | textEncoder | TEXT_ENCODER | → C.textEncoder |
+|  | textEncoder | TEXT_ENCODER | → C.textEncoder |
 | Text Encode (weighting options) (`text.encodeAdvanced`) | text | string multiline | → as Text Encode. |
 | | weighting | combo relative to empty, multiply, mean-normalised · **relative to empty** | How word weights are applied: scale against an empty prompt (default), multiply the vectors, or multiply then restore the average. Example: *mean-normalised* lets very high weights like 1.6 work without artefacts. |
 | | tokenNormalisation | combo none, mean, length · **none** | Rescale weights across the prompt. Example: *length* divides the effect of a long weighted phrase among its tokens. |

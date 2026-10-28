@@ -33,6 +33,10 @@ std::string removeComments(const std::string& prompt);
 std::string resolveChoices(const std::string& prompt, uint64_t seed);
 ParsedPrompt parsePrompt(const std::string& prompt, uint64_t seed);
 
+// The words of a parsed prompt without the weights: text pieces in order, embeddings written as "embedding:name", BREAK as a new line.
+// For backends that can only encode plain text.
+std::string plainText(const ParsedPrompt& prompt);
+
 // ---- chunks for a CLIP encoder -------------------------------------------------------------------------------------------
 constexpr int kChunkTokens = 75;
 constexpr int kEmbeddingBase = 1'000'000;   // ids from here on stand for the vectors of an embedding (kEmbeddingBase + n)

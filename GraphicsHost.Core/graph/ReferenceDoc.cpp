@@ -20,6 +20,7 @@ std::string trimmed(std::string s) {
 std::vector<std::string> cells(const std::string& line) {
     std::vector<std::string> out;
     std::string body = trimmed(line);
+    for (size_t at = 0; (at = body.find("\\|", at)) != std::string::npos;) body.replace(at, 2, "\001");   // an escaped bar is part of the text
     if (starts(body, "|")) body.erase(0, 1);
     if (!body.empty() && body.back() == '|') body.pop_back();
     size_t at = 0;
@@ -32,6 +33,7 @@ std::vector<std::string> cells(const std::string& line) {
         out.push_back(trimmed(body.substr(at, bar - at)));
         at = bar + 3;
     }
+    for (auto& cell : out) std::replace(cell.begin(), cell.end(), '\001', '|');
     return out;
 }
 

@@ -102,6 +102,7 @@
     <ClCompile Include="SamplerNodeTests.cpp" />
     <ClCompile Include="GuidanceTests.cpp" />
     <ClCompile Include="SampleRunTests.cpp" />
+    <ClCompile Include="TextNodeTests.cpp" />
     <ClCompile Include="ComponentTests.cpp" />
     <ClCompile Include="TlsAndLimitsTests.cpp" />
     <ClCompile Include="ApiContractTests.cpp" />

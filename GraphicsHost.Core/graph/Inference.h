@@ -1,6 +1,7 @@
 #pragma once
 
 #include "graph/Value.h"
+#include "text/PromptParser.h"
 
 #include <string>
 #include <vector>
@@ -25,9 +26,10 @@ class InferenceService {
 public:
     virtual ~InferenceService() = default;
 
+    // (The parsed prompt carries the weights, embeddings and BREAKs; a backend that can only encode plain text uses plainText().)
     // The conditioning for a prompt: the output of the text encoders as a CONDITIONING value. `zeroOut` gives the all-zero
     // encoding SDXL uses for an empty negative prompt.
-    virtual Value encodeText(const TextEncoderHandle& encoder, const ModelHandle& model, const std::string& text, int clipSkip, int width, int height, bool zeroOut) = 0;
+    virtual Value encodeText(const TextEncoderHandle& encoder, const text::ParsedPrompt& prompt, int clipSkip, int width, int height, bool zeroOut) = 0;
 
     // The model's estimate of the clean latent for x at noise level sigma, for one conditioning (no guidance). `out` has the size of x.
     virtual void denoise(const ModelHandle& model, const Value& conditioning, const LatentView& x, float sigma, std::vector<float>& out) = 0;
