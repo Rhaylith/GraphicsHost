@@ -11,6 +11,7 @@ void registerBuiltinNodes(graph::Registry& registry) {
     registerSigmaNodes(registry);
     registerSamplerListNodes(registry);
     registerGuiderNodes(registry);
+    registerSampleNodes2(registry);
 }
 
 }  // namespace gh::nodes

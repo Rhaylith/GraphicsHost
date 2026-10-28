@@ -14,5 +14,6 @@ void registerModelSamplingNodes(graph::Registry& registry);  // ModelSamplingNod
 void registerSigmaNodes(graph::Registry& registry);  // SigmaNodes.cpp
 void registerSamplerListNodes(graph::Registry& registry);  // SamplerNodes.cpp
 void registerGuiderNodes(graph::Registry& registry);  // GuiderNodes.cpp
+void registerSampleNodes2(graph::Registry& registry);  // SampleNodes.cpp
 
 }  // namespace gh::nodes

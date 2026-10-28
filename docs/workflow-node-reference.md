@@ -271,19 +271,29 @@ Contents: [C Common](#c-common-tooltips) · [O Options](#o-option-tooltips) · [
 
 | Node (`id`) | Parameter | Type · range · default | Tooltip |
 |---|---|---|---|
-| Sampler (`sampling.sample`) | model, positive, negative, latent | MODEL, CONDITIONING ×2, LATENT | → C.model, C.positive, C.negative, C.latentIn |
-| | seed | int 0 … 2⁶⁴−1 · **0** | → C.seed |
-| | seedControl | combo fixed, increment, decrement, randomize · **randomize** | → C.seedControl |
-| | steps | int 1 … 10000 · **20** | → C.steps |
-| | cfg | float 0 … 100 · 0.1 · **family default** (7.5 SD 1.x, 7.0 SDXL) | → C.cfg |
-| | sampler | combo (O.sampler) · **euler** | → C.sampler |
-| | scheduler | combo (O.scheduler) · **normal** | → C.scheduler |
-| | denoise | float 0 … 1 · 0.01 · **1.0** | → C.denoise |
-| Sampler (advanced) (`sampling.sampleAdvanced`) | addNoise | bool · **true** | Add the seed's noise to the input first. Turn off when the input already carries leftover noise from a previous sampler. Example: off for the second stage of a base → refiner chain. |
-| | seed, seedControl, steps, cfg, sampler, scheduler | as Sampler | → C.seed, C.seedControl, C.steps, C.cfg, C.sampler, C.scheduler |
-| | startStep | int 0 … 10000 · **0** | First step of the schedule to run. Example: steps 30, start 20 runs only the last 10 steps (like denoise ≈ 0.33 but on the same schedule). |
-| | endStep | int 0 … 10000 · **10000** | Step to stop at (exclusive). Example: steps 30, end 24 hands the last 6 steps to an SDXL refiner. |
-| | returnWithNoise | bool · **false** | Return the latent before the final noise is removed, for chaining into another sampler. Example: on for the base pass when a refiner continues from step 24. |
+| Sampler (`sampling.sample`) | model | MODEL | → C.model |
+|  | positive | CONDITIONING | → C.positive |
+|  | negative | CONDITIONING | → C.negative |
+|  | latent | LATENT | → C.latentIn |
+|  | seed | int 0 … 9007199254740991 · **0** | → C.seed |
+|  | steps | int 1 … 10000 · **20** | → C.steps |
+|  | cfg | float 0 … 100 · 0.1 · **7.5** | → C.cfg |
+|  | sampler | combo euler, euler cfg++, euler ancestral, euler ancestral cfg++, heun, heun++, dpm2, dpm2 ancestral, lms, dpm fast, dpm adaptive, dpm++ 2S ancestral, dpm++ 2S ancestral cfg++, dpm++ SDE, dpm++ 2M, dpm++ 2M cfg++, dpm++ 2M SDE, dpm++ 3M SDE, ddpm, ddim, lcm, ipndm, ipndm v, deis, uni pc, uni pc bh2, res multistep, res multistep ancestral, res multistep cfg++, gradient estimation, er sde, seeds 2, seeds 3, sa solver · **euler** | → C.sampler |
+|  | scheduler | combo normal, karras, exponential, sgm uniform, simple, ddim uniform, beta, linear quadratic, kl optimal · **normal** | → C.scheduler |
+|  | denoise | float 0 … 1 · 0.01 · **1** | → C.denoise |
+| Sampler (advanced) (`sampling.sampleAdvanced`) | model | MODEL | → C.model |
+|  | positive | CONDITIONING | → C.positive |
+|  | negative | CONDITIONING | → C.negative |
+|  | latent | LATENT | → C.latentIn |
+|  | addNoise | bool · **true** | Add the seed's noise to the input first. Turn off when the input already carries leftover noise from a previous sampler. Example: off for the second stage of a base → refiner chain. |
+|  | seed | int 0 … 9007199254740991 · **0** | → C.seed |
+|  | steps | int 1 … 10000 · **20** | → C.steps |
+|  | cfg | float 0 … 100 · 0.1 · **7.5** | → C.cfg |
+|  | sampler | combo euler, euler cfg++, euler ancestral, euler ancestral cfg++, heun, heun++, dpm2, dpm2 ancestral, lms, dpm fast, dpm adaptive, dpm++ 2S ancestral, dpm++ 2S ancestral cfg++, dpm++ SDE, dpm++ 2M, dpm++ 2M cfg++, dpm++ 2M SDE, dpm++ 3M SDE, ddpm, ddim, lcm, ipndm, ipndm v, deis, uni pc, uni pc bh2, res multistep, res multistep ancestral, res multistep cfg++, gradient estimation, er sde, seeds 2, seeds 3, sa solver · **euler** | → C.sampler |
+|  | scheduler | combo normal, karras, exponential, sgm uniform, simple, ddim uniform, beta, linear quadratic, kl optimal · **normal** | → C.scheduler |
+|  | startStep | int 0 … 10000 · **0** | First step of the schedule to run. Example: steps 30, start 20 runs only the last 10 steps (like denoise ≈ 0.33 but on the same schedule). |
+|  | endStep | int 0 … 10000 · **10000** | Step to stop at (exclusive). Example: steps 30, end 24 hands the last 6 steps to an SDXL refiner. |
+|  | returnWithNoise | bool · **false** | Return the latent before the final noise is removed, for chaining into another sampler. Example: on for the base pass when a refiner continues from step 24. |
 
 ## N6. Custom sampling
 
@@ -291,7 +301,11 @@ The split pipeline: **Noise** + **Guider** + **Sampler** + **Sigmas** → Sample
 
 | Node (`id`) | Parameter | Type · range · default | Tooltip |
 |---|---|---|---|
-| Sample (custom) (`sampling.custom`) | noise, guider, sampler, sigmas, latent | NOISE, GUIDER, SAMPLER, SIGMAS, LATENT | Runs any sampler with any schedule and any guidance method. Outputs the result and the denoised estimate. Example: Random Noise + CFG Guider + dpm++ 2M + Karras Schedule. |
+| Sample (custom) (`sampling.custom`) | noise | NOISE | The noise source. Example: Random Noise. |
+|  | guider | GUIDER | How the model is called and its predictions combined. Example: CFG Guider. |
+|  | sampler | SAMPLER | The sampling method. Example: Choose Sampler. |
+|  | sigmas | SIGMAS | The noise schedule. Example: Basic Schedule. |
+|  | latent | LATENT | → C.latentIn |
 | Random Noise (`sampling.noiseRandom`) | seed | int 0 … 9007199254740991 · **0** | → C.seed |
 |  | generator | combo setting default, cpu-compatible, philox · **setting default** | Random generator for the SDE noise (made on the host, so it is identical on every GPU). *cpu-compatible* matches the generator most tools use for seeds. Example: *cpu-compatible* to reproduce a seed shared from another tool. |
 | No Noise (`sampling.noiseNone`) | — | — | Supplies zero noise, for continuing from a latent that already has noise. |
