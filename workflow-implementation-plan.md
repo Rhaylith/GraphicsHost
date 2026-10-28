@@ -653,7 +653,8 @@ Vulkan. A software Vulkan driver runs the fixture tests in CI (W0.7).
   - Written and compiled, **tests not run** (Code Integrity blocks the test executable, see W4.1): `sampling/Rng` (cpu-compatible mt19937 + Box-Muller as the CPU tensor generators do it, not compared against another tool here; Philox-4x32-10 with the Random123 known answers), `sampling/BrownianTree`, nodes `sampling.noiseRandom` and `sampling.noiseNone`, setting `graph.rng`.
 - [x] W4.4 Model sampling types and their nodes (discrete, continuous EDM/V, flow shift) (M)
   - Compiled, **tests not run** (Code Integrity). `sampling/ModelSampling`: SD beta schedule, zero-SNR rescale, eps/v/x0/lcm/img-to-img/EDM/playground predictions, flow shift and FLUX shift; nodes `model.samplingDiscrete/Edm/V/Shift/Flux`. "cosmos rflow" is not offered yet.
-- [ ] W4.5 All schedulers and sigma nodes (M)
+- [x] W4.5 All schedulers and sigma nodes (M)
+  - Compiled, **tests not run** (Code Integrity). `sampling/Schedulers`: normal, karras, exponential, sgm uniform, simple, ddim uniform, beta, linear quadratic, kl optimal, denoise, VP, poly-exponential, Laplace, Turbo; nodes for them and for split/flip/set-first/extend. **Not done:** Align-Your-Steps, GITS and optimal-steps (they need published constant tables that I could not check here); their rows stay in the reference as pending.
 - [ ] W4.6 All samplers incl. CFG++ variants, toy-denoiser convergence tests (XL)
 - [ ] W4.7 Guiders: basic, CFG, dual CFG, perpendicular negative; rescale CFG, CFG-Zero*, APG (M)
 - [ ] W4.8 Sampler and Sampler (advanced) nodes, custom-sampling nodes, inpaint noise mask, start/end steps (M)

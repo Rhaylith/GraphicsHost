@@ -326,35 +326,54 @@ The split pipeline: **Noise** + **Guider** + **Sampler** + **Sigmas** → Sample
 | ER-SDE Sampler (`sampling.samplerErSde`) | solverType | combo ER-SDE, reverse ODE · **ER-SDE** | *reverse ODE* makes it deterministic. Example: ER-SDE for texture. |
 | | maxStage | int 1 … 3 · **3** | Solver order. Example: 3. |
 | | eta, noiseScale | float · **1.0, 1.0** | As above. |
-| Basic Schedule (`sampling.scheduleBasic`) | model | MODEL | The model whose noise range is used. |
-| | scheduler | combo (O.scheduler) · **simple** | → C.scheduler |
-| | steps | int 1 … 10000 · **20** | → C.steps |
-| | denoise | float 0 … 1 · **1.0** | → C.denoise (drops the noisiest part of the schedule). |
-| Karras Schedule (`sampling.scheduleKarras`) | steps | int · **20** | → C.steps |
-| | sigmaMax, sigmaMin | float 0 … 5000 · **14.61, 0.03** | Highest and lowest noise level. Example: SD 1.5 uses 14.6 → 0.03; lowering sigmaMax gives a gentler start. |
-| | rho | float 0 … 100 · **7.0** | Curve shape: higher spends more steps at low noise. Example: 7 (paper value). |
-| Exponential Schedule (`sampling.scheduleExponential`) | steps, sigmaMax, sigmaMin | as Karras | Noise falls evenly in log scale. Example: 20 steps, 14.6 → 0.03. |
-| Poly-exponential Schedule (`sampling.schedulePolyExp`) | steps, sigmaMax, sigmaMin, rho | as Karras, rho **1.0** | Between exponential (rho 1) and steeper curves. Example: rho 2. |
-| VP Schedule (`sampling.scheduleVp`) | steps | int · **20** | → C.steps |
-| | betaD, betaMin, epsS | float · **19.9, 0.1, 0.001** | Variance-preserving schedule parameters. Example: defaults reproduce the classic VP curve. |
-| Beta Schedule (`sampling.scheduleBeta`) | steps | int · **20** | → C.steps |
-| | alpha, beta | float 0 … 50 · **0.6, 0.6** | Shape of the beta distribution; values under 1 put more steps at both ends. Example: 0.6 / 0.6. |
-| Laplace Schedule (`sampling.scheduleLaplace`) | steps, sigmaMax, sigmaMin | as Karras | → C.steps; noise range. |
-| | mu, beta | float · **0, 0.5** | Centre and width of the Laplace distribution in log noise. Example: beta 0.5. |
+| Basic Schedule (`sampling.scheduleBasic`) | model | MODEL | → C.model |
+|  | scheduler | combo normal, karras, exponential, sgm uniform, simple, ddim uniform, beta, linear quadratic, kl optimal · **simple** | → C.scheduler |
+|  | steps | int 1 … 10000 · **20** | → C.steps |
+|  | denoise | float 0 … 1 · 0.01 · **1** | → C.denoise |
+| Karras Schedule (`sampling.scheduleKarras`) | steps | int 1 … 10000 · **20** | → C.steps |
+|  | sigmaMax | float 0 … 5000 · 0.01 · **14.61** | Highest noise level. Example: 14.6 for SD 1.5; lowering it gives a gentler start. |
+|  | sigmaMin | float 0 … 5000 · 0.001 · **0.03** | Lowest noise level. Example: 0.03 for SD 1.5. |
+|  | rho | float 0 … 100 · 0.01 · **7** | Curve shape: higher spends more steps at low noise. Example: 7 (the paper value). |
+| Exponential Schedule (`sampling.scheduleExponential`) | steps | int 1 … 10000 · **20** | → C.steps |
+|  | sigmaMax | float 0 … 5000 · 0.01 · **14.61** | Highest noise level. Example: 14.6 for SD 1.5; lowering it gives a gentler start. |
+|  | sigmaMin | float 0 … 5000 · 0.001 · **0.03** | Lowest noise level. Example: 0.03 for SD 1.5. |
+| Poly-exponential Schedule (`sampling.schedulePolyExp`) | steps | int 1 … 10000 · **20** | → C.steps |
+|  | sigmaMax | float 0 … 5000 · 0.01 · **14.61** | Highest noise level. Example: 14.6 for SD 1.5; lowering it gives a gentler start. |
+|  | sigmaMin | float 0 … 5000 · 0.001 · **0.03** | Lowest noise level. Example: 0.03 for SD 1.5. |
+|  | rho | float 0 … 100 · 0.01 · **1** | Between exponential (1) and steeper curves. Example: 2. |
+| VP Schedule (`sampling.scheduleVp`) | steps | int 1 … 10000 · **20** | → C.steps |
+|  | betaD | float 0 … 100 · 0.01 · **19.9** | Variance-preserving schedule parameter. Example: 19.9 reproduces the classic VP curve. |
+|  | betaMin | float 0 … 100 · 0.01 · **0.1** | Minimum of the variance-preserving beta. Example: 0.1. |
+|  | epsS | float 0 … 1 · 0.0001 · **0.001** | Smallest time of the schedule. Example: 0.001. |
+| Beta Schedule (`sampling.scheduleBeta`) | model | MODEL | → C.model |
+|  | steps | int 1 … 10000 · **20** | → C.steps |
+|  | alpha | float 0 … 50 · 0.01 · **0.6** | Shape of the beta distribution; values under 1 put more steps at both ends. Example: 0.6. |
+|  | beta | float 0 … 50 · 0.01 · **0.6** | Second shape of the beta distribution. Example: 0.6. |
+| Laplace Schedule (`sampling.scheduleLaplace`) | steps | int 1 … 10000 · **20** | → C.steps |
+|  | sigmaMax | float 0 … 5000 · 0.01 · **14.61** | Highest noise level. Example: 14.6 for SD 1.5; lowering it gives a gentler start. |
+|  | sigmaMin | float 0 … 5000 · 0.001 · **0.03** | Lowest noise level. Example: 0.03 for SD 1.5. |
+|  | mu | float −10 … 10 · 0.01 · **0** | Centre of the Laplace distribution in log noise. Example: 0. |
+|  | beta | float 0 … 10 · 0.01 · **0.5** | Width of the Laplace distribution in log noise. Example: 0.5. |
 | Align-Your-Steps Schedule (`sampling.scheduleAys`) | modelType | combo SD1, SDXL, SVD · **SD1** | Uses a pre-optimised schedule for that family. Example: *SDXL* with 10 steps. |
 | | steps, denoise | int **10**; float **1.0** | → C.steps, C.denoise |
 | GITS Schedule (`sampling.scheduleGits`) | coeff | float 0.8 … 1.5 · 0.05 · **1.2** | Coefficient of the geometric search. Example: 1.2. |
 | | steps, denoise | int **10**; float **1.0** | → C.steps, C.denoise |
 | Optimal-Steps Schedule (`sampling.scheduleOptimal`) | modelType | combo FLUX, Wan, Chroma · **FLUX** | Pre-computed best steps for that family. Example: *FLUX* at 10 steps. |
 | | steps, denoise | int **20**; float **1.0** | → C.steps, C.denoise |
-| Turbo Schedule (`sampling.scheduleTurbo`) | model, steps, denoise | MODEL; int 1 … 10 **1**; float **1.0** | Schedule for one-to-few-step Turbo models. Example: 1 step for SDXL Turbo at 512². |
-| Split Sigmas (`sampling.splitSigmas`) | step | int 0 … 10000 · **0** | Cuts a schedule in two at this step, for two-stage sampling. Example: 20 steps split at 15: base model runs 15, refiner runs 5. |
-| Split Sigmas by Denoise (`sampling.splitSigmasDenoise`) | denoise | float 0 … 1 · **1.0** | Cuts so the second part covers this fraction. Example: 0.25 gives the last quarter to the second sampler. |
+| Turbo Schedule (`sampling.scheduleTurbo`) | model | MODEL | → C.model |
+|  | steps | int 1 … 10 · **1** | → C.steps |
+| Split Sigmas (`sampling.splitSigmas`) | sigmas | SIGMAS | The noise schedule to change. Example: the output of Basic Schedule. |
+|  | step | int 0 … 10000 · **0** | Cuts a schedule in two at this step, for two-stage sampling. Example: 20 steps split at 15: base model runs 15, refiner runs 5. |
+| Split Sigmas by Denoise (`sampling.splitSigmasDenoise`) | sigmas | SIGMAS | The noise schedule to change. Example: the output of Basic Schedule. |
+|  | denoise | float 0 … 1 · 0.01 · **1** | Cuts so the second part covers this fraction. Example: 0.25 gives the last quarter to the second sampler. |
 | Flip Sigmas (`sampling.flipSigmas`) | sigmas | SIGMAS | Reverses the schedule to go from image to noise (inversion). Example: find the noise that recreates a photo. |
-| Set First Sigma (`sampling.setFirstSigma`) | sigma | float 0 … 20000 · **136.0** | Replaces the starting noise level. Example: 136 for a fully noised start on a high-noise model. |
-| Extend Intermediate Sigmas (`sampling.extendSigmas`) | steps | int 1 … 100 · **2** | New steps inserted between each pair. Example: 2 turns 10 steps into 28. |
-| | startAt, endAt | float · **−1, 12** | Only extend between these noise levels (−1 = any). Example: 0–2 adds steps only in the fine-detail phase. |
-| | spacing | combo linear, cosine, sine · **linear** | How the new points are spaced. Example: *cosine* clusters them near the ends. |
+| Set First Sigma (`sampling.setFirstSigma`) | sigmas | SIGMAS | The noise schedule to change. Example: the output of Basic Schedule. |
+|  | sigma | float 0 … 20000 · 0.01 · **136** | Replaces the starting noise level. Example: 136 for a fully noised start on a high-noise model. |
+| Extend Intermediate Sigmas (`sampling.extendSigmas`) | sigmas | SIGMAS | The noise schedule to change. Example: the output of Basic Schedule. |
+|  | steps | int 1 … 100 · **2** | New steps inserted between each pair. Example: 2 turns 10 steps into 28. |
+|  | startAt | float −1 … 1000 · 0.01 · **−1** | Only extend where the noise level is at least this (-1 = no limit). Example: 0. |
+|  | endAt | float −1 … 1000 · 0.01 · **12** | Only extend where the noise level is at most this (-1 = no limit). Example: 2 adds steps only in the fine-detail phase. |
+|  | spacing | combo linear, cosine, sine · **linear** | How the new points are spaced. Example: *cosine* clusters them near the ends. |
 
 ## N7. Model sampling and model patches
 

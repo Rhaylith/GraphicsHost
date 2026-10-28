@@ -62,6 +62,12 @@ struct NoiseHandle {
     std::string rng = "cpu-compatible";   // resolved: cpu-compatible | philox
 };
 
+// A SIGMAS link: the noise levels of a run, high to low, as a 1-D tensor.
+inline Value sigmasValue(const std::vector<float>& sigmas) {
+    return Value::makeTensor(ValueType::Sigmas, tensor::Tensor({static_cast<int64_t>(sigmas.size())}, sigmas));
+}
+inline std::vector<float> sigmasOf(const Value& v) { return v.asTensor().values(); }
+
 template <typename Handle>
 Value handleValue(ValueType type, Handle handle) {
     return Value::makeOpaque(type, std::make_shared<const Handle>(std::move(handle)));
