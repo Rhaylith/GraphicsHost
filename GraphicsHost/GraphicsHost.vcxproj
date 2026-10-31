@@ -70,6 +70,29 @@
     <ClInclude Include="ui\MainWindow.h" />
     <QtMoc Include="ui\MainWindow.h" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ggml\ggml-vulkan.vcxproj">
+      <Project>{7b3d1e0a-5c2f-4e7a-9a11-0f6e2d4c8a0b}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\ggml\ggml.vcxproj">
+      <Project>{7b3d1e0a-5c2f-4e7a-9a11-0f6e2d4c8a01}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\ggml\vulkan-shaders-gen.vcxproj">
+      <Project>{7b3d1e0a-5c2f-4e7a-9a11-0f6e2d4c8a04}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\runtime\sd-cpu-avx2.vcxproj">
+      <Project>{7b3d1e0a-5c2f-4e7a-9a11-0f6e2d4c8a05}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\runtime\sd-vulkan.vcxproj">
+      <Project>{7b3d1e0a-5c2f-4e7a-9a11-0f6e2d4c8a07}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\spike\spike.vcxproj">
+      <Project>{7b3d1e0a-5c2f-4e7a-9a11-0f6e2d4c8a03}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\stable-diffusion\stable-diffusion.vcxproj">
+      <Project>{7b3d1e0a-5c2f-4e7a-9a11-0f6e2d4c8a02}</Project>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <Import Project="$(RepoRoot)props\Data.targets" />
   <Import Project="$(RepoRoot)props\Qt.targets" />
